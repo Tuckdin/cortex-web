@@ -769,9 +769,7 @@ f_updateOBState(array<OrderBlock> obs, bool isBull) =>
     if array.size(obs) > 0
         for i = 0 to array.size(obs) - 1
             ob = array.get(obs, i)
-            mitPrice = i_obMitigation == "Wick" ? (isBull ? low : high) :
-                      i_obMitigation == "Close" ? close :
-                      (high + low) / 2
+            mitPrice = i_obMitigation == "Wick" ? (isBull ? low : high) : i_obMitigation == "Close" ? close : (high + low) / 2
 
             // State transitions
             if ob.state == OB_FRESH
@@ -819,11 +817,7 @@ f_updateOBState(array<OrderBlock> obs, bool isBull) =>
 
             // Update label - Clean minimal indicators
             if not na(ob.stateLabel) and i_obShowLifecycle
-                stateText = ob.state == OB_FRESH ? "●" :
-                           ob.state == OB_PROPULSION ? "◉" :
-                           ob.state == OB_TESTED ? "◎" :
-                           ob.state == OB_MITIGATED ? "○" :
-                           ob.isBreaker ? "⊘" : "✕"
+                stateText = ob.state == OB_FRESH ? "●" : ob.state == OB_PROPULSION ? "◉" : ob.state == OB_TESTED ? "◎" : ob.state == OB_MITIGATED ? "○" : ob.isBreaker ? "⊘" : "✕"
                 label.set_text(ob.stateLabel, stateText)
                 label.set_x(ob.stateLabel, bar_index)
 
@@ -1586,15 +1580,12 @@ else
     dolTarget := equilibrium
 
 // Build reason string
-dolReason := dolDirection == DIR_BULL ?
-             "MS+" + (htfBias == DIR_BULL ? " HTF+" : "") +
-             (inDiscount ? " Disc+" : "") + (inOTE ? " OTE+" : "") +
-             (bullishTS ? " TS+" : "") + (model2022Bull ? " 2022+" : "") :
-             dolDirection == DIR_BEAR ?
-             "MS-" + (htfBias == DIR_BEAR ? " HTF-" : "") +
-             (inPremium ? " Prem-" : "") + (inOTE ? " OTE-" : "") +
-             (bearishTS ? " TS-" : "") + (model2022Bear ? " 2022-" : "") :
-             "Neutral"
+if dolDirection == DIR_BULL
+    dolReason := "MS+" + (htfBias == DIR_BULL ? " HTF+" : "") + (inDiscount ? " Disc+" : "") + (inOTE ? " OTE+" : "") + (bullishTS ? " TS+" : "") + (model2022Bull ? " 2022+" : "")
+else if dolDirection == DIR_BEAR
+    dolReason := "MS-" + (htfBias == DIR_BEAR ? " HTF-" : "") + (inPremium ? " Prem-" : "") + (inOTE ? " OTE-" : "") + (bearishTS ? " TS-" : "") + (model2022Bear ? " 2022-" : "")
+else
+    dolReason := "Neutral"
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        COMPOSITE PATTERN SCORING                               ║
@@ -1708,10 +1699,7 @@ if i_showComposite
 // SESSION BACKGROUNDS - Very subtle, non-distracting
 // ═══════════════════════════════════════════════════════════════════════════════
 
-sessionColor = asianSession ? color.new(#9C27B0, 97) :
-               londonSession ? color.new(#2196F3, 97) :
-               nyAMSession ? color.new(#4CAF50, 97) :
-               nyPMSession ? color.new(#FF9800, 97) : na
+sessionColor = asianSession ? color.new(#9C27B0, 97) : londonSession ? color.new(#2196F3, 97) : nyAMSession ? color.new(#4CAF50, 97) : nyPMSession ? color.new(#FF9800, 97) : na
 
 bgcolor(i_showSessions ? sessionColor : na, title="Session Background")
 
@@ -1909,16 +1897,13 @@ if i_showDOL and i_showPacMan and barstate.islast
          style=label.style_none, textcolor=i_pacmanColor, size=size.large)
 
     // Draw DOL path line - elegant arrow
-    arrowColor = dolDirection == DIR_BULL ? color.new(i_bullColor, 20) :
-                 dolDirection == DIR_BEAR ? color.new(i_bearColor, 20) : color.new(i_neutralColor, 40)
+    arrowColor = dolDirection == DIR_BULL ? color.new(i_bullColor, 20) : dolDirection == DIR_BEAR ? color.new(i_bearColor, 20) : color.new(i_neutralColor, 40)
 
     if not na(dolTarget)
-        dolLine := line.new(bar_index + 2, close, bar_index + 12, dolTarget,
-             color=arrowColor, width=2, style=line.style_arrow_right)
+        dolLine := line.new(bar_index + 2, close, bar_index + 12, dolTarget, color=arrowColor, width=2, style=line.style_arrow_right)
 
         // Target label - minimal clean style
-        targetText = dolDirection == DIR_BULL ? "▲ BSL" :
-                     dolDirection == DIR_BEAR ? "▼ SSL" : "◆ EQ"
+        targetText = dolDirection == DIR_BULL ? "▲ BSL" : dolDirection == DIR_BEAR ? "▼ SSL" : "◆ EQ"
         dolTargetLabel := label.new(bar_index + 13, dolTarget, targetText,
              style=label.style_none, textcolor=arrowColor, size=size.small)
 
@@ -2064,19 +2049,10 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 1, 7, sessDisplay, text_color=kzActive ? kzColor : textDim, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
     // ═══ CONFLUENCE COUNT (12 factors) ═══
-    // Build dots string based on count out of 12
-    confDots = confluenceCount >= 12 ? "●●●●●●●●●●●●" :
-               confluenceCount >= 11 ? "●●●●●●●●●●●○" :
-               confluenceCount >= 10 ? "●●●●●●●●●●○○" :
-               confluenceCount >= 9 ? "●●●●●●●●●○○○" :
-               confluenceCount >= 8 ? "●●●●●●●●○○○○" :
-               confluenceCount >= 7 ? "●●●●●●●○○○○○" :
-               confluenceCount >= 6 ? "●●●●●●○○○○○○" :
-               confluenceCount >= 5 ? "●●●●●○○○○○○○" :
-               confluenceCount >= 4 ? "●●●●○○○○○○○○" :
-               confluenceCount >= 3 ? "●●●○○○○○○○○○" :
-               confluenceCount >= 2 ? "●●○○○○○○○○○○" :
-               confluenceCount >= 1 ? "●○○○○○○○○○○○" : "○○○○○○○○○○○○"
+    // Build dots string dynamically
+    confDots = ""
+    for i = 0 to 11
+        confDots := confDots + (i < confluenceCount ? "●" : "○")
     confLabel = confluenceCount >= 10 ? "STRONG" : confluenceCount >= 7 ? "GOOD" : confluenceCount >= 4 ? "MODERATE" : "WEAK"
     confColor = confluenceCount >= 10 ? color.new(#00E676, 0) : confluenceCount >= 7 ? i_bullColor : confluenceCount >= 4 ? i_pacmanColor : textDim
     confDisplay = "(" + str.tostring(confluenceCount) + "/12)"
@@ -2092,12 +2068,8 @@ if i_showDOLTable and barstate.islast
     isSeekDestroy = sdPhase == "SEEK" or sdPhase == "WATCH" or sdPhase == "DESTROY_BEARS" or sdPhase == "DESTROY_BULLS"
 
     // Build display based on priority: S&D > Day phase
-    weeklyDisplay = isSeekDestroy ? "⚠ SEEK & DESTROY" :
-                    isFormingDays ? "MON-WED ◉ FORMING" :
-                    isTradeDays ? "THU-FRI ◉ TRADE" : "—"
-    weeklyColor = isSeekDestroy ? i_bearColor :
-                  isFormingDays ? i_pacmanColor :
-                  isTradeDays ? i_bullColor : textDim
+    weeklyDisplay = isSeekDestroy ? "⚠ SEEK & DESTROY" : isFormingDays ? "MON-WED ◉ FORMING" : isTradeDays ? "THU-FRI ◉ TRADE" : "—"
+    weeklyColor = isSeekDestroy ? i_bearColor : isFormingDays ? i_pacmanColor : isTradeDays ? i_bullColor : textDim
 
     table.cell(infoTable, 0, 9, "Weekly", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
     table.cell(infoTable, 1, 9, weeklyDisplay, text_color=weeklyColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
