@@ -406,17 +406,24 @@ inDiscount = close < equilibrium
 // 🔍 IPDA DATA RANGES (Cortex: "20/40/60 day lookback")
 // ════════════════════════════════════════════════════════════════════════════════
 
+// Calculate IPDA ranges (called unconditionally for Pine Script consistency)
+_ipda20High = ta.highest(high, 480)  // Approximate 20 trading days
+_ipda20Low = ta.lowest(low, 480)
+_ipda40High = ta.highest(high, 500)  // Use max lookback Pine allows efficiently
+_ipda40Low = ta.lowest(low, 500)
+_ipda60High = ta.highest(high, 500)
+_ipda60Low = ta.lowest(low, 500)
+
 if i_ipdaEnabled and bar_index > 60
-    // Calculate IPDA ranges
     if i_ipda20
-        ipda20High := ta.highest(high, 20 * 24)  // Approximate 20 trading days
-        ipda20Low := ta.lowest(low, 20 * 24)
+        ipda20High := _ipda20High
+        ipda20Low := _ipda20Low
     if i_ipda40
-        ipda40High := ta.highest(high, 40 * 24)
-        ipda40Low := ta.lowest(low, 40 * 24)
+        ipda40High := _ipda40High
+        ipda40Low := _ipda40Low
     if i_ipda60
-        ipda60High := ta.highest(high, 60 * 24)
-        ipda60Low := ta.lowest(low, 60 * 24)
+        ipda60High := _ipda60High
+        ipda60Low := _ipda60Low
 
 // ════════════════════════════════════════════════════════════════════════════════
 // 📈 SWING DETECTION - Finding Pellets
@@ -442,40 +449,41 @@ var int[] equalLowBars = array.new_int()
 // Tolerance for "equal" (from Cortex: highs/lows within small range)
 equalTolerance = atr * 0.15
 
+// Pre-calculate reference levels for equal high/low detection (must be outside conditionals)
+_recentHigh1 = ta.highest(high, 50)[10]
+_recentHigh2 = ta.highest(high, 100)[50]
+_recentLow1 = ta.lowest(low, 50)[10]
+_recentLow2 = ta.lowest(low, 100)[50]
+
 // Detect equal highs (Power Pellets - major liquidity)
 if not na(pivotHigh) and bar_index > 20
-    for i = 1 to 20
-        int idx = bar_index - 5 - i * 5
-        if idx > 0
-            float oldHigh = ta.pivothigh(high, 5, 5)[i * 5]
-            if not na(oldHigh) and math.abs(pivotHigh - oldHigh) < equalTolerance
-                // Found equal high - this is a Power Pellet
-                bool exists = false
-                for j = 0 to math.min(array.size(equalHighs) - 1, 10)
-                    if math.abs(array.get(equalHighs, j) - pivotHigh) < equalTolerance
-                        exists := true
-                        break
-                if not exists
-                    array.push(equalHighs, pivotHigh)
-                    array.push(equalHighBars, bar_index - 5)
-                break
+    bool foundEqual = false
+    for j = 0 to math.min(array.size(equalHighs) - 1, 10)
+        if math.abs(array.get(equalHighs, j) - pivotHigh) < equalTolerance
+            foundEqual := true
+            break
+    if not foundEqual
+        if math.abs(pivotHigh - _recentHigh1) < equalTolerance or math.abs(pivotHigh - _recentHigh2) < equalTolerance
+            array.push(equalHighs, pivotHigh)
+            array.push(equalHighBars, bar_index - 5)
+            if array.size(equalHighs) > 20
+                array.shift(equalHighs)
+                array.shift(equalHighBars)
 
 // Detect equal lows (Power Pellets)
 if not na(pivotLow) and bar_index > 20
-    for i = 1 to 20
-        int idx = bar_index - 5 - i * 5
-        if idx > 0
-            float oldLow = ta.pivotlow(low, 5, 5)[i * 5]
-            if not na(oldLow) and math.abs(pivotLow - oldLow) < equalTolerance
-                bool exists = false
-                for j = 0 to math.min(array.size(equalLows) - 1, 10)
-                    if math.abs(array.get(equalLows, j) - pivotLow) < equalTolerance
-                        exists := true
-                        break
-                if not exists
-                    array.push(equalLows, pivotLow)
-                    array.push(equalLowBars, bar_index - 5)
-                break
+    bool foundEqual = false
+    for j = 0 to math.min(array.size(equalLows) - 1, 10)
+        if math.abs(array.get(equalLows, j) - pivotLow) < equalTolerance
+            foundEqual := true
+            break
+    if not foundEqual
+        if math.abs(pivotLow - _recentLow1) < equalTolerance or math.abs(pivotLow - _recentLow2) < equalTolerance
+            array.push(equalLows, pivotLow)
+            array.push(equalLowBars, bar_index - 5)
+            if array.size(equalLows) > 20
+                array.shift(equalLows)
+                array.shift(equalLowBars)
 
 // ════════════════════════════════════════════════════════════════════════════════
 // 📊 HTF BIAS (Cortex: "Higher timeframe determines direction")
@@ -1154,19 +1162,19 @@ if barstate.islast and i_showSessionBG
 
 // WAKA-WAKA signal - high confidence with sweep in killzone
 bool wakaAlert = pacmanConfidence >= 30 and inKillzone and (bullishSweep or bearishSweep)
-alertcondition(wakaAlert, title="WAKA-WAKA Signal", message="🕹️ PAC-MAN WAKA-WAKA: High probability " + pacmanDirection + " setup detected!")
+alertcondition(wakaAlert, title="WAKA-WAKA Signal", message="PAC-MAN WAKA-WAKA: High probability setup detected! Check chart for direction.")
 
 // Cherry identified
 bool cherryAlert = not na(primaryDOL) and pacmanConfidence >= 25
-alertcondition(cherryAlert and barstate.isconfirmed, title="Cherry Spotted", message="🍒 PAC-MAN: Cherry (DOL) identified - " + primaryDOLType)
+alertcondition(cherryAlert and barstate.isconfirmed, title="Cherry Spotted", message="PAC-MAN: Cherry (DOL) identified! Check chart for target level.")
 
 // Power Pellet sweep
 bool powerSweep = (bullishSweep and array.size(equalLows) > 0) or (bearishSweep and array.size(equalHighs) > 0)
-alertcondition(powerSweep, title="Power Pellet Sweep", message="⚪ PAC-MAN: Power Pellet (Equal H/L) swept!")
+alertcondition(powerSweep, title="Power Pellet Sweep", message="PAC-MAN: Power Pellet (Equal H/L) swept!")
 
 // Silver Bullet with confluence
 bool sbSetup = inSilverBullet and (array.size(fvgBars) > 0 or array.size(obBars) > 0) and pacmanConfidence >= 20
-alertcondition(sbSetup, title="Silver Bullet Setup", message="⚡ PAC-MAN: Silver Bullet spawn point detected!")
+alertcondition(sbSetup, title="Silver Bullet Setup", message="PAC-MAN: Silver Bullet spawn point detected!")
 
 // Killzone entry
-alertcondition(inKillzone and not inKillzone[1], title="Killzone Start", message="🎮 PAC-MAN: Entering Killzone - Game On!")
+alertcondition(inKillzone and not inKillzone[1], title="Killzone Start", message="PAC-MAN: Entering Killzone - Game On!")
