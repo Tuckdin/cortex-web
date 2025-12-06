@@ -543,14 +543,10 @@ if tsStalking == -1 and low < recentSwingLow - tsBuffer
         tsStageBar := bar_index
 
 // Bearish Turtle Soup CONFIRM: Sweep high, close back inside
-bearishTS = i_showTurtleSoup and htfAllowsBear and not na(recentSwingHigh) and
-            not swingHighSwept and high > recentSwingHigh + tsBuffer and
-            close < recentSwingHigh and close < open
+bearishTS = i_showTurtleSoup and htfAllowsBear and not na(recentSwingHigh) and not swingHighSwept and high > recentSwingHigh + tsBuffer and close < recentSwingHigh and close < open
 
 // Bullish Turtle Soup CONFIRM: Sweep low, close back inside
-bullishTS = i_showTurtleSoup and htfAllowsBull and not na(recentSwingLow) and
-            not swingLowSwept and low < recentSwingLow - tsBuffer and
-            close > recentSwingLow and close > open
+bullishTS = i_showTurtleSoup and htfAllowsBull and not na(recentSwingLow) and not swingLowSwept and low < recentSwingLow - tsBuffer and close > recentSwingLow and close > open
 
 // CONFIRM stage
 if bearishTS
@@ -602,11 +598,9 @@ if asianSession
         asianLow := math.min(asianLow, low)
 
 // Judas Swing: False move during London opposite to true NY direction
-bearishJudas = i_showJudas and inJudasSession and not na(asianHigh) and
-               high > asianHigh and close < open and htfAllowsBear
+bearishJudas = i_showJudas and inJudasSession and not na(asianHigh) and high > asianHigh and close < open and htfAllowsBear
 
-bullishJudas = i_showJudas and inJudasSession and not na(asianLow) and
-               low < asianLow and close > open and htfAllowsBull
+bullishJudas = i_showJudas and inJudasSession and not na(asianLow) and low < asianLow and close > open and htfAllowsBull
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        ORDER BLOCK DETECTION                                   ║
