@@ -1123,6 +1123,8 @@ var float orgHigh = na
 var float orgLow = na
 var float orgCE = na
 var bool hasORG = false
+var bool gapIsAbove = false  // true = gap above price, false = gap below price
+var float gapFillPct = 0.0   // 0-100% fill progress
 
 // Detect new day (for intraday timeframes)
 isNewDay = ta.change(time("D")) != 0
@@ -1136,8 +1138,35 @@ if isNewDay
         orgLow := math.min(prevDayClose, currentDayOpen)
         orgCE := (orgHigh + orgLow) / 2
         hasORG := true
+        // Determine if gap is above or below (at creation)
+        gapIsAbove := currentDayOpen > prevDayClose  // Gap up = gap is above
     else
         hasORG := false
+        gapFillPct := 0.0
+
+// Calculate gap fill percentage dynamically
+if hasORG and not na(orgHigh) and not na(orgLow)
+    float gapSize = orgHigh - orgLow
+    if gapSize > 0
+        // Determine current gap position relative to price
+        gapIsAbove := close < orgLow  // Gap is above if price is below gap low
+
+        // Calculate fill based on how much price has penetrated the gap
+        if close >= orgHigh
+            gapFillPct := 100.0  // Fully filled from below
+        else if close <= orgLow
+            gapFillPct := 0.0    // Not filled yet (price below gap)
+        else
+            // Price is inside the gap - calculate percentage
+            gapFillPct := ((close - orgLow) / gapSize) * 100.0
+
+        // For gap downs (gap below price), invert the calculation
+        if not gapIsAbove and close <= orgLow
+            gapFillPct := 100.0
+        else if not gapIsAbove and close >= orgHigh
+            gapFillPct := 0.0
+        else if not gapIsAbove and close > orgLow and close < orgHigh
+            gapFillPct := ((orgHigh - close) / gapSize) * 100.0
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        SEEK & DESTROY DETECTION                                ║
@@ -2073,11 +2102,13 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 9, "Weekly", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
     table.cell(infoTable, 1, 9, weeklyDisplay, text_color=weeklyColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
-    // ═══ ORG (Opening Range Gap) ═══
-    orgText = hasORG ? "◉ GAP" : "—"
-    orgColor = hasORG ? color.new(#FF9800, 0) : textDim
-    table.cell(infoTable, 0, 10, "ORG", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 10, orgText, text_color=orgColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
+    // ═══ GAP (Opening Range Gap) ═══
+    string gapArrow = hasORG ? (gapIsAbove ? "↑" : "↓") : "—"
+    string gapPctText = hasORG ? str.tostring(math.round(gapFillPct)) + "%" : "0%"
+    string gapDisplay = hasORG ? gapArrow + " " + gapPctText : "— 0%"
+    gapColor = hasORG ? (gapFillPct >= 100 ? i_bullColor : color.new(#FF9800, 0)) : textDim
+    table.cell(infoTable, 0, 10, "GAP", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 10, gapDisplay, text_color=gapColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
     // ═══ KEY FACTORS - Compact ═══
     table.cell(infoTable, 0, 11, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_center)
