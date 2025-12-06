@@ -1,0 +1,857 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © ATLAS - Advanced Trading & Life Assistance System
+// Version 5.0 - "PAC-MAN GOD MODE" - The Mind of ICT, Powered by The Cortex
+//
+// 🕹️ PAC-MAN LEGEND (ICT Concepts Translated):
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// PAC-MAN    = Price Action Confirmation - Market Analysis Navigator
+// PELLET     = Standard liquidity pool (swing highs/lows, old highs/lows)
+// POWER PELLET = Major liquidity targets (PWH/PWL, equal H/L, IPDA levels)
+// CHERRY     = Highest probability DOL target (where PAC-MAN is headed)
+// GHOST      = Opposing liquidity that could trap you (counter-bias targets)
+// SPAWN      = Entry zones (FVGs, OBs in OTE zone)
+// MAZE       = The path structure between price and DOL
+// WAKA-WAKA  = Confirmation signal (displacement + FVG alignment)
+// FRUIT BONUS = Confluence of multiple ICT concepts
+//
+// 🧠 CORTEX-DERIVED ICT RULES (20,833 chunks analyzed):
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 1. "The market goes to liquidity" - Draw on Liquidity is THE target
+// 2. "20 days of opening prices" - IPDA Data Ranges for context
+// 3. "Relative equal highs/lows - too smooth" - Magnets for price
+// 4. "Quadrant levels on wicks and FVGs" - Precision entry/targets
+// 5. "Higher timeframe determines direction" - HTF bias filters LTF
+// 6. "Buy in discount, sell in premium" - PD Array alignment
+// 7. "Displacement confirms direction" - Strong moves validate bias
+// 8. "Midnight, 9:30, 6PM opening prices" - Key algorithmic levels
+// 9. "New Week Opening Gap" - Weekly institutional reference
+// 10. "First presented FVG in Silver Bullet" - Time-based setups
+
+//@version=5
+indicator("ATLAS ICT Pro v5.0 - PAC-MAN GOD MODE 🕹️", overlay=true, max_boxes_count=500, max_labels_count=500, max_lines_count=500)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🕹️ PAC-MAN ENGINE - MAIN CONTROLS
+// ════════════════════════════════════════════════════════════════════════════════
+
+grp_pacman = "═══ 🕹️ PAC-MAN ENGINE ═══"
+i_pacmanEnabled = input.bool(true, "Enable PAC-MAN Mode", group=grp_pacman, tooltip="Master toggle for DOL prediction")
+i_showMaze = input.bool(true, "Show Maze (DOL Path)", group=grp_pacman, tooltip="Visual path to Draw on Liquidity")
+i_showPanel = input.bool(true, "Show Arcade Panel", group=grp_pacman, tooltip="Display PAC-MAN scoring panel")
+i_showPellets = input.bool(true, "Show Pellets (Liquidity)", group=grp_pacman, tooltip="Standard liquidity pools")
+i_showPowerPellets = input.bool(true, "Show Power Pellets", group=grp_pacman, tooltip="Major liquidity targets")
+i_showCherry = input.bool(true, "Show Cherry (Primary DOL)", group=grp_pacman, tooltip="Highest probability target")
+i_showGhosts = input.bool(true, "Show Ghosts (Counter-Liquidity)", group=grp_pacman, tooltip="Opposing targets")
+i_showSpawns = input.bool(true, "Show Spawn Points (Entry Zones)", group=grp_pacman, tooltip="FVGs and OBs for entry")
+
+grp_ipda = "═══ 📊 IPDA DATA RANGES ═══"
+i_ipdaEnabled = input.bool(true, "Enable IPDA Levels", group=grp_ipda, tooltip="Track 20/40/60 day ranges")
+i_ipda20 = input.bool(true, "20-Day Range", group=grp_ipda)
+i_ipda40 = input.bool(true, "40-Day Range", group=grp_ipda)
+i_ipda60 = input.bool(true, "60-Day Range", group=grp_ipda)
+i_showOpenings = input.bool(true, "Show Key Opening Prices", group=grp_ipda, tooltip="Midnight, 9:30, 6PM opens")
+i_openingLookback = input.int(20, "Opening Price Lookback (Days)", minval=5, maxval=60, group=grp_ipda)
+
+grp_htf = "═══ 📈 HTF BIAS (The Boss) ═══"
+i_htfEnabled = input.bool(true, "Enable HTF Bias Filter", group=grp_htf)
+i_htfTimeframe = input.timeframe("60", "HTF Timeframe", group=grp_htf, options=["15", "30", "60", "240", "D"])
+i_htfSwingLen = input.int(5, "HTF Swing Length", minval=3, maxval=10, group=grp_htf)
+
+grp_time = "═══ ⏰ TIME WINDOWS ═══"
+i_showKillzones = input.bool(true, "Highlight Killzones", group=grp_time)
+i_showSilverBullet = input.bool(true, "Silver Bullet Windows", group=grp_time)
+i_showMacros = input.bool(true, "Macro Windows (:50-:10)", group=grp_time)
+
+grp_colors = "═══ 🎨 PAC-MAN COLORS ═══"
+i_pacmanColor = input.color(color.new(#FFEB3B, 0), "PAC-MAN (Direction)", group=grp_colors)
+i_pelletColor = input.color(color.new(#FFFFFF, 20), "Pellets (Liquidity)", group=grp_colors)
+i_powerPelletColor = input.color(color.new(#FFD700, 0), "Power Pellets", group=grp_colors)
+i_cherryColor = input.color(color.new(#FF1744, 0), "Cherry (Primary DOL)", group=grp_colors)
+i_ghostBullColor = input.color(color.new(#00E5FF, 30), "Ghost Bull (Blinky)", group=grp_colors)
+i_ghostBearColor = input.color(color.new(#FF6D00, 30), "Ghost Bear (Clyde)", group=grp_colors)
+i_spawnBullColor = input.color(color.new(#00E676, 80), "Spawn Bull (Entry)", group=grp_colors)
+i_spawnBearColor = input.color(color.new(#FF5252, 80), "Spawn Bear (Entry)", group=grp_colors)
+i_mazeColor = input.color(color.new(#2979FF, 50), "Maze Path", group=grp_colors)
+
+grp_display = "═══ 📊 DISPLAY ═══"
+i_maxZones = input.int(15, "Max Zones", minval=5, maxval=30, group=grp_display)
+i_lookback = input.int(100, "Lookback Bars", minval=20, maxval=500, group=grp_display)
+i_historicalDays = input.int(20, "Historical Levels (Days)", minval=5, maxval=60, group=grp_display)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🌐 GLOBAL VARIABLES & STATE
+// ════════════════════════════════════════════════════════════════════════════════
+
+atr = ta.atr(14)
+
+// PAC-MAN State
+var string pacmanDirection = "NEUTRAL"  // BULLISH, BEARISH, NEUTRAL
+var float pacmanBullScore = 50.0
+var float pacmanBearScore = 50.0
+var float pacmanConfidence = 0.0
+var float primaryDOL = na  // The Cherry - highest probability target
+var string primaryDOLType = ""
+var bool primaryDOLBull = true
+
+// HTF Bias
+var bool htfBullish = true
+var float htfSwingHigh = na
+var float htfSwingLow = na
+
+// Current structure
+var float swingHigh = na
+var float swingLow = na
+var bool isBullish = true
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ⏰ TIME FUNCTIONS (Cortex: "Specific times of day")
+// ════════════════════════════════════════════════════════════════════════════════
+
+nyHour = hour(time, "America/New_York")
+nyMinute = minute(time, "America/New_York")
+
+// Kill Zones (from Cortex: "London open and/or New York open kill zones")
+inAsia = nyHour >= 18 or nyHour < 2
+inLondon = nyHour >= 2 and nyHour < 5
+inNYAM = nyHour >= 8 and nyHour < 12
+inNYPM = nyHour >= 13 and nyHour < 16
+inKillzone = inLondon or inNYAM or inNYPM
+
+// Silver Bullet Windows (from Cortex: "10:00 to 11:00" and "2:00 to 3:00")
+inAMSilverBullet = nyHour == 10
+inPMSilverBullet = nyHour == 14
+inSilverBullet = inAMSilverBullet or inPMSilverBullet
+
+// Macro Windows (from Cortex: ":50 to :10")
+inMacroWindow = (nyMinute >= 50 or nyMinute <= 10) and inKillzone
+
+// Lunch - No Trade Zone (from Cortex: "algorithm rests")
+inNYLunch = nyHour == 12 or (nyHour == 13 and nyMinute < 30)
+
+// Day of week
+dayOfWeek = dayofweek(time, "America/New_York")
+isFriday = dayOfWeek == dayofweek.friday
+isMonday = dayOfWeek == dayofweek.monday
+
+// Key Times (from Cortex)
+isMidnight = nyHour == 0 and nyMinute == 0
+is930Open = nyHour == 9 and nyMinute == 30
+is6PMReopen = nyHour == 18 and nyMinute == 0
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 📊 KEY LEVELS - PELLETS & POWER PELLETS
+// ════════════════════════════════════════════════════════════════════════════════
+
+// Daily Levels
+var float pdh = na, var float pdl = na
+var float todayHigh = na, var float todayLow = na
+var float todayOpen = na
+
+// Weekly Levels
+var float pwh = na, var float pwl = na
+var float thisWeekHigh = na, var float thisWeekLow = na
+var float weekOpen = na, var float nwogHigh = na, var float nwogLow = na
+
+// Monthly Levels
+var float pmh = na, var float pml = na
+var float thisMonthHigh = na, var float thisMonthLow = na
+
+// IPDA Ranges (20/40/60 day)
+var float ipda20High = na, var float ipda20Low = na
+var float ipda40High = na, var float ipda40Low = na
+var float ipda60High = na, var float ipda60Low = na
+
+// Key Opening Prices (from Cortex: "20 days worth of opening prices")
+var float[] midnightOpens = array.new_float(60, na)
+var float[] open930s = array.new_float(60, na)
+var float[] open6PMs = array.new_float(60, na)
+
+// Time changes
+newDay = ta.change(time("D", "", "America/New_York")) != 0
+newWeek = ta.change(time("W", "", "America/New_York")) != 0
+newMonth = ta.change(time("M", "", "America/New_York")) != 0
+
+// Update Daily
+if newDay
+    pdh := todayHigh[1]
+    pdl := todayLow[1]
+    todayHigh := high
+    todayLow := low
+    todayOpen := open
+else
+    todayHigh := math.max(nz(todayHigh, high), high)
+    todayLow := math.min(nz(todayLow, low), low)
+
+// Update Weekly
+if newWeek
+    pwh := thisWeekHigh[1]
+    pwl := thisWeekLow[1]
+    thisWeekHigh := high
+    thisWeekLow := low
+    weekOpen := open
+    // NWOG - New Week Opening Gap (Cortex: critical weekly level)
+    nwogHigh := math.max(close[1], open)
+    nwogLow := math.min(close[1], open)
+else
+    thisWeekHigh := math.max(nz(thisWeekHigh, high), high)
+    thisWeekLow := math.min(nz(thisWeekLow, low), low)
+
+// Update Monthly
+if newMonth
+    pmh := thisMonthHigh[1]
+    pml := thisMonthLow[1]
+    thisMonthHigh := high
+    thisMonthLow := low
+else
+    thisMonthHigh := math.max(nz(thisMonthHigh, high), high)
+    thisMonthLow := math.min(nz(thisMonthLow, low), low)
+
+// Track Opening Prices (from Cortex: "Midnight, 9:30, 6PM")
+if isMidnight and i_showOpenings
+    array.unshift(midnightOpens, close)
+    if array.size(midnightOpens) > i_openingLookback
+        array.pop(midnightOpens)
+
+if is930Open and i_showOpenings
+    array.unshift(open930s, open)
+    if array.size(open930s) > i_openingLookback
+        array.pop(open930s)
+
+if is6PMReopen and i_showOpenings
+    array.unshift(open6PMs, open)
+    if array.size(open6PMs) > i_openingLookback
+        array.pop(open6PMs)
+
+// Equilibrium
+currentRangeHigh = math.max(nz(todayHigh, high), high)
+currentRangeLow = math.min(nz(todayLow, low), low)
+equilibrium = (currentRangeHigh + currentRangeLow) / 2
+inPremium = close > equilibrium
+inDiscount = close < equilibrium
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🔍 IPDA DATA RANGES (Cortex: "20/40/60 day lookback")
+// ════════════════════════════════════════════════════════════════════════════════
+
+if i_ipdaEnabled and bar_index > 60
+    // Calculate IPDA ranges
+    if i_ipda20
+        ipda20High := ta.highest(high, 20 * 24)  // Approximate 20 trading days
+        ipda20Low := ta.lowest(low, 20 * 24)
+    if i_ipda40
+        ipda40High := ta.highest(high, 40 * 24)
+        ipda40Low := ta.lowest(low, 40 * 24)
+    if i_ipda60
+        ipda60High := ta.highest(high, 60 * 24)
+        ipda60Low := ta.lowest(low, 60 * 24)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 📈 SWING DETECTION - Finding Pellets
+// ════════════════════════════════════════════════════════════════════════════════
+
+pivotHigh = ta.pivothigh(high, 5, 5)
+pivotLow = ta.pivotlow(low, 5, 5)
+
+if not na(pivotHigh)
+    swingHigh := pivotHigh
+if not na(pivotLow)
+    swingLow := pivotLow
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎯 EQUAL HIGHS/LOWS DETECTION (Cortex: "Relative equal highs - too smooth")
+// ════════════════════════════════════════════════════════════════════════════════
+
+var float[] equalHighs = array.new_float()
+var int[] equalHighBars = array.new_int()
+var float[] equalLows = array.new_float()
+var int[] equalLowBars = array.new_int()
+
+// Tolerance for "equal" (from Cortex: highs/lows within small range)
+equalTolerance = atr * 0.15
+
+// Detect equal highs (Power Pellets - major liquidity)
+if not na(pivotHigh) and bar_index > 20
+    for i = 1 to 20
+        int idx = bar_index - 5 - i * 5
+        if idx > 0
+            float oldHigh = ta.pivothigh(high, 5, 5)[i * 5]
+            if not na(oldHigh) and math.abs(pivotHigh - oldHigh) < equalTolerance
+                // Found equal high - this is a Power Pellet
+                bool exists = false
+                for j = 0 to math.min(array.size(equalHighs) - 1, 10)
+                    if math.abs(array.get(equalHighs, j) - pivotHigh) < equalTolerance
+                        exists := true
+                        break
+                if not exists
+                    array.push(equalHighs, pivotHigh)
+                    array.push(equalHighBars, bar_index - 5)
+                break
+
+// Detect equal lows (Power Pellets)
+if not na(pivotLow) and bar_index > 20
+    for i = 1 to 20
+        int idx = bar_index - 5 - i * 5
+        if idx > 0
+            float oldLow = ta.pivotlow(low, 5, 5)[i * 5]
+            if not na(oldLow) and math.abs(pivotLow - oldLow) < equalTolerance
+                bool exists = false
+                for j = 0 to math.min(array.size(equalLows) - 1, 10)
+                    if math.abs(array.get(equalLows, j) - pivotLow) < equalTolerance
+                        exists := true
+                        break
+                if not exists
+                    array.push(equalLows, pivotLow)
+                    array.push(equalLowBars, bar_index - 5)
+                break
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 📊 HTF BIAS (Cortex: "Higher timeframe determines direction")
+// ════════════════════════════════════════════════════════════════════════════════
+
+htfPivotHigh = request.security(syminfo.tickerid, i_htfTimeframe, ta.pivothigh(high, i_htfSwingLen, i_htfSwingLen))
+htfPivotLow = request.security(syminfo.tickerid, i_htfTimeframe, ta.pivotlow(low, i_htfSwingLen, i_htfSwingLen))
+htfClose = request.security(syminfo.tickerid, i_htfTimeframe, close)
+htfHigh = request.security(syminfo.tickerid, i_htfTimeframe, high)
+htfLow = request.security(syminfo.tickerid, i_htfTimeframe, low)
+htfAtr = request.security(syminfo.tickerid, i_htfTimeframe, ta.atr(14))
+
+htfSwingHigh := not na(htfPivotHigh) ? htfPivotHigh : htfSwingHigh
+htfSwingLow := not na(htfPivotLow) ? htfPivotLow : htfSwingLow
+
+// Structure breaks with displacement
+htfMinDisplacement = htfAtr * 0.5
+htfBullBreak = not na(htfSwingHigh) and htfClose > htfSwingHigh and (htfClose - htfSwingHigh) > htfMinDisplacement
+htfBearBreak = not na(htfSwingLow) and htfClose < htfSwingLow and (htfSwingLow - htfClose) > htfMinDisplacement
+
+if i_htfEnabled and htfBullBreak
+    htfBullish := true
+if i_htfEnabled and htfBearBreak
+    htfBullish := false
+
+int htfBias = i_htfEnabled ? (htfBullish ? 1 : -1) : 0
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🍒 FVG DETECTION - SPAWN POINTS (Entry Zones)
+// ════════════════════════════════════════════════════════════════════════════════
+
+var float[] fvgTops = array.new_float()
+var float[] fvgBottoms = array.new_float()
+var int[] fvgBars = array.new_int()
+var bool[] fvgBullish = array.new_bool()
+var float[] fvgScores = array.new_float()
+
+if i_showSpawns and bar_index > 5
+    // Bullish FVG
+    if low > high[2]
+        float gapSize = low - high[2]
+        if gapSize > atr * 0.15
+            bool exists = false
+            for j = 0 to math.min(array.size(fvgBars) - 1, 5)
+                if math.abs(array.get(fvgBars, j) - (bar_index - 1)) < 3
+                    exists := true
+                    break
+            if not exists
+                float score = 1.5
+                score += inDiscount ? 2.0 : 0.0
+                score += inKillzone ? 1.5 : 0.0
+                score += inSilverBullet ? 2.5 : 0.0
+                score += htfBias == 1 ? 3.0 : 0.0
+                score += inMacroWindow ? 1.0 : 0.0
+                array.push(fvgTops, low)
+                array.push(fvgBottoms, high[2])
+                array.push(fvgBars, bar_index - 1)
+                array.push(fvgBullish, true)
+                array.push(fvgScores, score)
+
+    // Bearish FVG
+    if high < low[2]
+        float gapSize = low[2] - high
+        if gapSize > atr * 0.15
+            bool exists = false
+            for j = 0 to math.min(array.size(fvgBars) - 1, 5)
+                if math.abs(array.get(fvgBars, j) - (bar_index - 1)) < 3
+                    exists := true
+                    break
+            if not exists
+                float score = 1.5
+                score += inPremium ? 2.0 : 0.0
+                score += inKillzone ? 1.5 : 0.0
+                score += inSilverBullet ? 2.5 : 0.0
+                score += htfBias == -1 ? 3.0 : 0.0
+                score += inMacroWindow ? 1.0 : 0.0
+                array.push(fvgTops, low[2])
+                array.push(fvgBottoms, high)
+                array.push(fvgBars, bar_index - 1)
+                array.push(fvgBullish, false)
+                array.push(fvgScores, score)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 📦 ORDER BLOCK DETECTION - SPAWN POINTS
+// ════════════════════════════════════════════════════════════════════════════════
+
+var float[] obTops = array.new_float()
+var float[] obBottoms = array.new_float()
+var int[] obBars = array.new_int()
+var bool[] obBullish = array.new_bool()
+
+if i_showSpawns and bar_index > 15
+    // Bullish OB: Down candle followed by displacement up
+    for i = 1 to 10
+        if close[i] < open[i]
+            if close > high[i] and (close - high[i]) > atr * 0.5
+                bool exists = false
+                for j = 0 to math.min(array.size(obBars) - 1, 5)
+                    if math.abs(array.get(obBars, j) - (bar_index - i)) < 3
+                        exists := true
+                        break
+                if not exists
+                    array.push(obTops, math.max(open[i], close[i]))
+                    array.push(obBottoms, math.min(open[i], close[i]))
+                    array.push(obBars, bar_index - i)
+                    array.push(obBullish, true)
+                break
+
+    // Bearish OB
+    for i = 1 to 10
+        if close[i] > open[i]
+            if close < low[i] and (low[i] - close) > atr * 0.5
+                bool exists = false
+                for j = 0 to math.min(array.size(obBars) - 1, 5)
+                    if math.abs(array.get(obBars, j) - (bar_index - i)) < 3
+                        exists := true
+                        break
+                if not exists
+                    array.push(obTops, math.max(open[i], close[i]))
+                    array.push(obBottoms, math.min(open[i], close[i]))
+                    array.push(obBars, bar_index - i)
+                    array.push(obBullish, false)
+                break
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 💧 LIQUIDITY SWEEP DETECTION
+// ════════════════════════════════════════════════════════════════════════════════
+
+bool bullishSweep = false
+bool bearishSweep = false
+
+if bar_index > 10 and not na(swingHigh) and not na(swingLow)
+    // Bullish sweep (Turtle Soup Long)
+    if low < swingLow and close > swingLow and close > open
+        bullishSweep := true
+    // Bearish sweep (Turtle Soup Short)
+    if high > swingHigh and close < swingHigh and close < open
+        bearishSweep := true
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🕹️ PAC-MAN DOL ENGINE - THE CHERRY FINDER
+// ════════════════════════════════════════════════════════════════════════════════
+// This is the core brain - determines where PAC-MAN (price) is most likely headed
+// Based on ALL ICT concepts from The Cortex
+
+if i_pacmanEnabled
+    float bullPoints = 0.0
+    float bearPoints = 0.0
+
+    // ═══ LIQUIDITY POOLS - What's the nearest/strongest draw? ═══
+    // (Cortex: "The market goes to liquidity")
+
+    // Calculate distances to all liquidity pools
+    float distToSwingHigh = not na(swingHigh) ? math.abs(swingHigh - close) : 9999.0
+    float distToSwingLow = not na(swingLow) ? math.abs(close - swingLow) : 9999.0
+    float distToPDH = not na(pdh) ? math.abs(pdh - close) : 9999.0
+    float distToPDL = not na(pdl) ? math.abs(close - pdl) : 9999.0
+    float distToPWH = not na(pwh) ? math.abs(pwh - close) : 9999.0
+    float distToPWL = not na(pwl) ? math.abs(close - pwl) : 9999.0
+
+    // BSL (Buyside Liquidity) above price = bullish targets
+    float nearestBSL = math.min(distToSwingHigh, distToPDH, distToPWH)
+    // SSL (Sellside Liquidity) below price = bearish targets
+    float nearestSSL = math.min(distToSwingLow, distToPDL, distToPWL)
+
+    // Closer liquidity gets more weight (but filtered by HTF bias)
+    float liqWeight = 25.0  // 25% weight for liquidity draw
+    if nearestBSL < nearestSSL
+        bullPoints += liqWeight * (1.0 - math.min(nearestBSL / (atr * 10), 1.0))
+    else
+        bearPoints += liqWeight * (1.0 - math.min(nearestSSL / (atr * 10), 1.0))
+
+    // ═══ EQUAL HIGHS/LOWS - Power Pellets (Cortex: "too smooth") ═══
+    // These are MAJOR draws - price almost always takes them
+    float eqhWeight = 15.0
+    for i = 0 to math.min(array.size(equalHighs) - 1, 5)
+        float eqh = array.get(equalHighs, i)
+        if eqh > close and eqh < close + atr * 15
+            bullPoints += eqhWeight * (1.0 - (eqh - close) / (atr * 15))
+            break
+
+    for i = 0 to math.min(array.size(equalLows) - 1, 5)
+        float eql = array.get(equalLows, i)
+        if eql < close and eql > close - atr * 15
+            bearPoints += eqhWeight * (1.0 - (close - eql) / (atr * 15))
+            break
+
+    // ═══ HTF BIAS (30% weight - Cortex: "Higher timeframe determines direction") ═══
+    bullPoints += htfBias == 1 ? 30.0 : 0.0
+    bearPoints += htfBias == -1 ? 30.0 : 0.0
+
+    // ═══ PREMIUM/DISCOUNT (15% weight - Cortex: "Buy in discount, sell in premium") ═══
+    bullPoints += inDiscount ? 15.0 : 0.0
+    bearPoints += inPremium ? 15.0 : 0.0
+
+    // ═══ TIME CONTEXT (10% weight) ═══
+    float timeBonus = 0.0
+    timeBonus += inKillzone ? 3.0 : 0.0
+    timeBonus += inSilverBullet ? 5.0 : 0.0
+    timeBonus += inMacroWindow ? 2.0 : 0.0
+    timeBonus -= inNYLunch ? 5.0 : 0.0
+    timeBonus -= isFriday and nyHour >= 13 ? 3.0 : 0.0
+
+    // Monday bias (Cortex: often continuation from prior week)
+    if isMonday and nyHour < 10
+        // Check NWOG direction
+        if not na(nwogHigh) and not na(nwogLow)
+            if close > (nwogHigh + nwogLow) / 2
+                bullPoints += 5.0
+            else
+                bearPoints += 5.0
+
+    // Time bonus goes with HTF direction
+    if htfBias == 1
+        bullPoints += timeBonus
+    else if htfBias == -1
+        bearPoints += timeBonus
+
+    // ═══ PATTERN CONFLUENCE (5% weight) ═══
+    int bullPatterns = 0
+    int bearPatterns = 0
+
+    for i = 0 to math.min(array.size(obBullish) - 1, 5)
+        if array.get(obBullish, i)
+            bullPatterns += 1
+        else
+            bearPatterns += 1
+
+    for i = 0 to math.min(array.size(fvgBullish) - 1, 5)
+        if array.get(fvgBullish, i)
+            bullPatterns += 1
+        else
+            bearPatterns += 1
+
+    bullPoints += math.min(5.0, bullPatterns * 1.0)
+    bearPoints += math.min(5.0, bearPatterns * 1.0)
+
+    // ═══ RECENT SWEEPS BONUS ═══
+    if bullishSweep
+        bullPoints += 10.0
+    if bearishSweep
+        bearPoints += 10.0
+
+    // ═══ IPDA LEVELS - Historical context ═══
+    if i_ipdaEnabled
+        // If price is near IPDA range extremes, add to DOL score
+        if not na(ipda20High) and math.abs(close - ipda20High) < atr * 2
+            bearPoints += 5.0  // Near 20-day high, might reverse
+        if not na(ipda20Low) and math.abs(close - ipda20Low) < atr * 2
+            bullPoints += 5.0  // Near 20-day low, might reverse
+
+    // ═══ CALCULATE FINAL SCORES ═══
+    float totalPoints = bullPoints + bearPoints
+    if totalPoints > 0
+        pacmanBullScore := (bullPoints / totalPoints) * 100.0
+        pacmanBearScore := (bearPoints / totalPoints) * 100.0
+    else
+        pacmanBullScore := 50.0
+        pacmanBearScore := 50.0
+
+    pacmanConfidence := math.abs(pacmanBullScore - pacmanBearScore)
+    pacmanDirection := pacmanBullScore > pacmanBearScore + 10 ? "BULLISH" : pacmanBearScore > pacmanBullScore + 10 ? "BEARISH" : "NEUTRAL"
+
+    // ═══ DETERMINE PRIMARY DOL (THE CHERRY) ═══
+    // Find the most likely liquidity target
+    if pacmanDirection == "BULLISH"
+        // Find nearest BSL target
+        float bestTarget = na
+        string bestType = ""
+        float bestDist = 9999.0
+
+        if not na(swingHigh) and swingHigh > close and distToSwingHigh < bestDist
+            bestTarget := swingHigh
+            bestType := "SWING HIGH"
+            bestDist := distToSwingHigh
+        if not na(pdh) and pdh > close and distToPDH < bestDist
+            bestTarget := pdh
+            bestType := "PDH"
+            bestDist := distToPDH
+        if not na(pwh) and pwh > close and distToPWH < bestDist * 1.5  // PWH has priority
+            bestTarget := pwh
+            bestType := "PWH ⭐"
+            bestDist := distToPWH
+
+        // Check equal highs (Power Pellets have priority)
+        for i = 0 to math.min(array.size(equalHighs) - 1, 3)
+            float eqh = array.get(equalHighs, i)
+            float dist = math.abs(eqh - close)
+            if eqh > close and dist < bestDist * 0.8  // Equal highs have high priority
+                bestTarget := eqh
+                bestType := "EQH 🔴"
+                bestDist := dist
+                break
+
+        primaryDOL := bestTarget
+        primaryDOLType := bestType
+        primaryDOLBull := true
+    else if pacmanDirection == "BEARISH"
+        // Find nearest SSL target
+        float bestTarget = na
+        string bestType = ""
+        float bestDist = 9999.0
+
+        if not na(swingLow) and swingLow < close and distToSwingLow < bestDist
+            bestTarget := swingLow
+            bestType := "SWING LOW"
+            bestDist := distToSwingLow
+        if not na(pdl) and pdl < close and distToPDL < bestDist
+            bestTarget := pdl
+            bestType := "PDL"
+            bestDist := distToPDL
+        if not na(pwl) and pwl < close and distToPWL < bestDist * 1.5
+            bestTarget := pwl
+            bestType := "PWL ⭐"
+            bestDist := distToPWL
+
+        // Check equal lows
+        for i = 0 to math.min(array.size(equalLows) - 1, 3)
+            float eql = array.get(equalLows, i)
+            float dist = math.abs(close - eql)
+            if eql < close and dist < bestDist * 0.8
+                bestTarget := eql
+                bestType := "EQL 🔴"
+                bestDist := dist
+                break
+
+        primaryDOL := bestTarget
+        primaryDOLType := bestType
+        primaryDOLBull := false
+    else
+        primaryDOL := na
+        primaryDOLType := ""
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎨 DRAWING: PAC-MAN ARCADE PANEL
+// ════════════════════════════════════════════════════════════════════════════════
+
+var table pacmanPanel = na
+
+if barstate.islast and i_pacmanEnabled and i_showPanel
+    if not na(pacmanPanel)
+        table.delete(pacmanPanel)
+
+    pacmanPanel := table.new(position.top_right, 2, 12, bgcolor=color.new(#000000, 5), border_color=color.new(#2979FF, 0), border_width=2)
+
+    // Header with PAC-MAN
+    string pacEmoji = pacmanDirection == "BULLISH" ? "ᗧ" : pacmanDirection == "BEARISH" ? "ᗤ" : "●"
+    table.cell(pacmanPanel, 0, 0, pacEmoji + " PAC-MAN v5.0", text_color=#FFEB3B, text_size=size.small)
+    table.cell(pacmanPanel, 1, 0, "🕹️", text_color=#FFEB3B)
+
+    // Direction with confidence
+    string dirArrow = pacmanDirection == "BULLISH" ? "▲" : pacmanDirection == "BEARISH" ? "▼" : "◆"
+    color dirColor = pacmanDirection == "BULLISH" ? #00E676 : pacmanDirection == "BEARISH" ? #FF5252 : #FFC107
+    table.cell(pacmanPanel, 0, 1, "DIRECTION", text_color=#777777, text_size=size.tiny)
+    table.cell(pacmanPanel, 1, 1, dirArrow + " " + pacmanDirection, text_color=dirColor, text_size=size.small)
+
+    // Probability bars
+    table.cell(pacmanPanel, 0, 2, "BULL %", text_color=#777777, text_size=size.tiny)
+    table.cell(pacmanPanel, 1, 2, str.tostring(pacmanBullScore, "#.0") + "%", text_color=#00E676, text_size=size.tiny)
+
+    table.cell(pacmanPanel, 0, 3, "BEAR %", text_color=#777777, text_size=size.tiny)
+    table.cell(pacmanPanel, 1, 3, str.tostring(pacmanBearScore, "#.0") + "%", text_color=#FF5252, text_size=size.tiny)
+
+    // Confidence
+    color confColor = pacmanConfidence >= 30 ? #00E676 : pacmanConfidence >= 15 ? #FFC107 : #FF5252
+    table.cell(pacmanPanel, 0, 4, "CONFIDENCE", text_color=#777777, text_size=size.tiny)
+    table.cell(pacmanPanel, 1, 4, str.tostring(pacmanConfidence, "#.0") + "%", text_color=confColor, text_size=size.tiny)
+
+    // Primary DOL (The Cherry)
+    table.cell(pacmanPanel, 0, 5, "🍒 CHERRY", text_color=#FF1744, text_size=size.tiny)
+    string dolStr = not na(primaryDOL) ? primaryDOLType + " @ " + str.tostring(primaryDOL, "#.##") : "SCANNING..."
+    table.cell(pacmanPanel, 1, 5, dolStr, text_color=#FF1744, text_size=size.tiny)
+
+    // HTF Bias
+    string htfStr = htfBias == 1 ? "▲ BULL" : htfBias == -1 ? "▼ BEAR" : "— FLAT"
+    color htfColor = htfBias == 1 ? #00E676 : htfBias == -1 ? #FF5252 : #FFC107
+    table.cell(pacmanPanel, 0, 6, "HTF BOSS", text_color=#777777, text_size=size.tiny)
+    table.cell(pacmanPanel, 1, 6, htfStr, text_color=htfColor, text_size=size.tiny)
+
+    // Premium/Discount
+    string pdStr = inPremium ? "PREMIUM ⬆️" : inDiscount ? "DISCOUNT ⬇️" : "EQUILIBRIUM"
+    color pdColor = inPremium ? #FF5252 : inDiscount ? #00E676 : #FFC107
+    table.cell(pacmanPanel, 0, 7, "PD ZONE", text_color=#777777, text_size=size.tiny)
+    table.cell(pacmanPanel, 1, 7, pdStr, text_color=pdColor, text_size=size.tiny)
+
+    // Time Window
+    string timeStr = inSilverBullet ? "⚡ SILVER BULLET" : inKillzone ? "● KILLZONE" : inNYLunch ? "⛔ LUNCH" : "○ OFF HOURS"
+    color timeColor = inSilverBullet ? #00E5FF : inKillzone ? #FFC107 : inNYLunch ? #FF5252 : #555555
+    table.cell(pacmanPanel, 0, 8, "TIME", text_color=#777777, text_size=size.tiny)
+    table.cell(pacmanPanel, 1, 8, timeStr, text_color=timeColor, text_size=size.tiny)
+
+    // Macro Window
+    string macroStr = inMacroWindow ? "● ACTIVE" : "○ OFF"
+    color macroColor = inMacroWindow ? #00E5FF : #555555
+    table.cell(pacmanPanel, 0, 9, "MACRO", text_color=#777777, text_size=size.tiny)
+    table.cell(pacmanPanel, 1, 9, macroStr, text_color=macroColor, text_size=size.tiny)
+
+    // Power Pellets nearby
+    int eqhCount = array.size(equalHighs)
+    int eqlCount = array.size(equalLows)
+    table.cell(pacmanPanel, 0, 10, "⚪ POWER UPS", text_color=#FFD700, text_size=size.tiny)
+    table.cell(pacmanPanel, 1, 10, str.tostring(eqhCount) + " EQH / " + str.tostring(eqlCount) + " EQL", text_color=#FFD700, text_size=size.tiny)
+
+    // WAKA signal
+    bool wakaSignal = pacmanConfidence >= 25 and inKillzone and (bullishSweep or bearishSweep)
+    string wakaStr = wakaSignal ? "WAKA-WAKA! 🔊" : "..."
+    color wakaColor = wakaSignal ? #FFEB3B : #333333
+    table.cell(pacmanPanel, 0, 11, "SIGNAL", text_color=#777777, text_size=size.tiny)
+    table.cell(pacmanPanel, 1, 11, wakaStr, text_color=wakaColor, text_size=size.tiny)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎨 DRAWING: THE CHERRY (Primary DOL)
+// ════════════════════════════════════════════════════════════════════════════════
+
+if barstate.islast and i_showCherry and not na(primaryDOL)
+    int startBar = bar_index - 30
+    int endBar = bar_index + 60
+
+    // Draw cherry line
+    line.new(startBar, primaryDOL, endBar, primaryDOL, color=i_cherryColor, style=line.style_solid, width=3)
+
+    // Cherry label
+    string cherryLabel = "🍒 " + primaryDOLType
+    label.new(endBar + 5, primaryDOL, cherryLabel, color=color.new(color.white, 100), textcolor=i_cherryColor, style=label.style_label_left, size=size.normal)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎨 DRAWING: POWER PELLETS (Equal Highs/Lows)
+// ════════════════════════════════════════════════════════════════════════════════
+
+if barstate.islast and i_showPowerPellets
+    int startBar = bar_index - i_lookback
+    int endBar = bar_index + 30
+
+    // Draw equal highs
+    for i = 0 to math.min(array.size(equalHighs) - 1, 5)
+        float level = array.get(equalHighs, i)
+        if level > close - atr * 20 and level < close + atr * 30
+            line.new(startBar, level, endBar, level, color=i_powerPelletColor, style=line.style_dotted, width=2)
+            label.new(endBar + 2, level, "⚪ EQH", color=color.new(color.white, 100), textcolor=i_powerPelletColor, style=label.style_label_left, size=size.small)
+
+    // Draw equal lows
+    for i = 0 to math.min(array.size(equalLows) - 1, 5)
+        float level = array.get(equalLows, i)
+        if level > close - atr * 30 and level < close + atr * 20
+            line.new(startBar, level, endBar, level, color=i_powerPelletColor, style=line.style_dotted, width=2)
+            label.new(endBar + 2, level, "⚪ EQL", color=color.new(color.white, 100), textcolor=i_powerPelletColor, style=label.style_label_left, size=size.small)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎨 DRAWING: PELLETS (Standard Liquidity Levels)
+// ════════════════════════════════════════════════════════════════════════════════
+
+if barstate.islast and i_showPellets
+    int startBar = bar_index - i_lookback
+    int endBar = bar_index + 50
+
+    // PDH/PDL
+    if not na(pdh) and not na(pdl)
+        line.new(startBar, pdh, endBar, pdh, color=color.new(#FF5252, 30), style=line.style_solid, width=2)
+        line.new(startBar, pdl, endBar, pdl, color=color.new(#00E676, 30), style=line.style_solid, width=2)
+        label.new(endBar + 1, pdh, "• PDH", color=color.new(color.white, 100), textcolor=#FF5252, style=label.style_label_left, size=size.small)
+        label.new(endBar + 1, pdl, "• PDL", color=color.new(color.white, 100), textcolor=#00E676, style=label.style_label_left, size=size.small)
+
+    // PWH/PWL
+    if not na(pwh) and not na(pwl)
+        line.new(startBar, pwh, endBar + 20, pwh, color=color.new(#FF1744, 0), style=line.style_solid, width=3)
+        line.new(startBar, pwl, endBar + 20, pwl, color=color.new(#00E676, 0), style=line.style_solid, width=3)
+        label.new(endBar + 25, pwh, "⚪ PWH", color=color.new(color.white, 100), textcolor=#FF1744, style=label.style_label_left, size=size.normal)
+        label.new(endBar + 25, pwl, "⚪ PWL", color=color.new(color.white, 100), textcolor=#00E676, style=label.style_label_left, size=size.normal)
+
+    // Equilibrium
+    if not na(equilibrium)
+        line.new(startBar, equilibrium, endBar, equilibrium, color=color.new(#FFC107, 60), style=line.style_dotted, width=1)
+        label.new(endBar + 3, equilibrium, "EQ 50%", color=color.new(color.white, 100), textcolor=#FFC107, style=label.style_label_left, size=size.tiny)
+
+    // NWOG
+    if not na(nwogHigh) and not na(nwogLow)
+        float nwogMid = (nwogHigh + nwogLow) / 2
+        box.new(startBar, nwogHigh, endBar, nwogLow, border_color=color.new(#9C27B0, 30), bgcolor=color.new(#9C27B0, 93), border_width=1)
+        label.new(endBar + 1, nwogMid, "NWOG", color=color.new(color.white, 100), textcolor=#9C27B0, style=label.style_label_left, size=size.tiny)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎨 DRAWING: SPAWN POINTS (FVGs and OBs)
+// ════════════════════════════════════════════════════════════════════════════════
+
+if barstate.islast and i_showSpawns
+    // Draw FVGs
+    for i = 0 to math.min(array.size(fvgBars) - 1, i_maxZones - 1)
+        int fvgBar = array.get(fvgBars, i)
+        if (bar_index - fvgBar) <= i_lookback
+            float fvgTop = array.get(fvgTops, i)
+            float fvgBot = array.get(fvgBottoms, i)
+            bool fvgBull = array.get(fvgBullish, i)
+            color zoneColor = fvgBull ? i_spawnBullColor : i_spawnBearColor
+
+            box.new(fvgBar, fvgTop, bar_index + 5, fvgBot, border_color=color.new(zoneColor, 30), bgcolor=zoneColor, border_width=1)
+
+            // CE line
+            float ce = (fvgTop + fvgBot) / 2
+            line.new(fvgBar, ce, bar_index + 5, ce, color=color.new(fvgBull ? #00E5FF : #FF6D00, 40), style=line.style_dashed, width=1)
+
+    // Draw OBs
+    for i = 0 to math.min(array.size(obBars) - 1, i_maxZones - 1)
+        int obBar = array.get(obBars, i)
+        if (bar_index - obBar) <= i_lookback
+            float obTop = array.get(obTops, i)
+            float obBot = array.get(obBottoms, i)
+            bool obBull = array.get(obBullish, i)
+            color zoneColor = obBull ? color.new(#1E88E5, 85) : color.new(#B71C1C, 85)
+
+            box.new(obBar, obTop, bar_index + 8, obBot, border_color=color.new(zoneColor, 30), bgcolor=zoneColor, border_width=2)
+            label.new(bar_index + 10, (obTop + obBot) / 2, "SPAWN", color=color.new(color.white, 100), textcolor=obBull ? #00E676 : #FF5252, style=label.style_label_left, size=size.tiny)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎨 DRAWING: PAC-MAN DIRECTION ARROW
+// ════════════════════════════════════════════════════════════════════════════════
+
+// Large direction arrow on chart when high confidence
+bool showBullArrow = i_pacmanEnabled and pacmanDirection == "BULLISH" and pacmanConfidence >= 20
+bool showBearArrow = i_pacmanEnabled and pacmanDirection == "BEARISH" and pacmanConfidence >= 20
+
+plotshape(showBullArrow and barstate.islast, title="PAC-MAN Bull", location=location.belowbar, style=shape.triangleup, color=i_pacmanColor, size=size.huge)
+plotshape(showBearArrow and barstate.islast, title="PAC-MAN Bear", location=location.abovebar, style=shape.triangledown, color=i_pacmanColor, size=size.huge)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🔔 DRAWING: LIQUIDITY SWEEPS
+// ════════════════════════════════════════════════════════════════════════════════
+
+plotshape(bullishSweep, title="Bull Sweep", location=location.belowbar, style=shape.circle, color=#FFEB3B, size=size.small)
+plotshape(bearishSweep, title="Bear Sweep", location=location.abovebar, style=shape.circle, color=#FFEB3B, size=size.small)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🔔 ALERTS
+// ════════════════════════════════════════════════════════════════════════════════
+
+// WAKA-WAKA signal - high confidence with sweep in killzone
+bool wakaAlert = pacmanConfidence >= 30 and inKillzone and (bullishSweep or bearishSweep)
+alertcondition(wakaAlert, title="WAKA-WAKA Signal", message="🕹️ PAC-MAN WAKA-WAKA: High probability " + pacmanDirection + " setup detected!")
+
+// Cherry identified
+bool cherryAlert = not na(primaryDOL) and pacmanConfidence >= 25
+alertcondition(cherryAlert and barstate.isconfirmed, title="Cherry Spotted", message="🍒 PAC-MAN: Cherry (DOL) identified - " + primaryDOLType)
+
+// Power Pellet sweep
+bool powerSweep = (bullishSweep and array.size(equalLows) > 0) or (bearishSweep and array.size(equalHighs) > 0)
+alertcondition(powerSweep, title="Power Pellet Sweep", message="⚪ PAC-MAN: Power Pellet (Equal H/L) swept!")
+
+// Silver Bullet with confluence
+bool sbSetup = inSilverBullet and (array.size(fvgBars) > 0 or array.size(obBars) > 0) and pacmanConfidence >= 20
+alertcondition(sbSetup, title="Silver Bullet Setup", message="⚡ PAC-MAN: Silver Bullet spawn point detected!")
+
+// Killzone entry
+alertcondition(inKillzone and not inKillzone[1], title="Killzone Start", message="🎮 PAC-MAN: Entering Killzone - Game On!")
