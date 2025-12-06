@@ -877,36 +877,7 @@ totalRange = high - low
 wickThreshold = 0.6
 bodyThreshold = 0.4
 
-// Bullish Rejection Block: Long lower wick at discount
-bullishRejection = i_showRejBlock and totalRange > 0 and lowerWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close > open and inDiscount
-
-// Bearish Rejection Block: Long upper wick at premium
-bearishRejection = i_showRejBlock and totalRange > 0 and upperWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close < open and inPremium
-
-// Create Rejection Blocks
-if bullishRejection
-    newRB = RejBlock.new(
-         math.max(close, open), low, bar_index, DIR_BULL,
-         box.new(bar_index, math.max(close, open), bar_index + 15, low,
-                 border_color=color.new(#26A69A, 30), bgcolor=color.new(#26A69A, 88),
-                 border_width=2, border_style=line.style_solid))
-    if array.size(rejBlocks) >= 8
-        oldRB = array.shift(rejBlocks)
-        if not na(oldRB.visual)
-            box.delete(oldRB.visual)
-    array.push(rejBlocks, newRB)
-
-if bearishRejection
-    newRB = RejBlock.new(
-         high, math.min(close, open), bar_index, DIR_BEAR,
-         box.new(bar_index, high, bar_index + 15, math.min(close, open),
-                 border_color=color.new(#EF5350, 30), bgcolor=color.new(#EF5350, 88),
-                 border_width=2, border_style=line.style_solid))
-    if array.size(rejBlocks) >= 8
-        oldRB = array.shift(rejBlocks)
-        if not na(oldRB.visual)
-            box.delete(oldRB.visual)
-    array.push(rejBlocks, newRB)
+// NOTE: Rejection Block detection moved after Premium/Discount zone calculation
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        LIQUIDITY DETECTION                                     ║
@@ -1157,6 +1128,41 @@ atEquilibrium = close >= discountZone and close <= premiumZone
 oteTop = msDirection == DIR_BULL ? rangeLow + rangeSize * 0.79 : rangeHigh - rangeSize * 0.62
 oteBottom = msDirection == DIR_BULL ? rangeLow + rangeSize * 0.62 : rangeHigh - rangeSize * 0.79
 inOTE = f_inRange(close, math.max(oteTop, oteBottom), math.min(oteTop, oteBottom))
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REJECTION BLOCK DETECTION (uses inPremium/inDiscount defined above)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Bullish Rejection Block: Long lower wick at discount
+bullishRejection = i_showRejBlock and totalRange > 0 and lowerWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close > open and inDiscount
+
+// Bearish Rejection Block: Long upper wick at premium
+bearishRejection = i_showRejBlock and totalRange > 0 and upperWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close < open and inPremium
+
+// Create Rejection Blocks
+if bullishRejection
+    newRB = RejBlock.new(
+         math.max(close, open), low, bar_index, DIR_BULL,
+         box.new(bar_index, math.max(close, open), bar_index + 15, low,
+                 border_color=color.new(#26A69A, 30), bgcolor=color.new(#26A69A, 88),
+                 border_width=2, border_style=line.style_solid))
+    if array.size(rejBlocks) >= 8
+        oldRB = array.shift(rejBlocks)
+        if not na(oldRB.visual)
+            box.delete(oldRB.visual)
+    array.push(rejBlocks, newRB)
+
+if bearishRejection
+    newRB = RejBlock.new(
+         high, math.min(close, open), bar_index, DIR_BEAR,
+         box.new(bar_index, high, bar_index + 15, math.min(close, open),
+                 border_color=color.new(#EF5350, 30), bgcolor=color.new(#EF5350, 88),
+                 border_width=2, border_style=line.style_solid))
+    if array.size(rejBlocks) >= 8
+        oldRB = array.shift(rejBlocks)
+        if not na(oldRB.visual)
+            box.delete(oldRB.visual)
+    array.push(rejBlocks, newRB)
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        POWER OF THREE (AMD)                                    ║
