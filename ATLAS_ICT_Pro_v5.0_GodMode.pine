@@ -1809,7 +1809,7 @@ var table infoTable = table.new(position.middle_right, 2, 14, bgcolor=tableBg, b
 
 if i_showDOLTable and barstate.islast
     // ═══ HEADER - Sleek title bar ═══
-    table.cell(infoTable, 0, 0, "PAC-MAN STATUS", text_color=i_pacmanColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
+    table.cell(infoTable, 0, 0, "◉ PAC-MAN STATUS", text_color=i_pacmanColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
     table.cell(infoTable, 1, 0, str.tostring(dolProbability, "#") + "%", text_color=dolProbability >= 70 ? i_bullColor : dolProbability >= 50 ? i_neutralColor : i_bearColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
 
     // ═══ DIRECTION ROW - Main signal ═══
