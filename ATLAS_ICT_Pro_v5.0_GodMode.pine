@@ -1805,11 +1805,11 @@ var color accentLine = color.new(#0F3460, 0)
 var color textDim = color.new(#8892B0, 0)
 var color textBright = color.new(#E6F1FF, 0)
 
-var table infoTable = table.new(position.top_center, 2, 14, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
+var table infoTable = table.new(position.middle_right, 2, 14, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
 
 if i_showDOLTable and barstate.islast
     // ═══ HEADER - Sleek title bar ═══
-    table.cell(infoTable, 0, 0, "◉ STATUS", text_color=i_pacmanColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
+    table.cell(infoTable, 0, 0, "PAC-MAN STATUS", text_color=i_pacmanColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
     table.cell(infoTable, 1, 0, str.tostring(dolProbability, "#") + "%", text_color=dolProbability >= 70 ? i_bullColor : dolProbability >= 50 ? i_neutralColor : i_bearColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
 
     // ═══ DIRECTION ROW - Main signal ═══
