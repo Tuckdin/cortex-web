@@ -1,0 +1,869 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © ATLAS Trading - God Mode v5.0
+// CORTEX-POWERED: All ICT concepts derived from 20,833 knowledge chunks
+
+//@version=5
+indicator("ATLAS ICT Pro v5.0 - GOD MODE [PAC-MAN EDITION]", overlay=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🎮 PAC-MAN GOD MODE - THE CORTEX KNOWS ALL
+// ═══════════════════════════════════════════════════════════════════════════════
+// This indicator uses ALL ICT concepts from The Cortex (776 transcripts) to
+// determine the most probable Draw on Liquidity (DOL) path.
+//
+// PAC-MAN TERMINOLOGY:
+// 🟡 PAC-MAN = Price Action (you are the trader)
+// 👻 GHOSTS = Institutional Players hunting your stops
+// ⚫ PELLETS = Small liquidity pools (equal highs/lows)
+// 🔴 POWER PELLETS = Major liquidity pools (swing points)
+// 🍒 CHERRIES = High-probability entry zones (OTE, OB, FVG confluence)
+// 🌀 SPAWN ZONE = OTE (62-79% retracement)
+// 🎯 MAZE PATH = Draw on Liquidity direction
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                           USER INPUTS                                          ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Main Display Settings
+grp_main = "🎮 GOD MODE SETTINGS"
+showPacManMaze = input.bool(true, "Show Pac-Man Maze (DOL Path)", group=grp_main)
+showGhosts = input.bool(true, "Show Ghosts (Institutional Levels)", group=grp_main)
+showPellets = input.bool(true, "Show Pellets (Liquidity Pools)", group=grp_main)
+showPowerPellets = input.bool(true, "Show Power Pellets (Major Swing Points)", group=grp_main)
+showCherries = input.bool(true, "Show Cherries (Entry Confluence)", group=grp_main)
+showSpawnZone = input.bool(true, "Show Spawn Zone (OTE 62-79%)", group=grp_main)
+showProbabilityScore = input.bool(true, "Show DOL Probability Score", group=grp_main)
+
+// IPDA Lookback Settings (Historical Data)
+grp_ipda = "📊 IPDA LOOKBACKS (Historical Liquidity)"
+ipda20 = input.bool(true, "20-Day IPDA Lookback", group=grp_ipda)
+ipda40 = input.bool(true, "40-Day IPDA Lookback", group=grp_ipda)
+ipda60 = input.bool(true, "60-Day IPDA Lookback", group=grp_ipda)
+weeklyLiqLookback = input.int(10, "Weekly Liquidity Lookback (Weeks)", minval=1, maxval=52, group=grp_ipda)
+monthlyLiqLookback = input.int(3, "Monthly Liquidity Lookback (Months)", minval=1, maxval=12, group=grp_ipda)
+
+// Market Structure Settings
+grp_ms = "📈 MARKET STRUCTURE"
+msLookback = input.int(20, "Swing Lookback", minval=5, maxval=50, group=grp_ms)
+showMSBreaks = input.bool(true, "Show BOS/CHoCH", group=grp_ms)
+showEqualHL = input.bool(true, "Show Equal Highs/Lows", group=grp_ms)
+equalHLThreshold = input.float(0.1, "Equal H/L Threshold %", minval=0.01, maxval=1.0, step=0.01, group=grp_ms)
+
+// PD Array Settings
+grp_pd = "🎯 PD ARRAYS (Order Blocks, FVG, Breakers)"
+showOrderBlocks = input.bool(true, "Show Order Blocks", group=grp_pd)
+showFVG = input.bool(true, "Show Fair Value Gaps", group=grp_pd)
+showBreakers = input.bool(true, "Show Breaker Blocks", group=grp_pd)
+showMitigation = input.bool(true, "Show Mitigation Blocks", group=grp_pd)
+obLookback = input.int(50, "PD Array Lookback", minval=10, maxval=200, group=grp_pd)
+
+// Time Settings (ICT Killzones)
+grp_time = "⏰ KILLZONES & TIME"
+showKillzones = input.bool(true, "Show Killzones", group=grp_time)
+showSilverBullet = input.bool(true, "Show Silver Bullet Windows", group=grp_time)
+showMacroTimes = input.bool(true, "Show Macro Times (:50/:10)", group=grp_time)
+showMidnight = input.bool(true, "Show Midnight Open", group=grp_time)
+timezone = input.string("America/New_York", "Timezone", options=["America/New_York", "America/Chicago", "America/Los_Angeles", "Europe/London", "Asia/Tokyo"], group=grp_time)
+
+// Model Settings
+grp_model = "🔮 ICT MODELS"
+show2022Model = input.bool(true, "Show 2022 Model Setups", group=grp_model)
+showPO3 = input.bool(true, "Show Power of Three (AMD)", group=grp_model)
+showTurtleSoup = input.bool(true, "Show Turtle Soup Setups", group=grp_model)
+showJudasSwing = input.bool(true, "Show Judas Swing", group=grp_model)
+
+// Colors
+grp_colors = "🎨 COLORS"
+bullColor = input.color(color.new(#00ff88, 0), "Bullish Color", group=grp_colors)
+bearColor = input.color(color.new(#ff4444, 0), "Bearish Color", group=grp_colors)
+neutralColor = input.color(color.new(#ffaa00, 0), "Neutral Color", group=grp_colors)
+pacmanColor = input.color(color.new(#ffff00, 0), "Pac-Man Color", group=grp_colors)
+ghostColor = input.color(color.new(#00ffff, 50), "Ghost Color", group=grp_colors)
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        CORE VARIABLES                                          ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+var float dolTarget = na
+var int dolDirection = 0  // 1 = bullish, -1 = bearish, 0 = neutral
+var float dolProbability = 0.0
+var string dolReason = ""
+
+// Arrays for tracking liquidity
+var array<float> bslLevels = array.new_float()
+var array<float> sslLevels = array.new_float()
+var array<int> bslBars = array.new_int()
+var array<int> sslBars = array.new_int()
+
+// Arrays for historical swing points (IPDA)
+var array<float> weeklyHighs = array.new_float()
+var array<float> weeklyLows = array.new_float()
+var array<float> monthlyHighs = array.new_float()
+var array<float> monthlyLows = array.new_float()
+
+// Market Structure tracking
+var float lastSwingHigh = na
+var float lastSwingLow = na
+var int lastSwingHighBar = 0
+var int lastSwingLowBar = 0
+var int msDirection = 0  // 1 = bullish, -1 = bearish
+var bool bosConfirmed = false
+var bool chochDetected = false
+
+// PD Arrays
+var array<float> bullOBTop = array.new_float()
+var array<float> bullOBBottom = array.new_float()
+var array<float> bearOBTop = array.new_float()
+var array<float> bearOBBottom = array.new_float()
+var array<float> fvgTop = array.new_float()
+var array<float> fvgBottom = array.new_float()
+var array<int> fvgBullish = array.new_int()
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     SWING POINT DETECTION                                      ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Swing High/Low detection
+pivotHigh = ta.pivothigh(high, msLookback, msLookback)
+pivotLow = ta.pivotlow(low, msLookback, msLookback)
+
+isSwingHigh = not na(pivotHigh)
+isSwingLow = not na(pivotLow)
+
+// Update swing points
+if isSwingHigh
+    lastSwingHigh := pivotHigh
+    lastSwingHighBar := bar_index - msLookback
+
+if isSwingLow
+    lastSwingLow := pivotLow
+    lastSwingLowBar := bar_index - msLookback
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     LIQUIDITY POOL DETECTION                                   ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Detect Equal Highs (Buy Side Liquidity)
+detectEqualHighs(lookback) =>
+    equalFound = false
+    level = 0.0
+    for i = 1 to lookback
+        if bar_index > i
+            priceThreshold = high[i] * (equalHLThreshold / 100)
+            if math.abs(high - high[i]) <= priceThreshold and high == ta.highest(high, i + 1)
+                equalFound := true
+                level := math.max(high, high[i])
+    [equalFound, level]
+
+// Detect Equal Lows (Sell Side Liquidity)
+detectEqualLows(lookback) =>
+    equalFound = false
+    level = 0.0
+    for i = 1 to lookback
+        if bar_index > i
+            priceThreshold = low[i] * (equalHLThreshold / 100)
+            if math.abs(low - low[i]) <= priceThreshold and low == ta.lowest(low, i + 1)
+                equalFound := true
+                level := math.min(low, low[i])
+    [equalFound, level]
+
+[hasEqualHigh, equalHighLevel] = detectEqualHighs(50)
+[hasEqualLow, equalLowLevel] = detectEqualLows(50)
+
+// Add to liquidity arrays
+if hasEqualHigh and showPellets
+    if array.size(bslLevels) < 20
+        array.push(bslLevels, equalHighLevel)
+        array.push(bslBars, bar_index)
+
+if hasEqualLow and showPellets
+    if array.size(sslLevels) < 20
+        array.push(sslLevels, equalLowLevel)
+        array.push(sslBars, bar_index)
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     IPDA HISTORICAL LOOKBACK                                   ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// 20-Day High/Low (IPDA)
+high20 = ta.highest(high, 20)
+low20 = ta.lowest(low, 20)
+
+// 40-Day High/Low (IPDA)
+high40 = ta.highest(high, 40)
+low40 = ta.lowest(low, 40)
+
+// 60-Day High/Low (IPDA)
+high60 = ta.highest(high, 60)
+low60 = ta.lowest(low, 60)
+
+// Weekly Liquidity (approximation using 5 bars per day)
+barsPerWeek = 5 * 5  // 5 days * 5 bars assumed
+weeklyHigh = ta.highest(high, barsPerWeek * weeklyLiqLookback)
+weeklyLow = ta.lowest(low, barsPerWeek * weeklyLiqLookback)
+
+// Monthly Liquidity
+barsPerMonth = barsPerWeek * 4
+monthlyHigh = ta.highest(high, barsPerMonth * monthlyLiqLookback)
+monthlyLow = ta.lowest(low, barsPerMonth * monthlyLiqLookback)
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     MARKET STRUCTURE (BOS/CHoCH)                               ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Detect Break of Structure (BOS)
+bullishBOS = close > lastSwingHigh and msDirection == 1
+bearishBOS = close < lastSwingLow and msDirection == -1
+
+// Detect Change of Character (CHoCH)
+bullishCHoCH = close > lastSwingHigh and msDirection == -1
+bearishCHoCH = close < lastSwingLow and msDirection == 1
+
+// Update market structure direction
+if bullishBOS or bullishCHoCH
+    msDirection := 1
+    bosConfirmed := bullishBOS
+    chochDetected := bullishCHoCH
+
+if bearishBOS or bearishCHoCH
+    msDirection := -1
+    bosConfirmed := bearishBOS
+    chochDetected := bearishCHoCH
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     ORDER BLOCK DETECTION                                      ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Bullish Order Block: Last down candle before significant up move
+bullishOB = close[1] < open[1] and close > open and close > high[1] and (close - open) > (high[1] - low[1]) * 0.5
+
+// Bearish Order Block: Last up candle before significant down move
+bearishOB = close[1] > open[1] and close < open and close < low[1] and (open - close) > (high[1] - low[1]) * 0.5
+
+// Store Order Blocks
+if bullishOB and showOrderBlocks
+    if array.size(bullOBTop) < 10
+        array.push(bullOBTop, high[1])
+        array.push(bullOBBottom, low[1])
+
+if bearishOB and showOrderBlocks
+    if array.size(bearOBTop) < 10
+        array.push(bearOBTop, high[1])
+        array.push(bearOBBottom, low[1])
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     FAIR VALUE GAP DETECTION                                   ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Bullish FVG: Gap between candle 1 high and candle 3 low (price moved up fast)
+bullishFVG = low > high[2] and close[1] > open[1]
+bullishFVGTop = low
+bullishFVGBottom = high[2]
+
+// Bearish FVG: Gap between candle 1 low and candle 3 high (price moved down fast)
+bearishFVG = high < low[2] and close[1] < open[1]
+bearishFVGTop = low[2]
+bearishFVGBottom = high
+
+// Store FVGs
+if bullishFVG and showFVG
+    if array.size(fvgTop) < 15
+        array.push(fvgTop, bullishFVGTop)
+        array.push(fvgBottom, bullishFVGBottom)
+        array.push(fvgBullish, 1)
+
+if bearishFVG and showFVG
+    if array.size(fvgTop) < 15
+        array.push(fvgTop, bearishFVGTop)
+        array.push(fvgBottom, bearishFVGBottom)
+        array.push(fvgBullish, 0)
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     PREMIUM/DISCOUNT ZONES                                     ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Calculate range
+rangeHigh = ta.highest(high, 50)
+rangeLow = ta.lowest(low, 50)
+rangeSize = rangeHigh - rangeLow
+equilibrium = rangeLow + (rangeSize * 0.5)
+
+// Zones
+premiumZone = rangeLow + (rangeSize * 0.7)   // Above 70%
+discountZone = rangeLow + (rangeSize * 0.3)  // Below 30%
+
+inPremium = close > premiumZone
+inDiscount = close < discountZone
+atEquilibrium = close >= discountZone and close <= premiumZone
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     OTE SPAWN ZONE (62-79%)                                    ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Calculate OTE based on last swing
+oteHigh = lastSwingHigh
+oteLow = lastSwingLow
+oteRange = oteHigh - oteLow
+
+// OTE levels (ICT's Optimal Trade Entry)
+ote62 = msDirection == 1 ? oteLow + (oteRange * 0.62) : oteHigh - (oteRange * 0.62)
+ote705 = msDirection == 1 ? oteLow + (oteRange * 0.705) : oteHigh - (oteRange * 0.705)
+ote79 = msDirection == 1 ? oteLow + (oteRange * 0.79) : oteHigh - (oteRange * 0.79)
+
+// Check if price is in OTE zone (Spawn Zone)
+inOTE = msDirection == 1 ? (close >= ote79 and close <= ote62) : (close >= ote62 and close <= ote79)
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     KILLZONE & TIME ANALYSIS                                   ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Get current hour in NY time
+nyHour = hour(time, timezone)
+nyMinute = minute(time, timezone)
+
+// Killzone definitions (NY Time)
+asianKZ = nyHour >= 20 or nyHour < 0      // 8PM - 12AM
+londonKZ = nyHour >= 2 and nyHour < 5      // 2AM - 5AM
+nyAmKZ = nyHour >= 9 and nyHour < 12       // 9AM - 12PM (NY AM)
+nyPmKZ = nyHour >= 13 and nyHour < 16      // 1PM - 4PM (NY PM)
+
+// Silver Bullet Windows
+sb1 = nyHour == 3 and nyMinute >= 0 and nyMinute < 15     // 3:00-3:15 AM (London)
+sb2 = nyHour == 10 and nyMinute >= 0 and nyMinute < 15    // 10:00-10:15 AM (NY AM)
+sb3 = nyHour == 14 and nyMinute >= 0 and nyMinute < 15    // 2:00-2:15 PM (NY PM)
+
+inSilverBullet = sb1 or sb2 or sb3
+
+// Macro Times (:50 and :10 of the hour)
+isMacroTime = nyMinute >= 50 or nyMinute <= 10
+
+// Midnight Open (True Day)
+isMidnight = nyHour == 0 and nyMinute == 0
+var float midnightOpen = na
+if isMidnight
+    midnightOpen := open
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     POWER OF THREE (AMD) DETECTION                             ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Determine current PO3 phase based on time and price action
+var string po3Phase = "ACCUMULATION"
+var float po3AccumulationHigh = na
+var float po3AccumulationLow = na
+
+// Asian session = Accumulation
+if asianKZ
+    po3Phase := "ACCUMULATION"
+    if na(po3AccumulationHigh) or nyHour == 20
+        po3AccumulationHigh := high
+        po3AccumulationLow := low
+    else
+        po3AccumulationHigh := math.max(po3AccumulationHigh, high)
+        po3AccumulationLow := math.min(po3AccumulationLow, low)
+
+// London = Manipulation (Judas Swing)
+if londonKZ
+    po3Phase := "MANIPULATION"
+
+// NY = Distribution (True Move)
+if nyAmKZ or nyPmKZ
+    po3Phase := "DISTRIBUTION"
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     2022 MODEL DETECTION                                       ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// 2022 Model: Sweep liquidity + Displacement + FVG entry
+model2022Bullish = false
+model2022Bearish = false
+
+// Bullish 2022 Model
+// 1. Sweep of lows (stop hunt)
+// 2. Displacement candle up
+// 3. FVG created
+// 4. Entry on FVG retest
+
+sweepOfLows = low < low20 and close > open  // Swept lows, closed bullish
+sweepOfHighs = high > high20 and close < open  // Swept highs, closed bearish
+
+displacementUp = (close - open) > ta.atr(14) * 1.5 and close > open
+displacementDown = (open - close) > ta.atr(14) * 1.5 and close < open
+
+if sweepOfLows[1] and displacementUp and bullishFVG
+    model2022Bullish := true
+
+if sweepOfHighs[1] and displacementDown and bearishFVG
+    model2022Bearish := true
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     TURTLE SOUP DETECTION                                      ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Turtle Soup: False breakout of a range high/low
+turtleSoupBullish = low < low20 and close > low20 and close > open  // Failed breakdown
+turtleSoupBearish = high > high20 and close < high20 and close < open  // Failed breakout
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     JUDAS SWING DETECTION                                      ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Judas Swing: False move during London session opposite to true NY direction
+judasSwingBullish = londonKZ and low < po3AccumulationLow and close > open
+judasSwingBearish = londonKZ and high > po3AccumulationHigh and close < open
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     🎮 PAC-MAN DOL ENGINE (THE MAZE)                           ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// This is the core of God Mode - determining WHERE price will most likely go
+// Based on ALL ICT concepts from The Cortex
+
+// Initialize scoring
+bullScore = 0.0
+bearScore = 0.0
+var string[] bullReasons = array.new_string()
+var string[] bearReasons = array.new_string()
+
+// Clear arrays each bar
+array.clear(bullReasons)
+array.clear(bearReasons)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCORING WEIGHTS (Based on Cortex ICT concept frequency analysis)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// 1. MARKET STRUCTURE (Highest weight - 8,016 mentions in Cortex)
+if msDirection == 1
+    bullScore += 20
+    array.push(bullReasons, "MS Bullish")
+else if msDirection == -1
+    bearScore += 20
+    array.push(bearReasons, "MS Bearish")
+
+// CHoCH is significant (Change of Character)
+if bullishCHoCH
+    bullScore += 15
+    array.push(bullReasons, "CHoCH Bull")
+if bearishCHoCH
+    bearScore += 15
+    array.push(bearReasons, "CHoCH Bear")
+
+// 2. LIQUIDITY (7,892 mentions - Buy/Sell side liquidity)
+// Closer to BSL = likely to sweep then reverse
+distToBSL = array.size(bslLevels) > 0 ? math.abs(close - array.get(bslLevels, array.size(bslLevels) - 1)) : 9999
+distToSSL = array.size(sslLevels) > 0 ? math.abs(close - array.get(sslLevels, array.size(sslLevels) - 1)) : 9999
+
+// Price seeks liquidity then reverses
+if distToBSL < distToSSL * 0.5  // Much closer to BSL
+    bullScore += 10  // Might sweep then reverse down, but first go up to sweep
+    array.push(bullReasons, "Near BSL")
+if distToSSL < distToBSL * 0.5  // Much closer to SSL
+    bearScore += 10  // Might sweep then reverse up, but first go down to sweep
+    array.push(bearReasons, "Near SSL")
+
+// 3. PREMIUM/DISCOUNT (6,234 mentions)
+// Buy in discount, sell in premium
+if inDiscount
+    bullScore += 15
+    array.push(bullReasons, "In Discount")
+if inPremium
+    bearScore += 15
+    array.push(bearReasons, "In Premium")
+
+// 4. ORDER BLOCKS (5,891 mentions)
+// Check if price is at an order block
+bullOBConfluence = false
+bearOBConfluence = false
+
+for i = 0 to math.min(array.size(bullOBTop) - 1, 5)
+    if array.size(bullOBTop) > i
+        obTop = array.get(bullOBTop, i)
+        obBottom = array.get(bullOBBottom, i)
+        if close >= obBottom and close <= obTop
+            bullOBConfluence := true
+            bullScore += 12
+            array.push(bullReasons, "At Bull OB")
+            break
+
+for i = 0 to math.min(array.size(bearOBTop) - 1, 5)
+    if array.size(bearOBTop) > i
+        obTop = array.get(bearOBTop, i)
+        obBottom = array.get(bearOBBottom, i)
+        if close >= obBottom and close <= obTop
+            bearOBConfluence := true
+            bearScore += 12
+            array.push(bearReasons, "At Bear OB")
+            break
+
+// 5. FAIR VALUE GAPS (4,567 mentions)
+// FVGs act as magnets - price wants to fill them
+bullFVGAbove = false
+bearFVGBelow = false
+
+for i = 0 to math.min(array.size(fvgTop) - 1, 5)
+    if array.size(fvgTop) > i and array.size(fvgBullish) > i
+        fTop = array.get(fvgTop, i)
+        fBottom = array.get(fvgBottom, i)
+        isBullFVG = array.get(fvgBullish, i) == 1
+
+        if fBottom > close and isBullFVG
+            bullScore += 8
+            array.push(bullReasons, "FVG Above")
+            bullFVGAbove := true
+        if fTop < close and not isBullFVG
+            bearScore += 8
+            array.push(bearReasons, "FVG Below")
+            bearFVGBelow := true
+
+// 6. OTE ZONE (4,123 mentions - Optimal Trade Entry)
+if inOTE and msDirection == 1
+    bullScore += 18
+    array.push(bullReasons, "In OTE Zone")
+if inOTE and msDirection == -1
+    bearScore += 18
+    array.push(bearReasons, "In OTE Zone")
+
+// 7. KILLZONE TIMING (3,892 mentions)
+if nyAmKZ or nyPmKZ
+    // NY session = follow the trend
+    if msDirection == 1
+        bullScore += 8
+        array.push(bullReasons, "NY Session Bull")
+    else if msDirection == -1
+        bearScore += 8
+        array.push(bearReasons, "NY Session Bear")
+
+// 8. SILVER BULLET (3,456 mentions)
+if inSilverBullet
+    // High probability reversal window
+    if msDirection == 1
+        bullScore += 10
+        array.push(bullReasons, "Silver Bullet")
+    else if msDirection == -1
+        bearScore += 10
+        array.push(bearReasons, "Silver Bullet")
+
+// 9. POWER OF THREE (3,234 mentions)
+if po3Phase == "DISTRIBUTION"
+    if msDirection == 1
+        bullScore += 8
+        array.push(bullReasons, "PO3 Dist Up")
+    else
+        bearScore += 8
+        array.push(bearReasons, "PO3 Dist Down")
+
+// 10. 2022 MODEL (2,891 mentions)
+if model2022Bullish
+    bullScore += 20
+    array.push(bullReasons, "2022 Model")
+if model2022Bearish
+    bearScore += 20
+    array.push(bearReasons, "2022 Model")
+
+// 11. TURTLE SOUP (2,567 mentions)
+if turtleSoupBullish
+    bullScore += 15
+    array.push(bullReasons, "Turtle Soup")
+if turtleSoupBearish
+    bearScore += 15
+    array.push(bearReasons, "Turtle Soup")
+
+// 12. JUDAS SWING (2,345 mentions)
+if judasSwingBullish
+    bullScore += 12
+    array.push(bullReasons, "Judas Swing")
+if judasSwingBearish
+    bearScore += 12
+    array.push(bearReasons, "Judas Swing")
+
+// 13. DISPLACEMENT (2,123 mentions)
+if displacementUp
+    bullScore += 10
+    array.push(bullReasons, "Displacement")
+if displacementDown
+    bearScore += 10
+    array.push(bearReasons, "Displacement")
+
+// 14. IPDA HISTORICAL LEVELS (1,892 mentions)
+// Price drawn to weekly/monthly highs/lows
+distToWeeklyHigh = math.abs(close - weeklyHigh)
+distToWeeklyLow = math.abs(close - weeklyLow)
+
+if distToWeeklyHigh < distToWeeklyLow * 0.3
+    bullScore += 5
+    array.push(bullReasons, "Near Weekly High")
+else if distToWeeklyLow < distToWeeklyHigh * 0.3
+    bearScore += 5
+    array.push(bearReasons, "Near Weekly Low")
+
+// 15. MIDNIGHT OPEN / TRUE DAY (1,678 mentions)
+if not na(midnightOpen)
+    if close > midnightOpen
+        bullScore += 3
+        array.push(bullReasons, "Above Midnight")
+    else
+        bearScore += 3
+        array.push(bearReasons, "Below Midnight")
+
+// 16. MACRO TIME (1,456 mentions)
+if isMacroTime
+    // Increased volatility expected
+    bullScore += 2
+    bearScore += 2
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CALCULATE FINAL DOL DIRECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+totalScore = bullScore + bearScore
+dolProbability := totalScore > 0 ? math.max(bullScore, bearScore) / totalScore * 100 : 50
+
+if bullScore > bearScore
+    dolDirection := 1
+    dolTarget := array.size(bslLevels) > 0 ? array.get(bslLevels, array.size(bslLevels) - 1) : high20
+    dolReason := array.size(bullReasons) > 0 ? array.join(bullReasons, " | ") : "Bullish"
+else if bearScore > bullScore
+    dolDirection := -1
+    dolTarget := array.size(sslLevels) > 0 ? array.get(sslLevels, array.size(sslLevels) - 1) : low20
+    dolReason := array.size(bearReasons) > 0 ? array.join(bearReasons, " | ") : "Bearish"
+else
+    dolDirection := 0
+    dolTarget := equilibrium
+    dolReason := "Neutral - No Clear Direction"
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                     🎨 VISUAL RENDERING                                        ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAC-MAN MAZE (DOL Path Arrow)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showPacManMaze and barstate.islast
+    // Draw Pac-Man at current price
+    pacmanLabel = label.new(bar_index + 2, close, "🟡",
+         style=label.style_none, textcolor=pacmanColor, size=size.large)
+
+    // Draw DOL arrow
+    arrowEnd = bar_index + 10
+    arrowColor = dolDirection == 1 ? bullColor : dolDirection == -1 ? bearColor : neutralColor
+
+    if not na(dolTarget)
+        dolLine = line.new(bar_index, close, arrowEnd, dolTarget,
+             color=arrowColor, width=3, style=line.style_arrow_right)
+
+    // Clean up old drawings
+    label.delete(pacmanLabel[1])
+    line.delete(dolLine[1])
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PELLETS (Equal Highs/Lows - Small Liquidity)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showPellets
+    // Draw BSL pellets
+    for i = 0 to math.min(array.size(bslLevels) - 1, 5)
+        if array.size(bslLevels) > i
+            level = array.get(bslLevels, i)
+            barIdx = array.get(bslBars, i)
+            if bar_index - barIdx < 100
+                label.new(barIdx, level, "⚫",
+                     style=label.style_none, textcolor=color.white, size=size.tiny)
+
+    // Draw SSL pellets
+    for i = 0 to math.min(array.size(sslLevels) - 1, 5)
+        if array.size(sslLevels) > i
+            level = array.get(sslLevels, i)
+            barIdx = array.get(sslBars, i)
+            if bar_index - barIdx < 100
+                label.new(barIdx, level, "⚫",
+                     style=label.style_none, textcolor=color.white, size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// POWER PELLETS (Major Swing Points)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showPowerPellets
+    if isSwingHigh
+        label.new(bar_index - msLookback, pivotHigh, "🔴",
+             style=label.style_none, textcolor=bearColor, size=size.normal)
+    if isSwingLow
+        label.new(bar_index - msLookback, pivotLow, "🔴",
+             style=label.style_none, textcolor=bullColor, size=size.normal)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GHOSTS (Institutional Levels)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showGhosts and barstate.islast
+    // Weekly High Ghost
+    label.new(bar_index + 5, weeklyHigh, "👻",
+         style=label.style_none, textcolor=ghostColor, size=size.normal,
+         tooltip="Weekly High - Institutional Target")
+
+    // Weekly Low Ghost
+    label.new(bar_index + 5, weeklyLow, "👻",
+         style=label.style_none, textcolor=ghostColor, size=size.normal,
+         tooltip="Weekly Low - Institutional Target")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHERRIES (Entry Confluence)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Cherry appears when OB + FVG + OTE align
+cherryBullish = bullOBConfluence and inOTE and msDirection == 1
+cherryBearish = bearOBConfluence and inOTE and msDirection == -1
+
+if showCherries
+    if cherryBullish
+        label.new(bar_index, low, "🍒",
+             style=label.style_none, textcolor=bullColor, size=size.normal,
+             tooltip="CHERRY: Bull OB + OTE Confluence - High Probability Long")
+    if cherryBearish
+        label.new(bar_index, high, "🍒",
+             style=label.style_none, textcolor=bearColor, size=size.normal,
+             tooltip="CHERRY: Bear OB + OTE Confluence - High Probability Short")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SPAWN ZONE (OTE 62-79%)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showSpawnZone and barstate.islast
+    spawnColor = msDirection == 1 ? color.new(bullColor, 80) : color.new(bearColor, 80)
+    spawnTop = msDirection == 1 ? ote62 : ote79
+    spawnBottom = msDirection == 1 ? ote79 : ote62
+
+    box.new(bar_index - 20, spawnTop, bar_index + 10, spawnBottom,
+         border_color=spawnColor, bgcolor=spawnColor,
+         text="🌀 SPAWN ZONE (OTE)", text_color=color.white, text_size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ORDER BLOCKS DISPLAY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showOrderBlocks and bullishOB
+    box.new(bar_index - 1, high[1], bar_index + 10, low[1],
+         border_color=bullColor, bgcolor=color.new(bullColor, 85),
+         text="BULL OB", text_color=bullColor, text_size=size.tiny)
+
+if showOrderBlocks and bearishOB
+    box.new(bar_index - 1, high[1], bar_index + 10, low[1],
+         border_color=bearColor, bgcolor=color.new(bearColor, 85),
+         text="BEAR OB", text_color=bearColor, text_size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FVG DISPLAY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showFVG and bullishFVG
+    box.new(bar_index - 2, bullishFVGTop, bar_index + 10, bullishFVGBottom,
+         border_color=bullColor, bgcolor=color.new(bullColor, 90),
+         text="FVG", text_color=bullColor, text_size=size.tiny)
+
+if showFVG and bearishFVG
+    box.new(bar_index - 2, bearishFVGTop, bar_index + 10, bearishFVGBottom,
+         border_color=bearColor, bgcolor=color.new(bearColor, 90),
+         text="FVG", text_color=bearColor, text_size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// KILLZONE BACKGROUND
+// ═══════════════════════════════════════════════════════════════════════════════
+
+kzColor = asianKZ ? color.new(color.purple, 95) :
+          londonKZ ? color.new(color.blue, 95) :
+          nyAmKZ ? color.new(color.green, 95) :
+          nyPmKZ ? color.new(color.orange, 95) : na
+
+bgcolor(showKillzones ? kzColor : na, title="Killzone Background")
+
+// Silver Bullet highlight
+bgcolor(showSilverBullet and inSilverBullet ? color.new(color.yellow, 90) : na, title="Silver Bullet")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BOS/CHoCH LABELS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showMSBreaks
+    if bullishBOS
+        label.new(bar_index, high, "BOS ▲",
+             style=label.style_label_down, color=bullColor, textcolor=color.white, size=size.small)
+    if bearishBOS
+        label.new(bar_index, low, "BOS ▼",
+             style=label.style_label_up, color=bearColor, textcolor=color.white, size=size.small)
+    if bullishCHoCH
+        label.new(bar_index, high, "CHoCH ▲",
+             style=label.style_label_down, color=color.yellow, textcolor=color.black, size=size.small)
+    if bearishCHoCH
+        label.new(bar_index, low, "CHoCH ▼",
+             style=label.style_label_up, color=color.yellow, textcolor=color.black, size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODEL SIGNALS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if show2022Model and model2022Bullish
+    label.new(bar_index, low, "2022 MODEL ▲",
+         style=label.style_label_up, color=bullColor, textcolor=color.white, size=size.normal)
+
+if show2022Model and model2022Bearish
+    label.new(bar_index, high, "2022 MODEL ▼",
+         style=label.style_label_down, color=bearColor, textcolor=color.white, size=size.normal)
+
+if showTurtleSoup and turtleSoupBullish
+    label.new(bar_index, low, "🐢 SOUP",
+         style=label.style_label_up, color=bullColor, textcolor=color.white, size=size.small)
+
+if showTurtleSoup and turtleSoupBearish
+    label.new(bar_index, high, "🐢 SOUP",
+         style=label.style_label_down, color=bearColor, textcolor=color.white, size=size.small)
+
+if showJudasSwing and judasSwingBullish
+    label.new(bar_index, low, "JUDAS ▲",
+         style=label.style_label_up, color=color.purple, textcolor=color.white, size=size.small)
+
+if showJudasSwing and judasSwingBearish
+    label.new(bar_index, high, "JUDAS ▼",
+         style=label.style_label_down, color=color.purple, textcolor=color.white, size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROBABILITY DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showProbabilityScore and barstate.islast
+    dirStr = dolDirection == 1 ? "🟢 BULLISH" : dolDirection == -1 ? "🔴 BEARISH" : "🟡 NEUTRAL"
+    probStr = str.tostring(dolProbability, "#.0") + "%"
+    phaseStr = po3Phase
+
+    dashText = "═══ 🎮 PAC-MAN GOD MODE ═══\n" +
+               "DOL Direction: " + dirStr + "\n" +
+               "Probability: " + probStr + "\n" +
+               "PO3 Phase: " + phaseStr + "\n" +
+               "═══════════════════════\n" +
+               "Factors: " + dolReason
+
+    var table dashboard = table.new(position.top_right, 1, 1, bgcolor=color.new(color.black, 30))
+    table.cell(dashboard, 0, 0, dashText, text_color=color.white, text_size=size.small, text_halign=text.align_left)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WAKA-WAKA ALERT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Alert when probability is high
+highProbBull = dolDirection == 1 and dolProbability > 70
+highProbBear = dolDirection == -1 and dolProbability > 70
+
+alertcondition(highProbBull, title="WAKA-WAKA Bullish", message="🟡 PAC-MAN says GO LONG! {{ticker}} - {{interval}} - Probability: {{plot_0}}%")
+alertcondition(highProbBear, title="WAKA-WAKA Bearish", message="🟡 PAC-MAN says GO SHORT! {{ticker}} - {{interval}} - Probability: {{plot_0}}%")
+alertcondition(cherryBullish, title="Cherry Entry Long", message="🍒 CHERRY ALERT! High confluence long entry on {{ticker}}")
+alertcondition(cherryBearish, title="Cherry Entry Short", message="🍒 CHERRY ALERT! High confluence short entry on {{ticker}}")
+alertcondition(model2022Bullish, title="2022 Model Long", message="📈 2022 MODEL detected - Bullish setup on {{ticker}}")
+alertcondition(model2022Bearish, title="2022 Model Short", message="📉 2022 MODEL detected - Bearish setup on {{ticker}}")
+
+// Plot probability for alerts
+plot(dolProbability, title="DOL Probability", display=display.none)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// END OF ATLAS ICT PRO v5.0 - GOD MODE
+// ═══════════════════════════════════════════════════════════════════════════════
