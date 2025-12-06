@@ -641,9 +641,18 @@ else
 // PAC-MAN MAZE (DOL Path Arrow)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+var label pacmanLabel = na
+var line dolLine = na
+
 if showPacManMaze and barstate.islast
+    // Clean up old drawings first
+    if not na(pacmanLabel)
+        label.delete(pacmanLabel)
+    if not na(dolLine)
+        line.delete(dolLine)
+
     // Draw Pac-Man at current price
-    pacmanLabel = label.new(bar_index + 2, close, "🟡",
+    pacmanLabel := label.new(bar_index + 2, close, "🟡",
          style=label.style_none, textcolor=pacmanColor, size=size.large)
 
     // Draw DOL arrow
@@ -651,93 +660,82 @@ if showPacManMaze and barstate.islast
     arrowColor = dolDirection == 1 ? bullColor : dolDirection == -1 ? bearColor : neutralColor
 
     if not na(dolTarget)
-        dolLine = line.new(bar_index, close, arrowEnd, dolTarget,
+        dolLine := line.new(bar_index, close, arrowEnd, dolTarget,
              color=arrowColor, width=3, style=line.style_arrow_right)
 
-    // Clean up old drawings
-    label.delete(pacmanLabel[1])
-    line.delete(dolLine[1])
-
 // ═══════════════════════════════════════════════════════════════════════════════
-// PELLETS (Equal Highs/Lows - Small Liquidity)
+// PELLETS (Equal Highs/Lows - Small Liquidity) - Plot as shapes instead of labels
 // ═══════════════════════════════════════════════════════════════════════════════
 
-if showPellets
-    // Draw BSL pellets
-    for i = 0 to math.min(array.size(bslLevels) - 1, 5)
-        if array.size(bslLevels) > i
-            level = array.get(bslLevels, i)
-            barIdx = array.get(bslBars, i)
-            if bar_index - barIdx < 100
-                label.new(barIdx, level, "⚫",
-                     style=label.style_none, textcolor=color.white, size=size.tiny)
-
-    // Draw SSL pellets
-    for i = 0 to math.min(array.size(sslLevels) - 1, 5)
-        if array.size(sslLevels) > i
-            level = array.get(sslLevels, i)
-            barIdx = array.get(sslBars, i)
-            if bar_index - barIdx < 100
-                label.new(barIdx, level, "⚫",
-                     style=label.style_none, textcolor=color.white, size=size.tiny)
+// Use plotshape for pellets to avoid label spam
+plotshape(showPellets and hasEqualHigh, title="BSL Pellet", style=shape.circle,
+     location=location.abovebar, color=color.new(color.white, 30), size=size.tiny)
+plotshape(showPellets and hasEqualLow, title="SSL Pellet", style=shape.circle,
+     location=location.belowbar, color=color.new(color.white, 30), size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// POWER PELLETS (Major Swing Points)
+// POWER PELLETS (Major Swing Points) - Use plotshape
 // ═══════════════════════════════════════════════════════════════════════════════
 
-if showPowerPellets
-    if isSwingHigh
-        label.new(bar_index - msLookback, pivotHigh, "🔴",
-             style=label.style_none, textcolor=bearColor, size=size.normal)
-    if isSwingLow
-        label.new(bar_index - msLookback, pivotLow, "🔴",
-             style=label.style_none, textcolor=bullColor, size=size.normal)
+plotshape(showPowerPellets and isSwingHigh, title="Swing High", style=shape.diamond,
+     location=location.abovebar, color=bearColor, size=size.small, offset=-msLookback)
+plotshape(showPowerPellets and isSwingLow, title="Swing Low", style=shape.diamond,
+     location=location.belowbar, color=bullColor, size=size.small, offset=-msLookback)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GHOSTS (Institutional Levels)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+var label ghostHighLabel = na
+var label ghostLowLabel = na
+
 if showGhosts and barstate.islast
+    // Clean up old
+    if not na(ghostHighLabel)
+        label.delete(ghostHighLabel)
+    if not na(ghostLowLabel)
+        label.delete(ghostLowLabel)
+
     // Weekly High Ghost
-    label.new(bar_index + 5, weeklyHigh, "👻",
+    ghostHighLabel := label.new(bar_index + 5, weeklyHigh, "👻 BSL",
          style=label.style_none, textcolor=ghostColor, size=size.normal,
          tooltip="Weekly High - Institutional Target")
 
     // Weekly Low Ghost
-    label.new(bar_index + 5, weeklyLow, "👻",
+    ghostLowLabel := label.new(bar_index + 5, weeklyLow, "👻 SSL",
          style=label.style_none, textcolor=ghostColor, size=size.normal,
          tooltip="Weekly Low - Institutional Target")
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CHERRIES (Entry Confluence)
+// CHERRIES (Entry Confluence) - Use plotshape
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Cherry appears when OB + FVG + OTE align
 cherryBullish = bullOBConfluence and inOTE and msDirection == 1
 cherryBearish = bearOBConfluence and inOTE and msDirection == -1
 
-if showCherries
-    if cherryBullish
-        label.new(bar_index, low, "🍒",
-             style=label.style_none, textcolor=bullColor, size=size.normal,
-             tooltip="CHERRY: Bull OB + OTE Confluence - High Probability Long")
-    if cherryBearish
-        label.new(bar_index, high, "🍒",
-             style=label.style_none, textcolor=bearColor, size=size.normal,
-             tooltip="CHERRY: Bear OB + OTE Confluence - High Probability Short")
+plotshape(showCherries and cherryBullish, title="Cherry Long", style=shape.labelup,
+     location=location.belowbar, color=bullColor, text="🍒", textcolor=color.white, size=size.small)
+plotshape(showCherries and cherryBearish, title="Cherry Short", style=shape.labeldown,
+     location=location.abovebar, color=bearColor, text="🍒", textcolor=color.white, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SPAWN ZONE (OTE 62-79%)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+var box spawnBox = na
+
 if showSpawnZone and barstate.islast
+    if not na(spawnBox)
+        box.delete(spawnBox)
+
     spawnColor = msDirection == 1 ? color.new(bullColor, 80) : color.new(bearColor, 80)
     spawnTop = msDirection == 1 ? ote62 : ote79
     spawnBottom = msDirection == 1 ? ote79 : ote62
 
-    box.new(bar_index - 20, spawnTop, bar_index + 10, spawnBottom,
+    spawnBox := box.new(bar_index - 20, spawnTop, bar_index + 10, spawnBottom,
          border_color=spawnColor, bgcolor=spawnColor,
-         text="🌀 SPAWN ZONE (OTE)", text_color=color.white, text_size=size.small)
+         text="SPAWN ZONE (OTE)", text_color=color.white, text_size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ORDER BLOCKS DISPLAY
@@ -782,50 +780,36 @@ bgcolor(showKillzones ? kzColor : na, title="Killzone Background")
 bgcolor(showSilverBullet and inSilverBullet ? color.new(color.yellow, 90) : na, title="Silver Bullet")
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// BOS/CHoCH LABELS
+// BOS/CHoCH LABELS - Use plotshape
 // ═══════════════════════════════════════════════════════════════════════════════
 
-if showMSBreaks
-    if bullishBOS
-        label.new(bar_index, high, "BOS ▲",
-             style=label.style_label_down, color=bullColor, textcolor=color.white, size=size.small)
-    if bearishBOS
-        label.new(bar_index, low, "BOS ▼",
-             style=label.style_label_up, color=bearColor, textcolor=color.white, size=size.small)
-    if bullishCHoCH
-        label.new(bar_index, high, "CHoCH ▲",
-             style=label.style_label_down, color=color.yellow, textcolor=color.black, size=size.small)
-    if bearishCHoCH
-        label.new(bar_index, low, "CHoCH ▼",
-             style=label.style_label_up, color=color.yellow, textcolor=color.black, size=size.small)
+plotshape(showMSBreaks and bullishBOS, title="BOS Bull", style=shape.triangleup,
+     location=location.abovebar, color=bullColor, text="BOS", textcolor=color.white, size=size.tiny)
+plotshape(showMSBreaks and bearishBOS, title="BOS Bear", style=shape.triangledown,
+     location=location.belowbar, color=bearColor, text="BOS", textcolor=color.white, size=size.tiny)
+plotshape(showMSBreaks and bullishCHoCH, title="CHoCH Bull", style=shape.triangleup,
+     location=location.abovebar, color=color.yellow, text="CHoCH", textcolor=color.black, size=size.small)
+plotshape(showMSBreaks and bearishCHoCH, title="CHoCH Bear", style=shape.triangledown,
+     location=location.belowbar, color=color.yellow, text="CHoCH", textcolor=color.black, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MODEL SIGNALS
+// MODEL SIGNALS - Use plotshape
 // ═══════════════════════════════════════════════════════════════════════════════
 
-if show2022Model and model2022Bullish
-    label.new(bar_index, low, "2022 MODEL ▲",
-         style=label.style_label_up, color=bullColor, textcolor=color.white, size=size.normal)
+plotshape(show2022Model and model2022Bullish, title="2022 Model Bull", style=shape.labelup,
+     location=location.belowbar, color=bullColor, text="2022", textcolor=color.white, size=size.normal)
+plotshape(show2022Model and model2022Bearish, title="2022 Model Bear", style=shape.labeldown,
+     location=location.abovebar, color=bearColor, text="2022", textcolor=color.white, size=size.normal)
 
-if show2022Model and model2022Bearish
-    label.new(bar_index, high, "2022 MODEL ▼",
-         style=label.style_label_down, color=bearColor, textcolor=color.white, size=size.normal)
+plotshape(showTurtleSoup and turtleSoupBullish, title="Turtle Soup Bull", style=shape.labelup,
+     location=location.belowbar, color=bullColor, text="SOUP", textcolor=color.white, size=size.small)
+plotshape(showTurtleSoup and turtleSoupBearish, title="Turtle Soup Bear", style=shape.labeldown,
+     location=location.abovebar, color=bearColor, text="SOUP", textcolor=color.white, size=size.small)
 
-if showTurtleSoup and turtleSoupBullish
-    label.new(bar_index, low, "🐢 SOUP",
-         style=label.style_label_up, color=bullColor, textcolor=color.white, size=size.small)
-
-if showTurtleSoup and turtleSoupBearish
-    label.new(bar_index, high, "🐢 SOUP",
-         style=label.style_label_down, color=bearColor, textcolor=color.white, size=size.small)
-
-if showJudasSwing and judasSwingBullish
-    label.new(bar_index, low, "JUDAS ▲",
-         style=label.style_label_up, color=color.purple, textcolor=color.white, size=size.small)
-
-if showJudasSwing and judasSwingBearish
-    label.new(bar_index, high, "JUDAS ▼",
-         style=label.style_label_down, color=color.purple, textcolor=color.white, size=size.small)
+plotshape(showJudasSwing and judasSwingBullish, title="Judas Bull", style=shape.labelup,
+     location=location.belowbar, color=color.purple, text="JUDAS", textcolor=color.white, size=size.small)
+plotshape(showJudasSwing and judasSwingBearish, title="Judas Bear", style=shape.labeldown,
+     location=location.abovebar, color=color.purple, text="JUDAS", textcolor=color.white, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PROBABILITY DASHBOARD
