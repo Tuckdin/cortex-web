@@ -124,6 +124,7 @@ i_showCBDRProjections = input.bool(true, "Show SD Projections", group=grp_cbdr)
 grp_nwog = "📅 NWOG (New Week Opening Gap)"
 i_showNWOG = input.bool(true, "Show NWOG", group=grp_nwog)
 i_showNWOGCE = input.bool(true, "Show NWOG Consequent Encroachment", group=grp_nwog)
+i_nwogWeeks = input.int(5, "Number of Weeks to Show", minval=1, maxval=10, group=grp_nwog)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MARKET STRUCTURE SETTINGS
@@ -294,11 +295,16 @@ var float cbdrLow = na
 var float cbdrRange = na
 var bool inCBDR = false
 
-// NWOG
+// NWOG - Arrays for multiple weeks
+var float[] nwogHighs = array.new_float(0)
+var float[] nwogLows = array.new_float(0)
+var float[] nwogCEs = array.new_float(0)
+var int[] nwogBars = array.new_int(0)  // Store bar_index when NWOG was created
+var bool newWeekStart = false
+// Keep single variables for backward compatibility with confluence
 var float nwogHigh = na
 var float nwogLow = na
 var float nwogCE = na
-var bool newWeekStart = false
 
 // Power of Three
 var string po3Phase = "ACCUMULATION"
@@ -1194,9 +1200,27 @@ isNewWeek = dayofweek == dayofweek.monday and dayofweek[1] != dayofweek.monday
 
 if isNewWeek and i_showNWOG
     // NWOG = Gap between Friday close and Sunday/Monday open
-    nwogHigh := math.max(close[1], open)
-    nwogLow := math.min(close[1], open)
-    nwogCE := (nwogHigh + nwogLow) / 2
+    float newNwogHigh = math.max(close[1], open)
+    float newNwogLow = math.min(close[1], open)
+    float newNwogCE = (newNwogHigh + newNwogLow) / 2
+
+    // Add new NWOG to beginning of arrays (index 0 = most recent)
+    array.unshift(nwogHighs, newNwogHigh)
+    array.unshift(nwogLows, newNwogLow)
+    array.unshift(nwogCEs, newNwogCE)
+    array.unshift(nwogBars, bar_index)
+
+    // Trim arrays to max weeks
+    while array.size(nwogHighs) > i_nwogWeeks
+        array.pop(nwogHighs)
+        array.pop(nwogLows)
+        array.pop(nwogCEs)
+        array.pop(nwogBars)
+
+    // Update single variables for backward compatibility
+    nwogHigh := newNwogHigh
+    nwogLow := newNwogLow
+    nwogCE := newNwogCE
     newWeekStart := true
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
@@ -1750,21 +1774,56 @@ plot(i_showCBDR and not na(cbdrHigh) ? cbdrHigh : na, "CBDR High", color=color.n
 plot(i_showCBDR and not na(cbdrLow) ? cbdrLow : na, "CBDR Low", color=color.new(color.teal, 30), linewidth=2, style=plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NWOG ZONE - Clean subtle style
+// NWOG ZONE - Multi-week display with progressive fading
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var box nwogBox = na
+var box[] nwogBoxes = array.new_box(0)
+var line[] nwogCELines = array.new_line(0)
 
-if i_showNWOG and not na(nwogHigh) and not na(nwogLow) and barstate.islast
-    if not na(nwogBox)
-        box.delete(nwogBox)
-    nwogBox := box.new(bar_index - 50, nwogHigh, bar_index + 10, nwogLow,
-         border_color=color.new(#E040FB, 60), bgcolor=color.new(#E040FB, 93),
-         border_width=1, border_style=line.style_dotted,
-         text="NWOG", text_color=color.new(#E040FB, 50), text_size=size.tiny, text_halign=text.align_right)
+// Clean up old boxes and lines on last bar
+if barstate.islast
+    // Delete existing boxes
+    for i = 0 to array.size(nwogBoxes) - 1
+        box.delete(array.get(nwogBoxes, i))
+    array.clear(nwogBoxes)
 
-// NWOG CE line
-plot(i_showNWOGCE and not na(nwogCE) ? nwogCE : na, "NWOG CE", color=color.new(color.fuchsia, 30), linewidth=2, style=plot.style_linebr)
+    // Delete existing CE lines
+    for i = 0 to array.size(nwogCELines) - 1
+        line.delete(array.get(nwogCELines, i))
+    array.clear(nwogCELines)
+
+    // Draw new boxes for each stored NWOG
+    if i_showNWOG
+        int nwogCount = array.size(nwogHighs)
+        for i = 0 to nwogCount - 1
+            float h = array.get(nwogHighs, i)
+            float l = array.get(nwogLows, i)
+            float ce = array.get(nwogCEs, i)
+            int startBar = array.get(nwogBars, i)
+
+            // Progressive fading: newer = more visible, older = more faded
+            int fadeLevel = 50 + (i * 8)  // 50, 58, 66, 74, 82 for 5 weeks
+            int bgFade = 88 + (i * 2)     // 88, 90, 92, 94, 96 for 5 weeks
+            fadeLevel := math.min(fadeLevel, 90)
+            bgFade := math.min(bgFade, 97)
+
+            // Label: NWOG-1 (current) through NWOG-5 (oldest)
+            string nwogLabel = "NWOG-" + str.tostring(i + 1)
+
+            // Draw box from its creation point to current bar + projection
+            box newBox = box.new(startBar, h, bar_index + 10, l,
+                 border_color=color.new(#E040FB, fadeLevel), bgcolor=color.new(#E040FB, bgFade),
+                 border_width=1, border_style=line.style_dotted,
+                 text=nwogLabel, text_color=color.new(#E040FB, fadeLevel), text_size=size.tiny, text_halign=text.align_right)
+            array.push(nwogBoxes, newBox)
+
+            // Draw CE line for each NWOG
+            if i_showNWOGCE
+                int ceFade = 30 + (i * 12)  // 30, 42, 54, 66, 78 for 5 weeks
+                ceFade := math.min(ceFade, 85)
+                line ceLine = line.new(startBar, ce, bar_index + 10, ce,
+                     color=color.new(#E040FB, ceFade), width=i == 0 ? 2 : 1, style=line.style_dashed)
+                array.push(nwogCELines, ceLine)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // OPENING RANGE GAP (ORG) VISUAL
