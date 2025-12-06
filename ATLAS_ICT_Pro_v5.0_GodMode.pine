@@ -305,12 +305,15 @@ var int dolDirection = 0
 var float dolProbability = 0.0
 var string dolReason = ""
 
-// Turtle Soup
+// Turtle Soup with Stalking Stages
 var float recentSwingHigh = na
 var float recentSwingLow = na
 var bool swingHighSwept = false
 var bool swingLowSwept = false
 var int tsStalking = 0  // 0 = none, 1 = stalking high, -1 = stalking low
+var string tsStage = "NONE"  // STALK, TRAP, CONFIRM, INVALID
+var int tsStageBar = 0
+var float tsEntryPrice = na
 
 // Session tracking
 var float asianHigh = na
@@ -324,6 +327,7 @@ var float midnightOpen = na
 // Composite Score
 var float compositeScore = 0.0
 var int compositeTier = 0
+var string patternName = ""
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        HELPER FUNCTIONS                                        ║
@@ -496,21 +500,85 @@ if bearishBOS or bearishCHoCH
     chochDetected := bearishCHoCH
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
-// ║                        TURTLE SOUP DETECTION                                   ║
+// ║                        TURTLE SOUP DETECTION (Enhanced with Stalking)          ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
 // Turtle Soup: Failed breakout with reversal
 tsBuffer = i_tsBuffer * f_tickSize()
+stalkDist = atrVal * 0.5  // Distance to start stalking
 
-// Bearish Turtle Soup: Sweep high, close back inside
+// ═══════════════════════════════════════════════════════════════════════════════
+// STALKING STAGES: 👀 STALK → 🎯 TRAP → TS CONFIRM → 🚫 INVALID
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Check if near swing high (stalking)
+nearSwingHigh = not na(recentSwingHigh) and not swingHighSwept and
+                high >= recentSwingHigh - stalkDist and high < recentSwingHigh
+
+// Check if near swing low (stalking)
+nearSwingLow = not na(recentSwingLow) and not swingLowSwept and
+               low <= recentSwingLow + stalkDist and low > recentSwingLow
+
+// STALK stage - approaching the high/low
+if nearSwingHigh and tsStage != "TRAP" and tsStage != "CONFIRM"
+    tsStage := "STALK_HIGH"
+    tsStalking := 1
+    tsStageBar := bar_index
+
+if nearSwingLow and tsStage != "TRAP" and tsStage != "CONFIRM"
+    tsStage := "STALK_LOW"
+    tsStalking := -1
+    tsStageBar := bar_index
+
+// TRAP stage - price sweeps the level
+if tsStalking == 1 and high > recentSwingHigh + tsBuffer
+    if tsStage == "STALK_HIGH"
+        tsStage := "TRAP"
+        tsStageBar := bar_index
+
+if tsStalking == -1 and low < recentSwingLow - tsBuffer
+    if tsStage == "STALK_LOW"
+        tsStage := "TRAP"
+        tsStageBar := bar_index
+
+// Bearish Turtle Soup CONFIRM: Sweep high, close back inside
 bearishTS = i_showTurtleSoup and htfAllowsBear and not na(recentSwingHigh) and
             not swingHighSwept and high > recentSwingHigh + tsBuffer and
             close < recentSwingHigh and close < open
 
-// Bullish Turtle Soup: Sweep low, close back inside
+// Bullish Turtle Soup CONFIRM: Sweep low, close back inside
 bullishTS = i_showTurtleSoup and htfAllowsBull and not na(recentSwingLow) and
             not swingLowSwept and low < recentSwingLow - tsBuffer and
             close > recentSwingLow and close > open
+
+// CONFIRM stage
+if bearishTS
+    tsStage := "CONFIRM_BEAR"
+    tsEntryPrice := close
+    tsStalking := 1
+    tsStageBar := bar_index
+
+if bullishTS
+    tsStage := "CONFIRM_BULL"
+    tsEntryPrice := close
+    tsStalking := -1
+    tsStageBar := bar_index
+
+// INVALID stage - if price continues in sweep direction
+if tsStage == "TRAP" and tsStalking == 1
+    if close > recentSwingHigh and close > open
+        tsStage := "INVALID"
+        tsStageBar := bar_index
+
+if tsStage == "TRAP" and tsStalking == -1
+    if close < recentSwingLow and close < open
+        tsStage := "INVALID"
+        tsStageBar := bar_index
+
+// Reset after confirmation is old
+if bar_index - tsStageBar > 10 and (tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" or tsStage == "INVALID")
+    tsStage := "NONE"
+    tsStalking := 0
 
 // Update sweep tracking
 if high > recentSwingHigh + tsBuffer
@@ -518,12 +586,6 @@ if high > recentSwingHigh + tsBuffer
 
 if low < recentSwingLow - tsBuffer
     swingLowSwept := true
-
-// Stalking logic for Turtle Soup
-if bearishTS
-    tsStalking := 1
-else if bullishTS
-    tsStalking := -1
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        JUDAS SWING DETECTION                                   ║
@@ -1114,6 +1176,85 @@ dolReason := dolDirection == DIR_BULL ?
 // Tier calculation based on confluence
 compositeScore := dolProbability
 
+// Count active confluence factors for pattern naming
+confluenceCount = 0
+hasHTFAlignment = htfBias == DIR_BULL and msDirection == DIR_BULL or htfBias == DIR_BEAR and msDirection == DIR_BEAR
+hasZoneAlignment = (inDiscount and msDirection == DIR_BULL) or (inPremium and msDirection == DIR_BEAR)
+hasOTEEntry = inOTE
+hasModel2022 = model2022Bull or model2022Bear
+hasTurtleSoup = bullishTS or bearishTS
+hasJudas = bullishJudas or bearishJudas
+hasDisplacement = displacementUp or displacementDown
+hasSilverBullet = inSilverBullet
+hasFreshOB = atBullOB or atBearOB
+
+if hasHTFAlignment
+    confluenceCount += 1
+if hasZoneAlignment
+    confluenceCount += 1
+if hasOTEEntry
+    confluenceCount += 1
+if hasModel2022
+    confluenceCount += 1
+if hasTurtleSoup
+    confluenceCount += 1
+if hasJudas
+    confluenceCount += 1
+if hasDisplacement
+    confluenceCount += 1
+if hasSilverBullet
+    confluenceCount += 1
+if hasFreshOB
+    confluenceCount += 1
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATTERN NAMES (Based on confluence combination)
+// ═══════════════════════════════════════════════════════════════════════════════
+patternName := ""
+
+// TIER 1 PATTERNS (12+ points / 80%+ probability)
+if compositeScore >= i_tier1Threshold
+    if hasModel2022 and hasOTEEntry and hasHTFAlignment
+        patternName := "🏆 THE APEX"  // Perfect 2022 model setup
+    else if hasTurtleSoup and hasOTEEntry and hasZoneAlignment
+        patternName := "🏆 SWEET SPOT"  // TS + OTE + Zone
+    else if hasJudas and hasHTFAlignment and hasSilverBullet
+        patternName := "🏆 JUDAS TRAP"  // London false move in SB window
+    else if hasDisplacement and hasFreshOB and hasZoneAlignment
+        patternName := "🏆 EXECUTION"  // Clean displacement entry
+    else if confluenceCount >= 6
+        patternName := "🏆 MEGA SETUP"  // 6+ confluences
+    else
+        patternName := "🏆 TIER 1"
+
+// TIER 2 PATTERNS (8-11 points / 60-79% probability)
+else if compositeScore >= i_tier2Threshold
+    if hasOTEEntry and hasZoneAlignment
+        patternName := "🥈 OTE ZONE"  // OTE + P/D alignment
+    else if hasTurtleSoup and hasHTFAlignment
+        patternName := "🥈 SOUP ALIGNED"  // TS with HTF
+    else if hasDisplacement and hasFreshOB
+        patternName := "🥈 OB PLAY"  // Displacement to OB
+    else if hasSilverBullet and hasZoneAlignment
+        patternName := "🥈 BULLET TIME"  // SB in correct zone
+    else if hasJudas
+        patternName := "🥈 JUDAS MOVE"  // Judas swing detected
+    else if confluenceCount >= 4
+        patternName := "🥈 FOUNDATION"  // Solid base setup
+    else
+        patternName := "🥈 TIER 2"
+
+// TIER 3 PATTERNS (5-7 points / 40-59% probability)
+else
+    if hasZoneAlignment
+        patternName := "🥉 ZONE PLAY"
+    else if hasDisplacement
+        patternName := "🥉 MOMENTUM"
+    else if hasFreshOB
+        patternName := "🥉 OB WATCH"
+    else
+        patternName := "🥉 DEVELOPING"
+
 if i_showComposite
     if compositeScore >= i_tier1Threshold
         compositeTier := TIER_1
@@ -1158,13 +1299,35 @@ plotshape(i_showCHoCH and bearishCHoCH, title="CHoCH Bear", style=shape.triangle
      location=location.belowbar, color=color.yellow, text="CHoCH", textcolor=color.black, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TURTLE SOUP LABELS
+// TURTLE SOUP STALKING LABELS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// STALK stage labels
+plotshape(i_showTurtleSoup and tsStage == "STALK_HIGH" and bar_index == tsStageBar,
+     title="TS Stalk High", style=shape.labeldown,
+     location=location.abovebar, color=color.new(color.yellow, 20), text="👀 STALK", textcolor=color.black, size=size.tiny)
+plotshape(i_showTurtleSoup and tsStage == "STALK_LOW" and bar_index == tsStageBar,
+     title="TS Stalk Low", style=shape.labelup,
+     location=location.belowbar, color=color.new(color.yellow, 20), text="👀 STALK", textcolor=color.black, size=size.tiny)
+
+// TRAP stage labels
+plotshape(i_showTurtleSoup and tsStage == "TRAP" and bar_index == tsStageBar and tsStalking == 1,
+     title="TS Trap High", style=shape.labeldown,
+     location=location.abovebar, color=color.new(color.orange, 0), text="🎯 TRAP", textcolor=color.white, size=size.small)
+plotshape(i_showTurtleSoup and tsStage == "TRAP" and bar_index == tsStageBar and tsStalking == -1,
+     title="TS Trap Low", style=shape.labelup,
+     location=location.belowbar, color=color.new(color.orange, 0), text="🎯 TRAP", textcolor=color.white, size=size.small)
+
+// CONFIRM stage labels (Turtle Soup confirmed)
 plotshape(i_showTurtleSoup and bullishTS, title="Turtle Soup Bull", style=shape.labelup,
-     location=location.belowbar, color=i_bullColor, text="🐢 SOUP", textcolor=color.white, size=size.small)
+     location=location.belowbar, color=i_bullColor, text="🐢 TS CONFIRM", textcolor=color.white, size=size.normal)
 plotshape(i_showTurtleSoup and bearishTS, title="Turtle Soup Bear", style=shape.labeldown,
-     location=location.abovebar, color=i_bearColor, text="🐢 SOUP", textcolor=color.white, size=size.small)
+     location=location.abovebar, color=i_bearColor, text="🐢 TS CONFIRM", textcolor=color.white, size=size.normal)
+
+// INVALID stage labels
+plotshape(i_showTurtleSoup and tsStage == "INVALID" and bar_index == tsStageBar,
+     title="TS Invalid", style=shape.xcross,
+     location=location.abovebar, color=color.new(color.gray, 0), text="🚫 INVALID", textcolor=color.gray, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // JUDAS SWING LABELS
@@ -1340,7 +1503,7 @@ plotshape(tier2Bear and barstate.isconfirmed, title="Tier 2 Bear", style=shape.l
 // DOL PROBABILITY DASHBOARD (GOD MODE INFO TABLE)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var table infoTable = table.new(position.top_right, 2, 12, bgcolor=color.new(color.black, 20), border_width=1)
+var table infoTable = table.new(position.top_right, 2, 14, bgcolor=color.new(color.black, 20), border_width=1)
 
 if i_showDOLTable and barstate.islast
     // Header
@@ -1377,28 +1540,45 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 6, "Zone:", text_color=color.white, text_size=size.small)
     table.cell(infoTable, 1, 6, zoneText, text_color=zoneColor, text_size=size.small)
 
+    // Pattern Name (NEW!)
+    patternColor = compositeTier == TIER_1 ? color.new(color.lime, 0) :
+                   compositeTier == TIER_2 ? color.new(color.yellow, 0) : color.new(color.gray, 0)
+    table.cell(infoTable, 0, 7, "Pattern:", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 7, patternName, text_color=patternColor, text_size=size.small)
+
     // Composite Tier
     tierText = compositeTier == TIER_1 ? "🏆 TIER 1" : compositeTier == TIER_2 ? "🥈 TIER 2" : "🥉 TIER 3"
-    table.cell(infoTable, 0, 7, "Composite:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 7, tierText, text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 0, 8, "Composite:", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 8, tierText, text_color=color.white, text_size=size.small)
+
+    // Turtle Soup Stage (NEW!)
+    tsStageText = tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? "👀 STALKING" :
+                  tsStage == "TRAP" ? "🎯 TRAPPED" :
+                  tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? "🐢 CONFIRMED" :
+                  tsStage == "INVALID" ? "🚫 INVALID" : "—"
+    tsStageColor = tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? color.lime :
+                   tsStage == "TRAP" ? color.orange :
+                   tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? color.yellow : color.gray
+    table.cell(infoTable, 0, 9, "TS Stage:", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 9, tsStageText, text_color=tsStageColor, text_size=size.small)
 
     // Session
     sessText = asianSession ? "ASIAN" : londonSession ? "LONDON" : nyAMSession ? "NY AM" : nyPMSession ? "NY PM" : "OFF"
-    table.cell(infoTable, 0, 8, "Session:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 8, sessText, text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 0, 10, "Session:", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 10, sessText, text_color=color.white, text_size=size.small)
 
     // Killzone
     kzText = inSilverBullet ? "🔫 SILVER BULLET" : nyAMKZ or nyPMKZ ? "🎯 NY KZ" : londonKZ ? "🎯 LON KZ" : asianKZ ? "🎯 ASIA KZ" : "NONE"
-    table.cell(infoTable, 0, 9, "Killzone:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 9, kzText, text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 0, 11, "Killzone:", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 11, kzText, text_color=color.white, text_size=size.small)
 
     // Key Factors
-    table.cell(infoTable, 0, 10, "Factors:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 10, dolReason, text_color=color.gray, text_size=size.tiny)
+    table.cell(infoTable, 0, 12, "Factors:", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 12, dolReason, text_color=color.gray, text_size=size.tiny)
 
     // Target
-    table.cell(infoTable, 0, 11, "Target:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 11, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small)
+    table.cell(infoTable, 0, 13, "Target:", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 13, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALERTS
