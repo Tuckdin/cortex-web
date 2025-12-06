@@ -483,6 +483,67 @@ htfAllowsBull = not i_htfBias or htfBias >= 0
 htfAllowsBear = not i_htfBias or htfBias <= 0
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        MULTI-TIMEFRAME BIAS (ICT Method)                       ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// MTF Bias: Determine bias on each timeframe using swing structure
+// Per ICT: Bias is based on swing high/low breaks (BOS) and price position
+
+// Function to calculate bias from swing levels
+f_calcBias(float swingHigh, float swingLow, float closePrice) =>
+    if na(swingHigh) or na(swingLow)
+        0  // Neutral if no swings
+    else if closePrice > swingHigh
+        1  // Bullish - above swing high
+    else if closePrice < swingLow
+        -1  // Bearish - below swing low
+    else
+        0  // Neutral - between swings
+
+// Request data from each timeframe
+[wHigh, wLow, wClose, wPivotH, wPivotL] = request.security(syminfo.tickerid, "W", [high, low, close, ta.pivothigh(high, 3, 3), ta.pivotlow(low, 3, 3)])
+[dHigh, dLow, dClose, dPivotH, dPivotL] = request.security(syminfo.tickerid, "D", [high, low, close, ta.pivothigh(high, 3, 3), ta.pivotlow(low, 3, 3)])
+[h1High, h1Low, h1Close, h1PivotH, h1PivotL] = request.security(syminfo.tickerid, "60", [high, low, close, ta.pivothigh(high, 5, 5), ta.pivotlow(low, 5, 5)])
+[m15High, m15Low, m15Close, m15PivotH, m15PivotL] = request.security(syminfo.tickerid, "15", [high, low, close, ta.pivothigh(high, 5, 5), ta.pivotlow(low, 5, 5)])
+[m5High, m5Low, m5Close, m5PivotH, m5PivotL] = request.security(syminfo.tickerid, "5", [high, low, close, ta.pivothigh(high, 5, 5), ta.pivotlow(low, 5, 5)])
+
+// Track swing levels for each timeframe
+var float wSwingHigh = na, var float wSwingLow = na
+var float dSwingHigh = na, var float dSwingLow = na
+var float h1SwingHigh = na, var float h1SwingLow = na
+var float m15SwingHigh = na, var float m15SwingLow = na
+var float m5SwingHigh = na, var float m5SwingLow = na
+
+// Update swing levels when new pivots form
+if not na(wPivotH)
+    wSwingHigh := wPivotH
+if not na(wPivotL)
+    wSwingLow := wPivotL
+if not na(dPivotH)
+    dSwingHigh := dPivotH
+if not na(dPivotL)
+    dSwingLow := dPivotL
+if not na(h1PivotH)
+    h1SwingHigh := h1PivotH
+if not na(h1PivotL)
+    h1SwingLow := h1PivotL
+if not na(m15PivotH)
+    m15SwingHigh := m15PivotH
+if not na(m15PivotL)
+    m15SwingLow := m15PivotL
+if not na(m5PivotH)
+    m5SwingHigh := m5PivotH
+if not na(m5PivotL)
+    m5SwingLow := m5PivotL
+
+// Calculate bias for each timeframe
+mtfBiasW = f_calcBias(wSwingHigh, wSwingLow, wClose)
+mtfBiasD = f_calcBias(dSwingHigh, dSwingLow, dClose)
+mtfBias1H = f_calcBias(h1SwingHigh, h1SwingLow, h1Close)
+mtfBias15m = f_calcBias(m15SwingHigh, m15SwingLow, m15Close)
+mtfBias5m = f_calcBias(m5SwingHigh, m5SwingLow, m5Close)
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        MARKET STRUCTURE (BOS/CHoCH)                            ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
@@ -1841,14 +1902,30 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 1, dirText, text_color=dirColor, text_size=size.normal, bgcolor=dirBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 1, 1, 1)
 
-    // ═══ BIAS ALIGNMENT ═══
-    htfIcon = htfBias == DIR_BULL ? "●" : htfBias == DIR_BEAR ? "●" : "○"
-    htfColor = htfBias == DIR_BULL ? i_bullColor : htfBias == DIR_BEAR ? i_bearColor : textDim
-    msIcon = msDirection == DIR_BULL ? "●" : msDirection == DIR_BEAR ? "●" : "○"
-    msColor = msDirection == DIR_BULL ? i_bullColor : msDirection == DIR_BEAR ? i_bearColor : textDim
-    aligned = (htfBias == msDirection and htfBias != 0)
-    table.cell(infoTable, 0, 2, "HTF " + htfIcon + "  MS " + msIcon, text_color=aligned ? i_bullColor : textDim, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 2, aligned ? "ALIGNED" : "—", text_color=aligned ? i_bullColor : textDim, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
+    // ═══ MTF BIAS (ICT Multi-Timeframe) ═══
+    // Arrows: ↑ bullish, ↓ bearish, — neutral
+    wArrow = mtfBiasW == 1 ? "↑" : mtfBiasW == -1 ? "↓" : "—"
+    dArrow = mtfBiasD == 1 ? "↑" : mtfBiasD == -1 ? "↓" : "—"
+    h1Arrow = mtfBias1H == 1 ? "↑" : mtfBias1H == -1 ? "↓" : "—"
+    m15Arrow = mtfBias15m == 1 ? "↑" : mtfBias15m == -1 ? "↓" : "—"
+    m5Arrow = mtfBias5m == 1 ? "↑" : mtfBias5m == -1 ? "↓" : "—"
+
+    // Colors for each arrow
+    wColor = mtfBiasW == 1 ? i_bullColor : mtfBiasW == -1 ? i_bearColor : textDim
+    dColor = mtfBiasD == 1 ? i_bullColor : mtfBiasD == -1 ? i_bearColor : textDim
+    h1Color = mtfBias1H == 1 ? i_bullColor : mtfBias1H == -1 ? i_bearColor : textDim
+    m15Color = mtfBias15m == 1 ? i_bullColor : mtfBias15m == -1 ? i_bearColor : textDim
+    m5Color = mtfBias5m == 1 ? i_bullColor : mtfBias5m == -1 ? i_bearColor : textDim
+
+    // Count alignment
+    bullCount = (mtfBiasW == 1 ? 1 : 0) + (mtfBiasD == 1 ? 1 : 0) + (mtfBias1H == 1 ? 1 : 0) + (mtfBias15m == 1 ? 1 : 0) + (mtfBias5m == 1 ? 1 : 0)
+    bearCount = (mtfBiasW == -1 ? 1 : 0) + (mtfBiasD == -1 ? 1 : 0) + (mtfBias1H == -1 ? 1 : 0) + (mtfBias15m == -1 ? 1 : 0) + (mtfBias5m == -1 ? 1 : 0)
+    mtfAligned = bullCount >= 4 or bearCount >= 4
+    mtfColor = mtfAligned ? (bullCount > bearCount ? i_bullColor : i_bearColor) : textDim
+
+    mtfDisplay = "W" + wArrow + " D" + dArrow + " 1H" + h1Arrow + " 15m" + m15Arrow + " 5m" + m5Arrow
+    table.cell(infoTable, 0, 2, "MTF Bias", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 2, mtfDisplay, text_color=mtfColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
     // ═══ ZONE ═══
     zoneText = inPremium ? "PREMIUM ▲" : inDiscount ? "DISCOUNT ▼" : inOTE ? "◉ OTE" : "EQUILIBRIUM"
