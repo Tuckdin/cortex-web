@@ -1762,17 +1762,17 @@ if i_showPacMan and barstate.islast
     if not na(sslLine)
         line.delete(sslLine)
 
-    // BSL - subtle dotted line with small label
+    // BSL - Ghost hunting highs with eyes 👻
     bslLine := line.new(bar_index - 20, high60IPDA, bar_index + 5, high60IPDA,
          color=color.new(#FF5252, 60), width=1, style=line.style_dotted)
-    ghostHighLabel := label.new(bar_index + 6, high60IPDA, "BSL",
-         style=label.style_none, textcolor=color.new(#FF5252, 40), size=size.tiny)
+    ghostHighLabel := label.new(bar_index + 6, high60IPDA, "👻 BSL",
+         style=label.style_none, textcolor=color.new(#FF5252, 20), size=size.small)
 
-    // SSL - subtle dotted line with small label
+    // SSL - Ghost hunting lows with eyes 👻
     sslLine := line.new(bar_index - 20, low60IPDA, bar_index + 5, low60IPDA,
          color=color.new(#69F0AE, 60), width=1, style=line.style_dotted)
-    ghostLowLabel := label.new(bar_index + 6, low60IPDA, "SSL",
-         style=label.style_none, textcolor=color.new(#69F0AE, 40), size=size.tiny)
+    ghostLowLabel := label.new(bar_index + 6, low60IPDA, "👻 SSL",
+         style=label.style_none, textcolor=color.new(#69F0AE, 20), size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPOSITE TIER SIGNALS (Only on TRUE high-confluence events)
@@ -1805,12 +1805,12 @@ var color accentLine = color.new(#0F3460, 0)
 var color textDim = color.new(#8892B0, 0)
 var color textBright = color.new(#E6F1FF, 0)
 
-var table infoTable = table.new(position.top_right, 2, 14, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
+var table infoTable = table.new(position.top_center, 2, 14, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
 
 if i_showDOLTable and barstate.islast
     // ═══ HEADER - Sleek title bar ═══
-    table.cell(infoTable, 0, 0, "◉ GOD MODE", text_color=i_pacmanColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 0, str.tostring(dolProbability, "#") + "%", text_color=dolProbability >= 70 ? i_bullColor : dolProbability >= 50 ? i_neutralColor : i_bearColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 0, "◉ STATUS", text_color=i_pacmanColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
+    table.cell(infoTable, 1, 0, str.tostring(dolProbability, "#") + "%", text_color=dolProbability >= 70 ? i_bullColor : dolProbability >= 50 ? i_neutralColor : i_bearColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
 
     // ═══ DIRECTION ROW - Main signal ═══
     dirText = dolDirection == DIR_BULL ? "▲ LONG" : dolDirection == DIR_BEAR ? "▼ SHORT" : "◆ NEUTRAL"
