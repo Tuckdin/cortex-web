@@ -1582,8 +1582,8 @@ if i_showDOLTable and barstate.islast
 highProbBull = dolDirection == DIR_BULL and dolProbability >= 70
 highProbBear = dolDirection == DIR_BEAR and dolProbability >= 70
 
-alertcondition(highProbBull, title="🟡 WAKA-WAKA Bullish", message="🟡 PAC-MAN GOD MODE: GO LONG! {{ticker}} - {{interval}} - Probability: " + str.tostring(dolProbability) + "%")
-alertcondition(highProbBear, title="🟡 WAKA-WAKA Bearish", message="🟡 PAC-MAN GOD MODE: GO SHORT! {{ticker}} - {{interval}} - Probability: " + str.tostring(dolProbability) + "%")
+alertcondition(highProbBull, title="🟡 WAKA-WAKA Bullish", message="🟡 PAC-MAN GOD MODE: GO LONG! {{ticker}} - {{interval}} - High Probability Setup!")
+alertcondition(highProbBear, title="🟡 WAKA-WAKA Bearish", message="🟡 PAC-MAN GOD MODE: GO SHORT! {{ticker}} - {{interval}} - High Probability Setup!")
 
 // Tier 1 alerts
 alertcondition(tier1Bull, title="🏆 Tier 1 Long", message="🏆 TIER 1 LONG SETUP on {{ticker}} - Maximum confluence!")
