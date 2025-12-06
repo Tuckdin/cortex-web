@@ -1550,7 +1550,7 @@ dolReason := dolDirection == DIR_BULL ?
 // Tier calculation based on confluence
 compositeScore := dolProbability
 
-// Count active confluence factors for pattern naming
+// Count active confluence factors for pattern naming (12 factors total)
 confluenceCount = 0
 hasHTFAlignment = htfBias == DIR_BULL and msDirection == DIR_BULL or htfBias == DIR_BEAR and msDirection == DIR_BEAR
 hasZoneAlignment = (inDiscount and msDirection == DIR_BULL) or (inPremium and msDirection == DIR_BEAR)
@@ -1561,6 +1561,10 @@ hasJudas = bullishJudas or bearishJudas
 hasDisplacement = displacementUp or displacementDown
 hasSilverBullet = inSilverBullet
 hasFreshOB = atBullOB or atBearOB
+// New factors for expanded scoring
+hasKillzone = londonKZ or nyAMKZ or nyPMKZ
+hasFVGPresent = array.size(bullFVGs) > 0 or array.size(bearFVGs) > 0
+hasMTFAlignment = (mtfBiasW == 1 and mtfBiasD == 1 and mtfBias1H == 1 and mtfBias15m == 1) or (mtfBiasW == -1 and mtfBiasD == -1 and mtfBias1H == -1 and mtfBias15m == -1)
 
 if hasHTFAlignment
     confluenceCount += 1
@@ -1579,6 +1583,12 @@ if hasDisplacement
 if hasSilverBullet
     confluenceCount += 1
 if hasFreshOB
+    confluenceCount += 1
+if hasKillzone
+    confluenceCount += 1
+if hasFVGPresent
+    confluenceCount += 1
+if hasMTFAlignment
     confluenceCount += 1
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1965,11 +1975,25 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 7, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
     table.cell(infoTable, 1, 7, sessDisplay, text_color=kzActive ? kzColor : textDim, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
-    // ═══ CONFLUENCE COUNT ═══
-    confDots = confluenceCount >= 6 ? "●●●●●●" : confluenceCount >= 5 ? "●●●●●○" : confluenceCount >= 4 ? "●●●●○○" : confluenceCount >= 3 ? "●●●○○○" : confluenceCount >= 2 ? "●●○○○○" : "●○○○○○"
-    confColor = confluenceCount >= 5 ? i_bullColor : confluenceCount >= 3 ? i_neutralColor : textDim
+    // ═══ CONFLUENCE COUNT (12 factors) ═══
+    // Build dots string based on count out of 12
+    confDots = confluenceCount >= 12 ? "●●●●●●●●●●●●" :
+               confluenceCount >= 11 ? "●●●●●●●●●●●○" :
+               confluenceCount >= 10 ? "●●●●●●●●●●○○" :
+               confluenceCount >= 9 ? "●●●●●●●●●○○○" :
+               confluenceCount >= 8 ? "●●●●●●●●○○○○" :
+               confluenceCount >= 7 ? "●●●●●●●○○○○○" :
+               confluenceCount >= 6 ? "●●●●●●○○○○○○" :
+               confluenceCount >= 5 ? "●●●●●○○○○○○○" :
+               confluenceCount >= 4 ? "●●●●○○○○○○○○" :
+               confluenceCount >= 3 ? "●●●○○○○○○○○○" :
+               confluenceCount >= 2 ? "●●○○○○○○○○○○" :
+               confluenceCount >= 1 ? "●○○○○○○○○○○○" : "○○○○○○○○○○○○"
+    confLabel = confluenceCount >= 10 ? "STRONG" : confluenceCount >= 7 ? "GOOD" : confluenceCount >= 4 ? "MODERATE" : "WEAK"
+    confColor = confluenceCount >= 10 ? color.new(#00E676, 0) : confluenceCount >= 7 ? i_bullColor : confluenceCount >= 4 ? i_pacmanColor : textDim
+    confDisplay = "(" + str.tostring(confluenceCount) + "/12)"
     table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 8, confDots, text_color=confColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
+    table.cell(infoTable, 1, 8, confDots + " " + confDisplay, text_color=confColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
 
     // ═══ WEEKLY PROFILE & S&D ═══
     wpText = weeklyProfile == "ACCUMULATION" ? "ACC" : weeklyProfile == "MANIPULATION" ? "MAN" : "DIST"
