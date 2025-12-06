@@ -486,24 +486,56 @@ htfAllowsBear = not i_htfBias or htfBias <= 0
 // ║                        MARKET STRUCTURE (BOS/CHoCH)                            ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-// Break of Structure
-bullishBOS = close > lastSwingHigh and msDirection == DIR_BULL and not na(lastSwingHigh)
-bearishBOS = close < lastSwingLow and msDirection == DIR_BEAR and not na(lastSwingLow)
+// Bootstrap: Initialize msDirection on first valid swing comparison
+// This fixes the "cold start" problem where CHoCH can't detect on chart start
+var bool msInitialized = false
 
-// Change of Character
-bullishCHoCH = close > lastSwingHigh and msDirection == DIR_BEAR and not na(lastSwingHigh)
-bearishCHoCH = close < lastSwingLow and msDirection == DIR_BULL and not na(lastSwingLow)
+if not msInitialized and not na(lastSwingHigh) and not na(lastSwingLow)
+    // Initialize based on current price relative to recent swings
+    if close > lastSwingHigh
+        msDirection := DIR_BULL
+        msInitialized := true
+    else if close < lastSwingLow
+        msDirection := DIR_BEAR
+        msInitialized := true
+    else
+        // Price between swings - use HTF bias if available, else use swing relationship
+        if htfBias != 0
+            msDirection := htfBias
+            msInitialized := true
+        else if lastSwingHighBar > lastSwingLowBar
+            // More recent high = bullish structure forming
+            msDirection := DIR_BULL
+            msInitialized := true
+        else if lastSwingLowBar > lastSwingHighBar
+            // More recent low = bearish structure forming
+            msDirection := DIR_BEAR
+            msInitialized := true
+
+// Break of Structure (continuation in current direction)
+bullishBOS = close > lastSwingHigh and msDirection == DIR_BULL and not na(lastSwingHigh) and msInitialized
+bearishBOS = close < lastSwingLow and msDirection == DIR_BEAR and not na(lastSwingLow) and msInitialized
+
+// Change of Character (reversal against current direction)
+bullishCHoCH = close > lastSwingHigh and msDirection == DIR_BEAR and not na(lastSwingHigh) and msInitialized
+bearishCHoCH = close < lastSwingLow and msDirection == DIR_BULL and not na(lastSwingLow) and msInitialized
+
+// First structure break when not initialized (treat as BOS to establish direction)
+firstBullBreak = close > lastSwingHigh and msDirection == DIR_NEUTRAL and not na(lastSwingHigh)
+firstBearBreak = close < lastSwingLow and msDirection == DIR_NEUTRAL and not na(lastSwingLow)
 
 // Update market structure
-if bullishBOS or bullishCHoCH
+if bullishBOS or bullishCHoCH or firstBullBreak
     msDirection := DIR_BULL
-    bosDetected := bullishBOS
+    bosDetected := bullishBOS or firstBullBreak
     chochDetected := bullishCHoCH
+    msInitialized := true
 
-if bearishBOS or bearishCHoCH
+if bearishBOS or bearishCHoCH or firstBearBreak
     msDirection := DIR_BEAR
-    bosDetected := bearishBOS
+    bosDetected := bearishBOS or firstBearBreak
     chochDetected := bearishCHoCH
+    msInitialized := true
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        TURTLE SOUP DETECTION (Enhanced with Stalking)          ║
@@ -777,9 +809,104 @@ f_updateFVGMitigation(array<FVG> fvgs, bool isBull) =>
 f_updateFVGMitigation(bullFVGs, true)
 f_updateFVGMitigation(bearFVGs, false)
 
-// IFVG Detection (Inverse FVG - gaps that get filled create new zones)
-// When a bullish FVG gets filled, it can become bearish IFVG
-// Simplified: Create IFVG when price fills previous FVG then reverses
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        IFVG (Inverse FVG) DETECTION                            ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// IFVG: When price fills a FVG then reverses, the filled FVG becomes inverse zone
+// Track recently mitigated FVGs and check for reversal
+
+var array<FVG> bullIFVGs = array.new<FVG>()
+var array<FVG> bearIFVGs = array.new<FVG>()
+
+// Check for IFVG creation from mitigated FVGs
+f_checkIFVG(array<FVG> fvgs, array<FVG> ifvgs, bool wasBull) =>
+    if array.size(fvgs) > 0
+        for i = array.size(fvgs) - 1 to 0
+            fvg = array.get(fvgs, i)
+            // If FVG was just mitigated and we see reversal candle
+            if fvg.mitigated and bar_index - fvg.startBar <= 20
+                // Check for reversal after mitigation
+                reversalCandle = wasBull ? (close < open and close < fvg.bottom) : (close > open and close > fvg.top)
+                if reversalCandle and i_showIFVG
+                    // Create IFVG (opposite direction)
+                    newDir = wasBull ? DIR_BEAR : DIR_BULL
+                    ifvgColor = wasBull ? color.new(#FF6B6B, 85) : color.new(#4ECDC4, 85)
+                    newIFVG = FVG.new(
+                         fvg.top, fvg.bottom, bar_index, newDir, false, (fvg.top + fvg.bottom) / 2,
+                         box.new(bar_index - 1, fvg.top, bar_index + 10, fvg.bottom,
+                                 border_color=color.new(ifvgColor, 40), bgcolor=ifvgColor,
+                                 border_width=1, border_style=line.style_solid,
+                                 text="IFVG", text_color=color.new(ifvgColor, 20), text_size=size.tiny, text_halign=text.align_right))
+                    if array.size(ifvgs) >= 5
+                        oldIFVG = array.shift(ifvgs)
+                        if not na(oldIFVG.visual)
+                            box.delete(oldIFVG.visual)
+                    array.push(ifvgs, newIFVG)
+                    // Mark original as processed by moving far back
+                    fvg.startBar := bar_index - 1000
+
+f_checkIFVG(bullFVGs, bearIFVGs, true)
+f_checkIFVG(bearFVGs, bullIFVGs, false)
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        REJECTION BLOCK DETECTION                               ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Rejection Block: Long wick into a zone that rejects and closes outside
+// Bullish RB: Long lower wick, closes in upper half (buying rejection at lows)
+// Bearish RB: Long upper wick, closes in lower half (selling rejection at highs)
+
+// Rejection Block Type
+type RejBlock
+    float top
+    float bottom
+    int startBar
+    int direction
+    box visual
+
+var array<RejBlock> rejBlocks = array.new<RejBlock>()
+
+// Calculate candle metrics
+bodySize = math.abs(close - open)
+upperWick = high - math.max(close, open)
+lowerWick = math.min(close, open) - low
+totalRange = high - low
+
+// Rejection criteria: wick > 60% of range, body < 40% of range
+wickThreshold = 0.6
+bodyThreshold = 0.4
+
+// Bullish Rejection Block: Long lower wick at discount
+bullishRejection = i_showRejBlock and totalRange > 0 and lowerWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close > open and inDiscount
+
+// Bearish Rejection Block: Long upper wick at premium
+bearishRejection = i_showRejBlock and totalRange > 0 and upperWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close < open and inPremium
+
+// Create Rejection Blocks
+if bullishRejection
+    newRB = RejBlock.new(
+         math.max(close, open), low, bar_index, DIR_BULL,
+         box.new(bar_index, math.max(close, open), bar_index + 15, low,
+                 border_color=color.new(#26A69A, 30), bgcolor=color.new(#26A69A, 88),
+                 border_width=2, border_style=line.style_solid))
+    if array.size(rejBlocks) >= 8
+        oldRB = array.shift(rejBlocks)
+        if not na(oldRB.visual)
+            box.delete(oldRB.visual)
+    array.push(rejBlocks, newRB)
+
+if bearishRejection
+    newRB = RejBlock.new(
+         high, math.min(close, open), bar_index, DIR_BEAR,
+         box.new(bar_index, high, bar_index + 15, math.min(close, open),
+                 border_color=color.new(#EF5350, 30), bgcolor=color.new(#EF5350, 88),
+                 border_width=2, border_style=line.style_solid))
+    if array.size(rejBlocks) >= 8
+        oldRB = array.shift(rejBlocks)
+        if not na(oldRB.visual)
+            box.delete(oldRB.visual)
+    array.push(rejBlocks, newRB)
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        LIQUIDITY DETECTION                                     ║
@@ -852,6 +979,126 @@ barsPerMonth = weeklyBars * 4
 monthlyBars = math.min(barsPerMonth, 2000)
 pmHigh = ta.highest(high, int(math.min(monthlyBars, bar_index)))
 pmLow = ta.lowest(low, int(math.min(monthlyBars, bar_index)))
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        WEEKLY & QUARTERLY PROFILES                             ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Weekly Profile Detection
+// ICT teaches specific weekly patterns based on day of week
+currentDOW = dayofweek
+isMonday = currentDOW == dayofweek.monday
+isTuesday = currentDOW == dayofweek.tuesday
+isWednesday = currentDOW == dayofweek.wednesday
+isThursday = currentDOW == dayofweek.thursday
+isFriday = currentDOW == dayofweek.friday
+
+// Weekly Profile Types based on ICT teachings:
+// - Classic: Mon/Tue consolidation, Wed reversal, Thu/Fri expansion
+// - Seek & Destroy: Wed/Thu reversals trap traders
+var string weeklyProfile = "DEVELOPING"
+var float weekHigh = na
+var float weekLow = na
+var float mondayHigh = na
+var float mondayLow = na
+
+// Track weekly range
+if isMonday and (not isMonday[1] or na(weekHigh))
+    weekHigh := high
+    weekLow := low
+    mondayHigh := high
+    mondayLow := low
+    weeklyProfile := "ACCUMULATION"
+else if not isMonday and isMonday[1]
+    mondayHigh := high[1]
+    mondayLow := low[1]
+
+if not na(weekHigh)
+    weekHigh := math.max(weekHigh, high)
+    weekLow := math.min(weekLow, low)
+
+// Detect weekly profile pattern
+if isTuesday
+    weeklyProfile := "ACCUMULATION"
+else if isWednesday
+    // Wednesday is often manipulation/reversal day
+    weeklyProfile := "MANIPULATION"
+else if isThursday
+    weeklyProfile := "DISTRIBUTION"
+else if isFriday
+    weeklyProfile := "DISTRIBUTION"
+
+// Quarterly Shift Detection
+// Q1: Jan-Mar, Q2: Apr-Jun, Q3: Jul-Sep, Q4: Oct-Dec
+currentMonth = month
+isQ1 = currentMonth >= 1 and currentMonth <= 3
+isQ2 = currentMonth >= 4 and currentMonth <= 6
+isQ3 = currentMonth >= 7 and currentMonth <= 9
+isQ4 = currentMonth >= 10 and currentMonth <= 12
+
+// Quarterly shift months (first month of quarter often sees direction change)
+isQuarterStart = currentMonth == 1 or currentMonth == 4 or currentMonth == 7 or currentMonth == 10
+quarterName = isQ1 ? "Q1" : isQ2 ? "Q2" : isQ3 ? "Q3" : "Q4"
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        OPENING RANGE GAP (ORG)                                 ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Opening Range Gap: Gap between previous session close and current session open
+// This is a key ICT concept for gap trading
+
+var float prevDayClose = na
+var float currentDayOpen = na
+var float orgHigh = na
+var float orgLow = na
+var float orgCE = na
+var bool hasORG = false
+
+// Detect new day (for intraday timeframes)
+isNewDay = ta.change(time("D")) != 0
+
+if isNewDay
+    prevDayClose := close[1]
+    currentDayOpen := open
+    // ORG exists if there's a gap
+    if not na(prevDayClose) and math.abs(currentDayOpen - prevDayClose) > atrVal * 0.25
+        orgHigh := math.max(prevDayClose, currentDayOpen)
+        orgLow := math.min(prevDayClose, currentDayOpen)
+        orgCE := (orgHigh + orgLow) / 2
+        hasORG := true
+    else
+        hasORG := false
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        SEEK & DESTROY DETECTION                                ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Seek & Destroy: ICT concept where Wed/Thu are reversal days that trap traders
+// Market sweeps one side of Monday's range then reverses
+
+// S&D Profile Detection
+var bool seekDestroyDay = false
+var string sdPhase = "NONE"  // SEEK, DESTROY, COMPLETE
+
+// Wed/Thu are primary S&D days
+seekDestroyDay := isWednesday or isThursday
+
+// Detect S&D pattern
+sdSeekingHigh = seekDestroyDay and not na(mondayHigh) and high > mondayHigh
+sdSeekingLow = seekDestroyDay and not na(mondayLow) and low < mondayLow
+
+// Phase detection
+if seekDestroyDay
+    if sdSeekingHigh and close < mondayHigh and close < open
+        sdPhase := "DESTROY_BEARS"  // Swept high, reversing down
+    else if sdSeekingLow and close > mondayLow and close > open
+        sdPhase := "DESTROY_BULLS"  // Swept low, reversing up
+    else if sdSeekingHigh or sdSeekingLow
+        sdPhase := "SEEK"  // Currently seeking liquidity
+    else
+        sdPhase := "WATCH"  // S&D day but no sweep yet
+else
+    sdPhase := "NONE"
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        CBDR (Central Bank Dealers Range)                       ║
@@ -1385,6 +1632,23 @@ if i_showNWOG and not na(nwogHigh) and not na(nwogLow) and barstate.islast
 plot(i_showNWOGCE and not na(nwogCE) ? nwogCE : na, "NWOG CE", color=color.new(color.fuchsia, 30), linewidth=2, style=plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// OPENING RANGE GAP (ORG) VISUAL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var box orgBox = na
+
+if hasORG and not na(orgHigh) and not na(orgLow) and barstate.islast
+    if not na(orgBox)
+        box.delete(orgBox)
+    orgBox := box.new(bar_index - 20, orgHigh, bar_index + 5, orgLow,
+         border_color=color.new(#FF9800, 50), bgcolor=color.new(#FF9800, 92),
+         border_width=1, border_style=line.style_dotted,
+         text="ORG", text_color=color.new(#FF9800, 40), text_size=size.tiny, text_halign=text.align_right)
+
+// ORG CE line
+plot(hasORG and not na(orgCE) ? orgCE : na, "ORG CE", color=color.new(#FF9800, 50), linewidth=1, style=plot.style_linebr)
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MIDNIGHT OPEN
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1497,7 +1761,7 @@ var color accentLine = color.new(#0F3460, 0)
 var color textDim = color.new(#8892B0, 0)
 var color textBright = color.new(#E6F1FF, 0)
 
-var table infoTable = table.new(position.top_right, 2, 12, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
+var table infoTable = table.new(position.top_right, 2, 14, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
 
 if i_showDOLTable and barstate.islast
     // ═══ HEADER - Sleek title bar ═══
@@ -1554,25 +1818,39 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 7, sessText, text_color=sessColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_left)
     table.cell(infoTable, 1, 7, kzText, text_color=inSilverBullet ? color.new(#00E5FF, 0) : i_bullColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
-    // ═══ TARGET ═══
-    table.cell(infoTable, 0, 8, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 8, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
-
     // ═══ CONFLUENCE COUNT ═══
     confDots = confluenceCount >= 6 ? "●●●●●●" : confluenceCount >= 5 ? "●●●●●○" : confluenceCount >= 4 ? "●●●●○○" : confluenceCount >= 3 ? "●●●○○○" : confluenceCount >= 2 ? "●●○○○○" : "●○○○○○"
     confColor = confluenceCount >= 5 ? i_bullColor : confluenceCount >= 3 ? i_neutralColor : textDim
-    table.cell(infoTable, 0, 9, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 9, confDots, text_color=confColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 8, confDots, text_color=confColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
+
+    // ═══ WEEKLY PROFILE & S&D ═══
+    wpText = weeklyProfile == "ACCUMULATION" ? "ACC" : weeklyProfile == "MANIPULATION" ? "MAN" : "DIST"
+    wpColor = weeklyProfile == "DISTRIBUTION" ? i_bullColor : weeklyProfile == "MANIPULATION" ? i_liqColor : textDim
+    sdText = sdPhase == "DESTROY_BEARS" ? "⚡ BEARS" : sdPhase == "DESTROY_BULLS" ? "⚡ BULLS" : sdPhase == "SEEK" ? "◎ SEEK" : sdPhase == "WATCH" ? "◎ S&D" : "—"
+    sdColor = sdPhase == "DESTROY_BEARS" or sdPhase == "DESTROY_BULLS" ? i_bullColor : sdPhase == "SEEK" or sdPhase == "WATCH" ? i_liqColor : textDim
+    table.cell(infoTable, 0, 9, wpText + " " + quarterName, text_color=wpColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 9, sdText, text_color=sdColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
+
+    // ═══ ORG (Opening Range Gap) ═══
+    orgText = hasORG ? "◉ GAP" : "—"
+    orgColor = hasORG ? color.new(#FF9800, 0) : textDim
+    table.cell(infoTable, 0, 10, "ORG", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 10, orgText, text_color=orgColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
     // ═══ KEY FACTORS - Compact ═══
-    table.cell(infoTable, 0, 10, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 10, 1, 10)
+    table.cell(infoTable, 0, 11, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 11, 1, 11)
+
+    // ═══ TARGET ═══
+    table.cell(infoTable, 0, 12, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 12, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
     // ═══ TIER INDICATOR BAR ═══
     tierBar = compositeTier == TIER_1 ? "████████████" : compositeTier == TIER_2 ? "████████░░░░" : "████░░░░░░░░"
     tierColor = compositeTier == TIER_1 ? i_bullColor : compositeTier == TIER_2 ? i_neutralColor : textDim
-    table.cell(infoTable, 0, 11, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 11, 1, 11)
+    table.cell(infoTable, 0, 13, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 13, 1, 13)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALERTS (Reduced to stay under 64 plot limit)
