@@ -1866,10 +1866,10 @@ if hasORG and not na(orgHigh) and not na(orgLow) and barstate.islast
     orgBox := box.new(bar_index - 20, orgHigh, bar_index + 5, orgLow,
          border_color=color.new(#FF9800, 50), bgcolor=color.new(#FF9800, 92),
          border_width=1, border_style=line.style_dotted,
-         text="ORG", text_color=color.new(#FF9800, 40), text_size=size.tiny, text_halign=text.align_right)
+         text="GAP", text_color=color.new(#FF9800, 40), text_size=size.tiny, text_halign=text.align_right)
 
-// ORG CE line
-plot(hasORG and not na(orgCE) ? orgCE : na, "ORG CE", color=color.new(#FF9800, 50), linewidth=1, style=plot.style_linebr)
+// GAP CE line
+plot(hasORG and not na(orgCE) ? orgCE : na, "GAP CE", color=color.new(#FF9800, 50), linewidth=1, style=plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MIDNIGHT OPEN
@@ -2102,10 +2102,13 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 9, "Weekly", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
     table.cell(infoTable, 1, 9, weeklyDisplay, text_color=weeklyColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
-    // ═══ GAP (Opening Range Gap) ═══
+    // ═══ GAP (Opening Range Gap) - Gradient Fill Bar ═══
     string gapArrow = hasORG ? (gapIsAbove ? "↑" : "↓") : "—"
-    string gapPctText = hasORG ? str.tostring(math.round(gapFillPct)) + "%" : "0%"
-    string gapDisplay = hasORG ? gapArrow + " " + gapPctText : "— 0%"
+    int gapFillBlocks = math.round(gapFillPct / 10)  // 0-10 blocks
+    string gapBar = ""
+    for i = 0 to 9
+        gapBar := gapBar + (i < gapFillBlocks ? "▓" : "░")
+    string gapDisplay = hasORG ? gapArrow + " " + gapBar + " " + str.tostring(math.round(gapFillPct)) + "%" : "— ░░░░░░░░░░ 0%"
     gapColor = hasORG ? (gapFillPct >= 100 ? i_bullColor : color.new(#FF9800, 0)) : textDim
     table.cell(infoTable, 0, 10, "GAP", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
     table.cell(infoTable, 1, 10, gapDisplay, text_color=gapColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
