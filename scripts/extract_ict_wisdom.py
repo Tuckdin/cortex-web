@@ -27,7 +27,7 @@ def fetch_all_chunks(supabase):
         print(f"  Fetching chunks {offset} to {offset + BATCH_SIZE}...")
 
         response = supabase.table('ict_chunks') \
-            .select('id, content, source_transcript, chunk_index, metadata') \
+            .select('*') \
             .range(offset, offset + BATCH_SIZE - 1) \
             .execute()
 
@@ -61,8 +61,7 @@ def organize_by_source(chunks):
         by_source[source]['chunks'].append({
             'id': chunk.get('id'),
             'content': chunk.get('content'),
-            'chunk_index': chunk.get('chunk_index'),
-            'metadata': chunk.get('metadata')
+            'chunk_index': chunk.get('chunk_index')
         })
         by_source[source]['total_chunks'] += 1
 
