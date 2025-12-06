@@ -1,254 +1,311 @@
 #!/usr/bin/env python3
 """
-ICT Wisdom Extractor for God Mode Indicator
-Extracts all ICT trading rules from The Cortex for automated indicator logic.
+Full Cortex Extraction Script
+Extracts ALL 20,829 chunks from The Cortex - the complete ICT knowledge base.
+Organizes by source transcript for comprehensive coverage.
 """
 
-import json
 import os
-from openai import OpenAI
+import json
+from datetime import datetime
 from supabase import create_client
 
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
+# Environment variables
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
-# =============================================================================
-# COMPREHENSIVE ICT CONCEPTS (40+ queries for God Mode)
-# =============================================================================
-ICT_QUERIES = [
-    # === POWER OF THREE / AMD ===
-    ("po3_overview", "power of three AMD accumulation manipulation distribution"),
-    ("po3_accumulation", "accumulation phase asian session range midnight open"),
-    ("po3_manipulation", "manipulation phase judas swing false move liquidity grab stop hunt"),
-    ("po3_distribution", "distribution phase expansion real move true direction"),
-    ("po3_timing", "power of three timing when accumulation ends manipulation starts"),
-
-    # === 2022 MODEL ===
-    ("model_2022_overview", "2022 model entry rules complete sequence"),
-    ("model_2022_steps", "2022 model step by step liquidity sweep MSS FVG"),
-    ("model_2022_entry", "2022 model entry fair value gap order block"),
-    ("model_2022_confirmation", "2022 model confirmation displacement candle"),
-
-    # === SILVER BULLET ===
-    ("silver_bullet_overview", "silver bullet model complete rules"),
-    ("silver_bullet_time", "silver bullet time window 10am 11am 2pm 3pm new york"),
-    ("silver_bullet_entry", "silver bullet entry fair value gap formation"),
-    ("silver_bullet_target", "silver bullet target profit taking"),
-
-    # === DRAW ON LIQUIDITY ===
-    ("dol_overview", "draw on liquidity where price goes next"),
-    ("dol_determining", "how to determine draw on liquidity"),
-    ("dol_external", "external range liquidity buy stops sell stops"),
-    ("dol_internal", "internal range liquidity fair value gap"),
-    ("dol_priority", "liquidity priority which target first"),
-
-    # === ORDER BLOCKS ===
-    ("ob_definition", "order block definition what makes valid"),
-    ("ob_rules", "order block rules requirements displacement"),
-    ("ob_entry", "order block entry how to trade"),
-    ("ob_mitigation", "order block mitigation what happens when touched"),
-    ("ob_breaker", "order block becomes breaker when violated"),
-
-    # === FAIR VALUE GAPS ===
-    ("fvg_definition", "fair value gap definition imbalance"),
-    ("fvg_valid", "fair value gap valid requirements"),
-    ("fvg_entry", "fair value gap entry consequent encroachment"),
-    ("fvg_ce", "consequent encroachment 50% of FVG"),
-    ("ifvg", "inversion fair value gap IFVG when FVG fails"),
-
-    # === MARKET STRUCTURE ===
-    ("structure_bullish", "bullish market structure higher highs higher lows"),
-    ("structure_bearish", "bearish market structure lower highs lower lows"),
-    ("mss", "market structure shift MSS rules confirmation"),
-    ("choch", "change of character ChoCH reversal signal"),
-    ("bos", "break of structure BOS continuation"),
-    ("displacement", "displacement requirements strong candle institutional"),
-
-    # === LIQUIDITY CONCEPTS ===
-    ("liquidity_pools", "liquidity pools where stops rest"),
-    ("equal_highs", "equal highs EQH liquidity resting above"),
-    ("equal_lows", "equal lows EQL liquidity resting below"),
-    ("liquidity_sweep", "liquidity sweep stop hunt reversal"),
-    ("liquidity_void", "liquidity void volume imbalance"),
-
-    # === TIME AND SESSIONS ===
-    ("killzone_london", "london killzone time rules"),
-    ("killzone_ny", "new york killzone time rules"),
-    ("macro_time", "macro time 50 past 10 after hour"),
-    ("asian_session", "asian session range importance"),
-    ("true_day_open", "true day open 9:30 importance"),
-    ("midnight_open", "midnight open new york time"),
-
-    # === PREMIUM DISCOUNT ===
-    ("premium_discount", "premium discount equilibrium 50%"),
-    ("ote_zone", "optimal trade entry zone 62% 79% fibonacci"),
-    ("discount_array", "discount array buy in discount"),
-    ("premium_array", "premium array sell in premium"),
-
-    # === SPECIFIC SETUPS ===
-    ("turtle_soup", "turtle soup false breakout reversal"),
-    ("judas_swing", "judas swing false move london new york"),
-    ("breaker_block", "breaker block failed swing"),
-    ("mitigation_block", "mitigation block retest"),
-    ("rejection_block", "rejection block wick"),
-    ("propulsion_block", "propulsion block continuation"),
-
-    # === CBDR & NWOG ===
-    ("cbdr", "CBDR central bank dealer range 2pm 8pm"),
-    ("nwog", "NWOG new week opening gap sunday"),
-
-    # === WEEKLY PROFILE ===
-    ("weekly_profile", "weekly profile which day high low"),
-    ("day_of_week", "day of week monday tuesday wednesday thursday friday"),
-    ("weekly_range", "weekly range expansion contraction"),
-
-    # === BIAS & DIRECTION ===
-    ("daily_bias", "daily bias determination how to know"),
-    ("htf_ltf", "higher timeframe lower timeframe alignment"),
-    ("bias_confirmation", "bias confirmation what confirms direction"),
-    ("bias_invalidation", "bias invalidation when to flip"),
-
-    # === RISK & TARGETS ===
-    ("stop_loss", "stop loss placement where"),
-    ("take_profit", "take profit targets liquidity"),
-    ("risk_reward", "risk reward ratio minimum"),
-    ("invalidation", "invalidation when trade is wrong"),
-
-    # === INSTITUTIONAL BEHAVIOR ===
-    ("smart_money", "smart money what institutions do"),
-    ("accumulation_distribution", "accumulation distribution wyckoff"),
-    ("manipulation", "manipulation how market makers trap"),
-    ("algorithm", "algorithm how price delivered"),
-]
-
-# =============================================================================
-# FUNCTIONS
-# =============================================================================
-
-def generate_embedding(client, text):
-    """Generate embedding for semantic search."""
-    response = client.embeddings.create(model="text-embedding-3-small", input=text)
-    return response.data[0].embedding
+# Batch size for pagination (Supabase has row limits)
+BATCH_SIZE = 1000
 
 
-def search_cortex(supabase, openai_client, query, num_results=10):
-    """Semantic search in The Cortex."""
-    embedding = generate_embedding(openai_client, query)
+def fetch_all_chunks(supabase):
+    """Fetch ALL chunks from the Cortex using pagination."""
+    all_chunks = []
+    offset = 0
 
-    response = supabase.rpc('search_ict_knowledge', {
-        'query_embedding': embedding,
-        'match_threshold': 0.30,
-        'match_count': num_results
-    }).execute()
+    while True:
+        print(f"  Fetching chunks {offset} to {offset + BATCH_SIZE}...")
 
-    return response.data if response.data else []
+        response = supabase.table('ict_chunks') \
+            .select('id, content, source, chunk_index, metadata') \
+            .range(offset, offset + BATCH_SIZE - 1) \
+            .execute()
+
+        if not response.data:
+            break
+
+        all_chunks.extend(response.data)
+
+        if len(response.data) < BATCH_SIZE:
+            break
+
+        offset += BATCH_SIZE
+
+    return all_chunks
 
 
-def text_search(supabase, query, num_results=10):
-    """Direct text search for exact phrases."""
-    response = supabase.table('ict_chunks') \
-        .select('content, source_transcript') \
-        .ilike('content', f'%{query}%') \
-        .limit(num_results) \
-        .execute()
+def organize_by_source(chunks):
+    """Organize chunks by their source transcript."""
+    by_source = {}
 
-    return response.data if response.data else []
+    for chunk in chunks:
+        source = chunk.get('source', 'unknown')
+
+        if source not in by_source:
+            by_source[source] = {
+                'source': source,
+                'chunks': [],
+                'total_chunks': 0
+            }
+
+        by_source[source]['chunks'].append({
+            'id': chunk.get('id'),
+            'content': chunk.get('content'),
+            'chunk_index': chunk.get('chunk_index'),
+            'metadata': chunk.get('metadata')
+        })
+        by_source[source]['total_chunks'] += 1
+
+    # Sort chunks within each source by chunk_index
+    for source in by_source:
+        by_source[source]['chunks'].sort(key=lambda x: x.get('chunk_index', 0) or 0)
+
+    return by_source
+
+
+def extract_ict_concepts(chunks):
+    """Extract and categorize ICT concepts mentioned across all chunks."""
+    concepts = {
+        'power_of_three': [],
+        'order_blocks': [],
+        'fair_value_gaps': [],
+        'liquidity': [],
+        'market_structure': [],
+        'optimal_trade_entry': [],
+        'silver_bullet': [],
+        'judas_swing': [],
+        'turtle_soup': [],
+        'breaker_blocks': [],
+        'mitigation_blocks': [],
+        'killzones': [],
+        'asian_session': [],
+        'london_session': [],
+        'new_york_session': [],
+        'midnight_open': [],
+        'true_day': [],
+        'weekly_profiles': [],
+        'monthly_profiles': [],
+        'quarterly_shifts': [],
+        'institutional_order_flow': [],
+        'smart_money': [],
+        'displacement': [],
+        'imbalance': [],
+        'inefficiency': [],
+        'premium_discount': [],
+        'equilibrium': [],
+        'swing_points': [],
+        'pivot_points': [],
+        'time_and_price': [],
+        'fibonacci': [],
+        'pd_arrays': [],
+        'draw_on_liquidity': [],
+        'raid': [],
+        'stop_hunt': [],
+        'manipulation': [],
+        'accumulation': [],
+        'distribution': [],
+        'expansion': [],
+        'retracement': [],
+        'consolidation': [],
+        'propulsion_block': [],
+        'rejection_block': [],
+        'volume_imbalance': [],
+        'opening_range_gap': [],
+        'new_week_opening_gap': [],
+        'new_day_opening_gap': [],
+        'consequent_encroachment': [],
+        'model_2022': [],
+        'unicorn_model': [],
+        'ict_mentorship': [],
+        'amd': [],
+        'cbdr': [],
+        'nwog': [],
+        'ndog': [],
+        'macro_time': [],
+        'algorithmically_delivered': [],
+        'seek_and_destroy': [],
+        'standard_deviation': [],
+    }
+
+    # Keywords mapping for each concept
+    keywords = {
+        'power_of_three': ['power of three', 'po3', 'accumulation manipulation distribution'],
+        'order_blocks': ['order block', 'bullish order block', 'bearish order block'],
+        'fair_value_gaps': ['fair value gap', 'fvg', 'imbalance'],
+        'liquidity': ['liquidity', 'buy side liquidity', 'sell side liquidity', 'bsl', 'ssl', 'equal highs', 'equal lows'],
+        'market_structure': ['market structure', 'bos', 'break of structure', 'choch', 'change of character'],
+        'optimal_trade_entry': ['optimal trade entry', 'ote', '.62', '.705', '.79'],
+        'silver_bullet': ['silver bullet'],
+        'judas_swing': ['judas swing', 'judas'],
+        'turtle_soup': ['turtle soup'],
+        'breaker_blocks': ['breaker block', 'breaker'],
+        'mitigation_blocks': ['mitigation block', 'mitigation'],
+        'killzones': ['killzone', 'kill zone'],
+        'asian_session': ['asian session', 'asian range'],
+        'london_session': ['london session', 'london open', 'london close'],
+        'new_york_session': ['new york session', 'ny session', 'new york open'],
+        'midnight_open': ['midnight open', 'midnight'],
+        'true_day': ['true day'],
+        'weekly_profiles': ['weekly profile', 'weekly range'],
+        'monthly_profiles': ['monthly profile', 'monthly range'],
+        'quarterly_shifts': ['quarterly shift'],
+        'institutional_order_flow': ['institutional order flow', 'institutional'],
+        'smart_money': ['smart money'],
+        'displacement': ['displacement'],
+        'imbalance': ['imbalance'],
+        'inefficiency': ['inefficiency'],
+        'premium_discount': ['premium', 'discount'],
+        'equilibrium': ['equilibrium'],
+        'swing_points': ['swing high', 'swing low'],
+        'pivot_points': ['pivot'],
+        'time_and_price': ['time and price'],
+        'fibonacci': ['fibonacci', 'fib'],
+        'pd_arrays': ['pd array'],
+        'draw_on_liquidity': ['draw on liquidity', 'dol'],
+        'raid': ['raid', 'liquidity raid'],
+        'stop_hunt': ['stop hunt', 'stop run'],
+        'manipulation': ['manipulation'],
+        'accumulation': ['accumulation'],
+        'distribution': ['distribution'],
+        'expansion': ['expansion'],
+        'retracement': ['retracement'],
+        'consolidation': ['consolidation', 'range'],
+        'propulsion_block': ['propulsion block'],
+        'rejection_block': ['rejection block'],
+        'volume_imbalance': ['volume imbalance'],
+        'opening_range_gap': ['opening range gap'],
+        'new_week_opening_gap': ['new week opening gap', 'nwog'],
+        'new_day_opening_gap': ['new day opening gap', 'ndog'],
+        'consequent_encroachment': ['consequent encroachment'],
+        'model_2022': ['2022 model', 'model 2022'],
+        'unicorn_model': ['unicorn'],
+        'ict_mentorship': ['mentorship'],
+        'amd': ['amd'],
+        'cbdr': ['cbdr', 'central bank dealer range'],
+        'nwog': ['nwog'],
+        'ndog': ['ndog'],
+        'macro_time': ['macro', ':50', ':10'],
+        'algorithmically_delivered': ['algorithm', 'algorithmically'],
+        'seek_and_destroy': ['seek and destroy'],
+        'standard_deviation': ['standard deviation'],
+    }
+
+    for chunk in chunks:
+        content = chunk.get('content', '').lower()
+        source = chunk.get('source', 'unknown')
+
+        for concept, kws in keywords.items():
+            for kw in kws:
+                if kw.lower() in content:
+                    concepts[concept].append({
+                        'source': source,
+                        'chunk_id': chunk.get('id'),
+                        'excerpt': chunk.get('content', '')[:500]
+                    })
+                    break
+
+    # Remove duplicates and count
+    concept_stats = {}
+    for concept, matches in concepts.items():
+        unique_sources = list(set([m['source'] for m in matches]))
+        concept_stats[concept] = {
+            'total_mentions': len(matches),
+            'unique_sources': len(unique_sources),
+            'sources': unique_sources[:20]  # Limit to first 20 sources
+        }
+
+    return concept_stats
 
 
 def main():
     print("=" * 60)
-    print("  ICT WISDOM EXTRACTOR FOR GOD MODE INDICATOR")
+    print("🧠 FULL CORTEX EXTRACTION")
+    print("   The Complete ICT Knowledge Base")
     print("=" * 60)
 
-    # Validate environment
-    if not all([SUPABASE_URL, SUPABASE_KEY, OPENAI_API_KEY]):
-        raise ValueError("Missing required environment variables")
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        print("❌ Error: Missing SUPABASE_URL or SUPABASE_KEY")
+        return
 
-    # Initialize clients
     print("\n🔌 Connecting to The Cortex...")
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
-    # Verify connection
-    stats = supabase.table('ict_chunks').select('id', count='exact').execute()
-    total_chunks = stats.count or 0
-    print(f"✅ Connected! Total chunks in Cortex: {total_chunks}")
+    # Get total count
+    try:
+        stats = supabase.table('ict_chunks').select('*', count='exact').limit(1).execute()
+        total_chunks = stats.count if stats.count else 0
+        print(f"✅ Connected! Total chunks in Cortex: {total_chunks:,}")
+    except Exception as e:
+        print(f"⚠️ Could not get exact count: {e}")
+        total_chunks = 0
 
-    # Extract all ICT wisdom
-    wisdom = {}
-    total_queries = len(ICT_QUERIES)
+    # Fetch ALL chunks
+    print("\n📥 Extracting ALL chunks from The Cortex...")
+    all_chunks = fetch_all_chunks(supabase)
+    print(f"✅ Extracted {len(all_chunks):,} chunks")
 
-    print(f"\n📚 Extracting {total_queries} ICT concepts...\n")
+    # Organize by source
+    print("\n📂 Organizing by source transcript...")
+    by_source = organize_by_source(all_chunks)
+    print(f"✅ Found {len(by_source)} unique sources/transcripts")
 
-    for i, (concept_key, query) in enumerate(ICT_QUERIES, 1):
-        print(f"  [{i}/{total_queries}] {concept_key}...")
+    # Extract concept statistics
+    print("\n🔍 Analyzing ICT concepts across all chunks...")
+    concept_stats = extract_ict_concepts(all_chunks)
 
-        try:
-            # Semantic search
-            results = search_cortex(supabase, openai_client, query, num_results=8)
-
-            # Also try text search for key terms
-            key_term = query.split()[0]
-            text_results = text_search(supabase, key_term, num_results=3)
-
-            wisdom[concept_key] = {
-                "query": query,
-                "semantic_results": [
-                    {
-                        "content": r.get("content", ""),
-                        "source": r.get("source_transcript", ""),
-                        "similarity": round(r.get("similarity", 0), 4)
-                    }
-                    for r in results
-                ],
-                "text_results": [
-                    {
-                        "content": r.get("content", ""),
-                        "source": r.get("source_transcript", "")
-                    }
-                    for r in text_results
-                ]
-            }
-
-        except Exception as e:
-            print(f"      ⚠️ Error: {e}")
-            wisdom[concept_key] = {"query": query, "error": str(e)}
-
-    # Get unique sources
-    print("\n📋 Getting source list...")
-    sources_resp = supabase.table('ict_chunks') \
-        .select('source_transcript') \
-        .limit(5000) \
-        .execute()
-
-    unique_sources = list(set([s['source_transcript'] for s in sources_resp.data]))
-    unique_sources.sort()
-
-    # Compile final output
+    # Build final output
     output = {
-        "metadata": {
-            "total_chunks": total_chunks,
-            "total_sources": len(unique_sources),
-            "concepts_extracted": len(wisdom),
-            "extraction_version": "1.0"
+        'extraction_info': {
+            'timestamp': datetime.now().isoformat(),
+            'total_chunks': len(all_chunks),
+            'total_sources': len(by_source),
+            'source': 'The Cortex - Complete ICT Knowledge Base'
         },
-        "sources": unique_sources,
-        "wisdom": wisdom
+        'concept_analysis': concept_stats,
+        'transcripts': by_source
     }
 
     # Save to file
-    output_file = "ict_wisdom.json"
+    output_file = 'ict_wisdom.json'
+    print(f"\n💾 Saving to {output_file}...")
+
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
-    print(f"\n✅ EXTRACTION COMPLETE!")
-    print(f"   📁 Saved to: {output_file}")
-    print(f"   📊 Total concepts: {len(wisdom)}")
-    print(f"   📚 Total sources: {len(unique_sources)}")
+    file_size = os.path.getsize(output_file) / (1024 * 1024)
+    print(f"✅ Saved! File size: {file_size:.2f} MB")
+
+    # Print summary
+    print("\n" + "=" * 60)
+    print("📊 EXTRACTION SUMMARY")
+    print("=" * 60)
+    print(f"Total chunks extracted: {len(all_chunks):,}")
+    print(f"Total transcripts: {len(by_source)}")
+    print(f"\nTop 10 transcripts by chunk count:")
+
+    sorted_sources = sorted(by_source.items(), key=lambda x: x[1]['total_chunks'], reverse=True)
+    for i, (source, data) in enumerate(sorted_sources[:10], 1):
+        print(f"  {i}. {source}: {data['total_chunks']} chunks")
+
+    print("\n🎯 Top ICT concepts by mentions:")
+    sorted_concepts = sorted(concept_stats.items(), key=lambda x: x[1]['total_mentions'], reverse=True)
+    for concept, stats in sorted_concepts[:15]:
+        if stats['total_mentions'] > 0:
+            print(f"  • {concept}: {stats['total_mentions']} mentions across {stats['unique_sources']} sources")
+
+    print("\n" + "=" * 60)
+    print("✅ FULL CORTEX EXTRACTION COMPLETE!")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
