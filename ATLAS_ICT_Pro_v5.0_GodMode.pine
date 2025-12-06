@@ -1174,15 +1174,30 @@ bearishRejection = i_showRejBlock and totalRange > 0 and upperWick / totalRange 
 // ICT-style Rejection Block colors (teal/coral)
 rbBullColor = color.new(#2EC4B6, 0)  // Teal for bullish rejection
 rbBearColor = color.new(#E71D36, 0)  // Coral red for bearish rejection
+rbDotsColor = color.new(#FFEB3B, 0)  // Pac-Man yellow for strength dots
 
-// Create Rejection Blocks - ICT style with labels
+// RB Strength scoring function
+f_rbStrength(float wickPct, float bodyPct, bool inKZ) =>
+    score = 1  // Base score
+    if wickPct >= 0.70
+        score += 1  // Extra long wick
+    if inKZ or bodyPct <= 0.30
+        score += 1  // In killzone or extra small body
+    score
+
+// Create Rejection Blocks - ICT style with strength dots
 if bullishRejection
+    wickPct = lowerWick / totalRange
+    bodyPct = bodySize / totalRange
+    kzActive = londonKZ or nyAMKZ or nyPMKZ or inSilverBullet
+    rbScore = f_rbStrength(wickPct, bodyPct, kzActive)
+    rbDots = rbScore >= 3 ? "●●●" : rbScore >= 2 ? "●●○" : "●○○"
     newRB = RejBlock.new(
          math.max(close, open), low, bar_index, DIR_BULL,
          box.new(bar_index, math.max(close, open), bar_index + 15, low,
                  border_color=color.new(rbBullColor, 20), bgcolor=color.new(rbBullColor, 85),
                  border_width=2, border_style=line.style_solid,
-                 text="RB", text_color=color.new(rbBullColor, 10), text_size=size.tiny, text_halign=text.align_right))
+                 text="RB " + rbDots, text_color=rbDotsColor, text_size=size.tiny, text_halign=text.align_right))
     if array.size(rejBlocks) >= 8
         oldRB = array.shift(rejBlocks)
         if not na(oldRB.visual)
@@ -1190,12 +1205,17 @@ if bullishRejection
     array.push(rejBlocks, newRB)
 
 if bearishRejection
+    wickPct = upperWick / totalRange
+    bodyPct = bodySize / totalRange
+    kzActive = londonKZ or nyAMKZ or nyPMKZ or inSilverBullet
+    rbScore = f_rbStrength(wickPct, bodyPct, kzActive)
+    rbDots = rbScore >= 3 ? "●●●" : rbScore >= 2 ? "●●○" : "●○○"
     newRB = RejBlock.new(
          high, math.min(close, open), bar_index, DIR_BEAR,
          box.new(bar_index, high, bar_index + 15, math.min(close, open),
                  border_color=color.new(rbBearColor, 20), bgcolor=color.new(rbBearColor, 85),
                  border_width=2, border_style=line.style_solid,
-                 text="RB", text_color=color.new(rbBearColor, 10), text_size=size.tiny, text_halign=text.align_right))
+                 text="RB " + rbDots, text_color=rbDotsColor, text_size=size.tiny, text_halign=text.align_right))
     if array.size(rejBlocks) >= 8
         oldRB = array.shift(rejBlocks)
         if not na(oldRB.visual)
