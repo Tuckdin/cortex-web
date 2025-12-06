@@ -663,9 +663,9 @@ if bullishOB and i_showOB
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BULL, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=color.new(obBullColor, 20), bgcolor=color.new(obBullColor, 85),
+                 border_color=color.new(obBullColor, 0), bgcolor=color.new(obBullColor, 70),
                  border_width=2, border_style=line.style_solid,
-                 text="OB", text_color=color.new(obBullColor, 30), text_size=size.tiny, text_halign=text.align_right),
+                 text="OB", text_color=color.new(obBullColor, 0), text_size=size.tiny, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
                                        style=label.style_none, textcolor=color.new(obBullColor, 30), size=size.tiny) : na)
     if array.size(bullOBs) >= 10
@@ -680,9 +680,9 @@ if bearishOB and i_showOB
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BEAR, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=color.new(obBearColor, 20), bgcolor=color.new(obBearColor, 85),
+                 border_color=color.new(obBearColor, 0), bgcolor=color.new(obBearColor, 70),
                  border_width=2, border_style=line.style_solid,
-                 text="OB", text_color=color.new(obBearColor, 30), text_size=size.tiny, text_halign=text.align_right),
+                 text="OB", text_color=color.new(obBearColor, 0), text_size=size.tiny, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
                                        style=label.style_none, textcolor=color.new(obBearColor, 30), size=size.tiny) : na)
     if array.size(bearOBs) >= 10
