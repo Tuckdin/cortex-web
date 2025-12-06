@@ -1995,13 +1995,24 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
     table.cell(infoTable, 1, 8, confDots + " " + confDisplay, text_color=confColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
 
-    // ═══ WEEKLY PROFILE & S&D ═══
-    wpText = weeklyProfile == "ACCUMULATION" ? "ACC" : weeklyProfile == "MANIPULATION" ? "MAN" : "DIST"
-    wpColor = weeklyProfile == "DISTRIBUTION" ? i_bullColor : weeklyProfile == "MANIPULATION" ? i_liqColor : textDim
-    sdText = sdPhase == "DESTROY_BEARS" ? "⚡ BEARS" : sdPhase == "DESTROY_BULLS" ? "⚡ BULLS" : sdPhase == "SEEK" ? "◎ SEEK" : sdPhase == "WATCH" ? "◎ S&D" : "—"
-    sdColor = sdPhase == "DESTROY_BEARS" or sdPhase == "DESTROY_BULLS" ? i_bullColor : sdPhase == "SEEK" or sdPhase == "WATCH" ? i_liqColor : textDim
-    table.cell(infoTable, 0, 9, wpText + " " + quarterName, text_color=wpColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 9, sdText, text_color=sdColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
+    // ═══ WEEKLY PROFILE & S&D (ICT Day of Week Theory) ═══
+    // Mon-Wed = High/Low forming, Thu-Fri = Trade in bias
+    isFormingDays = isMonday or isTuesday or isWednesday
+    isTradeDays = isThursday or isFriday
+
+    // Check for Seek & Destroy (whipsaw - don't trade)
+    isSeekDestroy = sdPhase == "SEEK" or sdPhase == "WATCH" or sdPhase == "DESTROY_BEARS" or sdPhase == "DESTROY_BULLS"
+
+    // Build display based on priority: S&D > Day phase
+    weeklyDisplay = isSeekDestroy ? "⚠ SEEK & DESTROY" :
+                    isFormingDays ? "MON-WED ◉ FORMING" :
+                    isTradeDays ? "THU-FRI ◉ TRADE" : "—"
+    weeklyColor = isSeekDestroy ? i_bearColor :
+                  isFormingDays ? i_pacmanColor :
+                  isTradeDays ? i_bullColor : textDim
+
+    table.cell(infoTable, 0, 9, "Weekly", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 9, weeklyDisplay, text_color=weeklyColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
     // ═══ ORG (Opening Range Gap) ═══
     orgText = hasORG ? "◉ GAP" : "—"
