@@ -1828,9 +1828,11 @@ var color textBright = color.new(#E6F1FF, 0)
 var table infoTable = table.new(position.middle_right, 2, 14, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
 
 if i_showDOLTable and barstate.islast
-    // ═══ HEADER - Sleek title bar ═══
-    table.cell(infoTable, 0, 0, "◉ PAC-MAN STATUS", text_color=i_pacmanColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
-    table.cell(infoTable, 1, 0, str.tostring(dolProbability, "#") + "%", text_color=dolProbability >= 70 ? i_bullColor : dolProbability >= 50 ? i_neutralColor : i_bearColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
+    // ═══ HEADER - Merged and centered ═══
+    probColor = dolProbability >= 70 ? i_bullColor : dolProbability >= 50 ? i_neutralColor : i_bearColor
+    headerText = "◉ PAC-MAN STATUS " + str.tostring(dolProbability, "#") + "%"
+    table.cell(infoTable, 0, 0, headerText, text_color=i_pacmanColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 0, 1, 0)
 
     // ═══ DIRECTION ROW - Main signal ═══
     dirText = dolDirection == DIR_BULL ? "▲ LONG" : dolDirection == DIR_BEAR ? "▼ SHORT" : "◆ NEUTRAL"
