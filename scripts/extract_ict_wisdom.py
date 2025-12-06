@@ -174,9 +174,13 @@ def main():
     openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
     # Verify connection
-    stats = supabase.table('ict_chunks').select('id', count='exact').execute()
-    total_chunks = stats.count or 0
-    print(f"✅ Connected! Total chunks in Cortex: {total_chunks}")
+    try:
+        stats = supabase.table('ict_chunks').select('*', count='exact').limit(1).execute()
+        total_chunks = stats.count if stats.count else 0
+        print(f"✅ Connected! Total chunks in Cortex: {total_chunks}")
+    except Exception as e:
+        print(f"⚠️ Could not get exact count: {e}")
+        total_chunks = 0
 
     # Extract all ICT wisdom
     wisdom = {}
