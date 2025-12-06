@@ -515,12 +515,10 @@ stalkDist = atrVal * 0.5  // Distance to start stalking
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Check if near swing high (stalking)
-nearSwingHigh = not na(recentSwingHigh) and not swingHighSwept and
-                high >= recentSwingHigh - stalkDist and high < recentSwingHigh
+nearSwingHigh = not na(recentSwingHigh) and not swingHighSwept and high >= recentSwingHigh - stalkDist and high < recentSwingHigh
 
 // Check if near swing low (stalking)
-nearSwingLow = not na(recentSwingLow) and not swingLowSwept and
-               low <= recentSwingLow + stalkDist and low > recentSwingLow
+nearSwingLow = not na(recentSwingLow) and not swingLowSwept and low <= recentSwingLow + stalkDist and low > recentSwingLow
 
 // STALK stage - approaching the high/low
 if nearSwingHigh and tsStage != "TRAP" and tsStage != "CONFIRM"
