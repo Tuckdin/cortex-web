@@ -27,7 +27,7 @@ def fetch_all_chunks(supabase):
         print(f"  Fetching chunks {offset} to {offset + BATCH_SIZE}...")
 
         response = supabase.table('ict_chunks') \
-            .select('id, content, source, chunk_index, metadata') \
+            .select('id, content, source_transcript, chunk_index, metadata') \
             .range(offset, offset + BATCH_SIZE - 1) \
             .execute()
 
@@ -49,7 +49,7 @@ def organize_by_source(chunks):
     by_source = {}
 
     for chunk in chunks:
-        source = chunk.get('source', 'unknown')
+        source = chunk.get('source_transcript', 'unknown')
 
         if source not in by_source:
             by_source[source] = {
@@ -202,7 +202,7 @@ def extract_ict_concepts(chunks):
 
     for chunk in chunks:
         content = chunk.get('content', '').lower()
-        source = chunk.get('source', 'unknown')
+        source = chunk.get('source_transcript', 'unknown')
 
         for concept, kws in keywords.items():
             for kw in kws:
