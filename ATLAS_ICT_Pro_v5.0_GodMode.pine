@@ -1948,10 +1948,10 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 1, 5, tsText, text_color=tsColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
     // ═══ PO3 PHASE (Progressive Fill) ═══
-    // ◉ = current/active (yellow), ● = passed (dim), ○ = upcoming (dark)
-    po3Icons = po3Phase == "ACCUMULATION" ? "◉ ○ ○" : po3Phase == "MANIPULATION" ? "● ◉ ○" : "● ● ◉"
+    // ● = filled/passed (yellow), ○ = upcoming (dim)
+    po3Icons = po3Phase == "ACCUMULATION" ? "● ○ ○" : po3Phase == "MANIPULATION" ? "● ● ○" : "● ● ●"
     po3Text = po3Phase == "ACCUMULATION" ? "ACCUMULATE" : po3Phase == "MANIPULATION" ? "MANIPULATE" : "DISTRIBUTE"
-    po3Color = i_pacmanColor  // Yellow for active phase
+    po3Color = i_pacmanColor  // Yellow for Pac-Man theme
     table.cell(infoTable, 0, 6, "Phase", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
     table.cell(infoTable, 1, 6, po3Icons + " " + po3Text, text_color=po3Color, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
