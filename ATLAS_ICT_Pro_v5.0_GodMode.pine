@@ -176,16 +176,22 @@ i_tier1Threshold = input.int(80, "Tier 1 Threshold", minval=50, maxval=100, grou
 i_tier2Threshold = input.int(60, "Tier 2 Threshold", minval=30, maxval=80, group=grp_comp)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// COLORS
+// COLORS (Refined Retro-Arcade Palette)
 // ═══════════════════════════════════════════════════════════════════════════════
 grp_colors = "🎨 COLORS"
-i_bullColor = input.color(color.new(#00ff88, 0), "Bullish Color", group=grp_colors)
-i_bearColor = input.color(color.new(#ff4444, 0), "Bearish Color", group=grp_colors)
-i_neutralColor = input.color(color.new(#ffaa00, 0), "Neutral Color", group=grp_colors)
-i_obColor = input.color(color.new(#2962ff, 20), "Order Block Color", group=grp_colors)
-i_fvgColor = input.color(color.new(#7c4dff, 30), "FVG Color", group=grp_colors)
-i_liqColor = input.color(color.new(#ff6d00, 0), "Liquidity Color", group=grp_colors)
-i_pacmanColor = input.color(color.new(#ffff00, 0), "Pac-Man Color", group=grp_colors)
+i_bullColor = input.color(color.new(#00E676, 0), "Bullish Color", group=grp_colors)  // Neon green
+i_bearColor = input.color(color.new(#FF1744, 0), "Bearish Color", group=grp_colors)  // Hot pink-red
+i_neutralColor = input.color(color.new(#FFD740, 0), "Neutral Color", group=grp_colors)  // Warm yellow
+i_obColor = input.color(color.new(#448AFF, 20), "Order Block Color", group=grp_colors)  // Electric blue
+i_fvgColor = input.color(color.new(#7C4DFF, 30), "FVG Color", group=grp_colors)  // Purple
+i_liqColor = input.color(color.new(#FF9100, 0), "Liquidity Color", group=grp_colors)  // Orange
+i_pacmanColor = input.color(color.new(#FFEB3B, 0), "Pac-Man Color", group=grp_colors)  // Classic yellow
+
+// Visual Style Settings
+grp_style = "🎨 VISUAL STYLE"
+i_tableStyle = input.string("Minimal", "Dashboard Style", options=["Minimal", "Classic", "Compact"], group=grp_style)
+i_boxTransparency = input.int(88, "Zone Box Transparency", minval=70, maxval=95, group=grp_style)
+i_labelStyle = input.string("Clean", "Label Style", options=["Clean", "Badge", "Minimal"], group=grp_style)
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        CONSTANTS & ENUMS                                       ║
@@ -616,14 +622,15 @@ bullishOB = close[1] < open[1] and displacementUp and close > high[1]
 // Bearish OB: Last up candle before displacement down
 bearishOB = close[1] > open[1] and displacementDown and close < low[1]
 
-// Create and manage Order Blocks
+// Create and manage Order Blocks - Clean minimal style
 if bullishOB and i_showOB
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BULL, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=i_bullColor, bgcolor=color.new(i_bullColor, 85)),
-         i_obShowLifecycle ? label.new(bar_index - 1, high[1], "FRESH",
-                                       style=label.style_none, textcolor=i_bullColor, size=size.tiny) : na)
+                 border_color=color.new(i_bullColor, 40), bgcolor=color.new(i_bullColor, i_boxTransparency),
+                 border_width=2),
+         i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
+                                       style=label.style_none, textcolor=color.new(i_bullColor, 40), size=size.tiny) : na)
     if array.size(bullOBs) >= 10
         oldOB = array.shift(bullOBs)
         if not na(oldOB.visual)
@@ -636,9 +643,10 @@ if bearishOB and i_showOB
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BEAR, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=i_bearColor, bgcolor=color.new(i_bearColor, 85)),
-         i_obShowLifecycle ? label.new(bar_index - 1, high[1], "FRESH",
-                                       style=label.style_none, textcolor=i_bearColor, size=size.tiny) : na)
+                 border_color=color.new(i_bearColor, 40), bgcolor=color.new(i_bearColor, i_boxTransparency),
+                 border_width=2),
+         i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
+                                       style=label.style_none, textcolor=color.new(i_bearColor, 40), size=size.tiny) : na)
     if array.size(bearOBs) >= 10
         oldOB = array.shift(bearOBs)
         if not na(oldOB.visual)
@@ -688,13 +696,13 @@ f_updateOBState(array<OrderBlock> obs, bool isBull) =>
                     ob.state := OB_VIOLATED
                     ob.isBreaker := true
 
-            // Update label
+            // Update label - Clean minimal indicators
             if not na(ob.stateLabel) and i_obShowLifecycle
-                stateText = ob.state == OB_FRESH ? "FRESH" :
-                           ob.state == OB_PROPULSION ? "PROP" :
-                           ob.state == OB_TESTED ? "TESTED" :
-                           ob.state == OB_MITIGATED ? "MIT" :
-                           ob.isBreaker ? "BREAKER" : "VIOL"
+                stateText = ob.state == OB_FRESH ? "●" :
+                           ob.state == OB_PROPULSION ? "◉" :
+                           ob.state == OB_TESTED ? "◎" :
+                           ob.state == OB_MITIGATED ? "○" :
+                           ob.isBreaker ? "⊘" : "✕"
                 label.set_text(ob.stateLabel, stateText)
                 label.set_x(ob.stateLabel, bar_index)
 
@@ -722,15 +730,15 @@ bearishFVGBottom = high
 // Check minimum size
 minFVGSize = i_fvgMinSize * f_tickSize()
 
-// Create FVGs
+// Create FVGs - Clean minimal boxes without text
 if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
     mitPct = f_getMitPct()
     mitLevel = bullishFVGBottom + (bullishFVGTop - bullishFVGBottom) * mitPct
     newFVG = FVG.new(
          bullishFVGTop, bullishFVGBottom, bar_index, DIR_BULL, false, mitLevel,
          box.new(bar_index - 2, bullishFVGTop, bar_index + 15, bullishFVGBottom,
-                 border_color=i_bullColor, bgcolor=color.new(i_fvgColor, 80),
-                 text="FVG", text_color=i_bullColor, text_size=size.tiny))
+                 border_color=color.new(i_fvgColor, 60), bgcolor=color.new(i_fvgColor, i_boxTransparency),
+                 border_width=1, border_style=line.style_dotted))
     if array.size(bullFVGs) >= 15
         oldFVG = array.shift(bullFVGs)
         if not na(oldFVG.visual)
@@ -743,8 +751,8 @@ if bearishFVG and i_showFVG and (bearishFVGTop - bearishFVGBottom) >= minFVGSize
     newFVG = FVG.new(
          bearishFVGTop, bearishFVGBottom, bar_index, DIR_BEAR, false, mitLevel,
          box.new(bar_index - 2, bearishFVGTop, bar_index + 15, bearishFVGBottom,
-                 border_color=i_bearColor, bgcolor=color.new(i_fvgColor, 80),
-                 text="FVG", text_color=i_bearColor, text_size=size.tiny))
+                 border_color=color.new(i_fvgColor, 60), bgcolor=color.new(i_fvgColor, i_boxTransparency),
+                 border_width=1, border_style=line.style_dotted))
     if array.size(bearFVGs) >= 15
         oldFVG = array.shift(bearFVGs)
         if not na(oldFVG.visual)
@@ -1262,68 +1270,71 @@ if i_showComposite
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SESSION BACKGROUNDS
+// SESSION BACKGROUNDS - Very subtle, non-distracting
 // ═══════════════════════════════════════════════════════════════════════════════
 
-sessionColor = asianSession ? color.new(color.purple, 95) :
-               londonSession ? color.new(color.blue, 95) :
-               nyAMSession ? color.new(color.green, 95) :
-               nyPMSession ? color.new(color.orange, 95) : na
+sessionColor = asianSession ? color.new(#9C27B0, 97) :
+               londonSession ? color.new(#2196F3, 97) :
+               nyAMSession ? color.new(#4CAF50, 97) :
+               nyPMSession ? color.new(#FF9800, 97) : na
 
 bgcolor(i_showSessions ? sessionColor : na, title="Session Background")
 
-// Killzone highlight
-kzColor = (asianKZ or londonKZ or nyAMKZ or nyPMKZ) and i_showKillzones ? color.new(color.yellow, 92) : na
+// Killzone highlight - subtle accent
+kzColor = (asianKZ or londonKZ or nyAMKZ or nyPMKZ) and i_showKillzones ? color.new(#FFC107, 95) : na
 bgcolor(kzColor, title="Killzone Highlight")
 
-// Silver Bullet highlight
-bgcolor(i_showSilverBullet and inSilverBullet ? color.new(color.lime, 90) : na, title="Silver Bullet")
+// Silver Bullet highlight - slightly more visible for key windows
+bgcolor(i_showSilverBullet and inSilverBullet ? color.new(#00E5FF, 93) : na, title="Silver Bullet")
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MARKET STRUCTURE LABELS
+// MARKET STRUCTURE LABELS (Clean minimal style)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// BOS - subtle small markers
 plotshape(i_showBOS and bullishBOS, title="BOS Bull", style=shape.triangleup,
-     location=location.abovebar, color=i_bullColor, text="BOS", textcolor=color.white, size=size.tiny)
+     location=location.abovebar, color=color.new(i_bullColor, 30), text="", size=size.tiny)
 plotshape(i_showBOS and bearishBOS, title="BOS Bear", style=shape.triangledown,
-     location=location.belowbar, color=i_bearColor, text="BOS", textcolor=color.white, size=size.tiny)
-plotshape(i_showCHoCH and bullishCHoCH, title="CHoCH Bull", style=shape.triangleup,
-     location=location.abovebar, color=color.yellow, text="CHoCH", textcolor=color.black, size=size.small)
-plotshape(i_showCHoCH and bearishCHoCH, title="CHoCH Bear", style=shape.triangledown,
-     location=location.belowbar, color=color.yellow, text="CHoCH", textcolor=color.black, size=size.small)
+     location=location.belowbar, color=color.new(i_bearColor, 30), text="", size=size.tiny)
+
+// CHoCH - more prominent as it's a reversal signal
+plotshape(i_showCHoCH and bullishCHoCH, title="CHoCH Bull", style=shape.diamond,
+     location=location.abovebar, color=i_neutralColor, text="⟲", textcolor=i_neutralColor, size=size.tiny)
+plotshape(i_showCHoCH and bearishCHoCH, title="CHoCH Bear", style=shape.diamond,
+     location=location.belowbar, color=i_neutralColor, text="⟲", textcolor=i_neutralColor, size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TURTLE SOUP STALKING LABELS
+// TURTLE SOUP LABELS (Clean style)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Turtle Soup CONFIRM labels only (reduced plot count)
+// Turtle Soup - clean minimal badge
 plotshape(i_showTurtleSoup and bullishTS, title="Turtle Soup Bull", style=shape.labelup,
-     location=location.belowbar, color=i_bullColor, text="🐢 TS", textcolor=color.white, size=size.normal)
+     location=location.belowbar, color=color.new(i_bullColor, 20), text="TS", textcolor=color.white, size=size.small)
 plotshape(i_showTurtleSoup and bearishTS, title="Turtle Soup Bear", style=shape.labeldown,
-     location=location.abovebar, color=i_bearColor, text="🐢 TS", textcolor=color.white, size=size.normal)
+     location=location.abovebar, color=color.new(i_bearColor, 20), text="TS", textcolor=color.white, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// JUDAS SWING LABELS
+// JUDAS SWING LABELS (Subtle accent)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-plotshape(i_showJudas and bullishJudas, title="Judas Bull", style=shape.labelup,
-     location=location.belowbar, color=color.purple, text="🎭 JUDAS", textcolor=color.white, size=size.small)
-plotshape(i_showJudas and bearishJudas, title="Judas Bear", style=shape.labeldown,
-     location=location.abovebar, color=color.purple, text="🎭 JUDAS", textcolor=color.white, size=size.small)
+plotshape(i_showJudas and bullishJudas, title="Judas Bull", style=shape.circle,
+     location=location.belowbar, color=color.new(#9C27B0, 20), text="J", textcolor=color.white, size=size.tiny)
+plotshape(i_showJudas and bearishJudas, title="Judas Bear", style=shape.circle,
+     location=location.abovebar, color=color.new(#9C27B0, 20), text="J", textcolor=color.white, size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 2022 MODEL LABELS
+// 2022 MODEL LABELS (Important signal - keep visible)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 plotshape(model2022Bull, title="2022 Model Bull", style=shape.labelup,
-     location=location.belowbar, color=i_bullColor, text="📚 2022", textcolor=color.white, size=size.normal)
+     location=location.belowbar, color=color.new(#00BCD4, 10), text="2022", textcolor=color.white, size=size.small)
 plotshape(model2022Bear, title="2022 Model Bear", style=shape.labeldown,
-     location=location.abovebar, color=i_bearColor, text="📚 2022", textcolor=color.white, size=size.normal)
+     location=location.abovebar, color=color.new(#00BCD4, 10), text="2022", textcolor=color.white, size=size.small)
 
 // Swing points and EQH/EQL removed to reduce plot count - tracked via info table
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// OTE SPAWN ZONE
+// OTE SPAWN ZONE - Clean gradient style
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var box oteBox = na
@@ -1332,18 +1343,20 @@ if i_showOTE and barstate.islast
     if not na(oteBox)
         box.delete(oteBox)
 
-    oteColor = msDirection == DIR_BULL ? color.new(i_bullColor, 85) : color.new(i_bearColor, 85)
+    // Subtle cyan/teal for OTE zone - distinct but not overwhelming
+    oteColor = color.new(#00BCD4, 92)
+    oteBorder = color.new(#00BCD4, 70)
     oteBox := box.new(bar_index - 30, math.max(oteTop, oteBottom), bar_index + 10, math.min(oteTop, oteBottom),
-         border_color=oteColor, bgcolor=oteColor,
-         text="🌀 SPAWN ZONE (OTE 62-79%)", text_color=color.white, text_size=size.small)
+         border_color=oteBorder, bgcolor=oteColor, border_width=1, border_style=line.style_dashed,
+         text="OTE", text_color=color.new(#00BCD4, 50), text_size=size.tiny, text_halign=text.align_right)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PREMIUM/DISCOUNT ZONES
+// PREMIUM/DISCOUNT ZONES - Subtle reference lines
 // ═══════════════════════════════════════════════════════════════════════════════
 
-plot(i_showPDZones ? premiumZone : na, "Premium Zone", color=color.new(i_bearColor, 70), linewidth=1, style=plot.style_linebr)
-plot(i_showPDZones ? discountZone : na, "Discount Zone", color=color.new(i_bullColor, 70), linewidth=1, style=plot.style_linebr)
-plot(i_showEQ ? equilibrium : na, "Equilibrium", color=color.new(i_neutralColor, 50), linewidth=2, style=plot.style_linebr)
+plot(i_showPDZones ? premiumZone : na, "Premium Zone", color=color.new(i_bearColor, 80), linewidth=1, style=plot.style_linebr)
+plot(i_showPDZones ? discountZone : na, "Discount Zone", color=color.new(i_bullColor, 80), linewidth=1, style=plot.style_linebr)
+plot(i_showEQ ? equilibrium : na, "Equilibrium", color=color.new(#78909C, 60), linewidth=1, style=plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CBDR PROJECTIONS
@@ -1355,7 +1368,7 @@ plot(i_showCBDR and not na(cbdrHigh) ? cbdrHigh : na, "CBDR High", color=color.n
 plot(i_showCBDR and not na(cbdrLow) ? cbdrLow : na, "CBDR Low", color=color.new(color.teal, 30), linewidth=2, style=plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NWOG ZONE
+// NWOG ZONE - Clean subtle style
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var box nwogBox = na
@@ -1364,8 +1377,9 @@ if i_showNWOG and not na(nwogHigh) and not na(nwogLow) and barstate.islast
     if not na(nwogBox)
         box.delete(nwogBox)
     nwogBox := box.new(bar_index - 50, nwogHigh, bar_index + 10, nwogLow,
-         border_color=color.new(color.fuchsia, 30), bgcolor=color.new(color.fuchsia, 90),
-         text="🎁 NWOG", text_color=color.fuchsia, text_size=size.small)
+         border_color=color.new(#E040FB, 60), bgcolor=color.new(#E040FB, 93),
+         border_width=1, border_style=line.style_dotted,
+         text="NWOG", text_color=color.new(#E040FB, 50), text_size=size.tiny, text_halign=text.align_right)
 
 // NWOG CE line
 plot(i_showNWOGCE and not na(nwogCE) ? nwogCE : na, "NWOG CE", color=color.new(color.fuchsia, 30), linewidth=2, style=plot.style_linebr)
@@ -1385,12 +1399,13 @@ plot(i_ipda60 and i_showIPDA ? high60IPDA : na, "IPDA 60 High", color=color.new(
 plot(i_ipda60 and i_showIPDA ? low60IPDA : na, "IPDA 60 Low", color=color.new(color.blue, 60), linewidth=1, style=plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PAC-MAN DOL PATH VISUALIZATION
+// PAC-MAN DOL PATH VISUALIZATION - Sleek arcade style
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var label pacmanLabel = na
 var line dolLine = na
 var label dolTargetLabel = na
+var line dolPathDots = na
 
 if i_showDOL and i_showPacMan and barstate.islast
     // Clean up old visuals
@@ -1401,137 +1416,163 @@ if i_showDOL and i_showPacMan and barstate.islast
     if not na(dolTargetLabel)
         label.delete(dolTargetLabel)
 
-    // Draw Pac-Man at current price
-    pacmanLabel := label.new(bar_index + 2, close, "🟡",
+    // Draw Pac-Man at current price - cleaner circle icon
+    pacChar = dolDirection == DIR_BULL ? "◐" : dolDirection == DIR_BEAR ? "◑" : "●"
+    pacmanLabel := label.new(bar_index + 2, close, pacChar,
          style=label.style_none, textcolor=i_pacmanColor, size=size.large)
 
-    // Draw DOL path line
-    arrowColor = dolDirection == DIR_BULL ? i_bullColor :
-                 dolDirection == DIR_BEAR ? i_bearColor : i_neutralColor
+    // Draw DOL path line - elegant arrow
+    arrowColor = dolDirection == DIR_BULL ? color.new(i_bullColor, 20) :
+                 dolDirection == DIR_BEAR ? color.new(i_bearColor, 20) : color.new(i_neutralColor, 40)
 
     if not na(dolTarget)
-        dolLine := line.new(bar_index, close, bar_index + 15, dolTarget,
-             color=arrowColor, width=3, style=line.style_arrow_right)
+        dolLine := line.new(bar_index + 2, close, bar_index + 12, dolTarget,
+             color=arrowColor, width=2, style=line.style_arrow_right)
 
-        // Target label
-        targetText = dolDirection == DIR_BULL ? "🎯 BSL" :
-                     dolDirection == DIR_BEAR ? "🎯 SSL" : "🎯 EQ"
-        dolTargetLabel := label.new(bar_index + 16, dolTarget, targetText,
-             style=label.style_none, textcolor=arrowColor, size=size.normal)
+        // Target label - minimal clean style
+        targetText = dolDirection == DIR_BULL ? "▲ BSL" :
+                     dolDirection == DIR_BEAR ? "▼ SSL" : "◆ EQ"
+        dolTargetLabel := label.new(bar_index + 13, dolTarget, targetText,
+             style=label.style_none, textcolor=arrowColor, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GHOST VISUALS (Institutional Levels)
+// LIQUIDITY TARGETS (Institutional Levels) - Clean minimal
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var label ghostHighLabel = na
 var label ghostLowLabel = na
+var line bslLine = na
+var line sslLine = na
 
 if i_showPacMan and barstate.islast
     if not na(ghostHighLabel)
         label.delete(ghostHighLabel)
     if not na(ghostLowLabel)
         label.delete(ghostLowLabel)
+    if not na(bslLine)
+        line.delete(bslLine)
+    if not na(sslLine)
+        line.delete(sslLine)
 
-    ghostHighLabel := label.new(bar_index + 5, high60IPDA, "👻 BSL",
-         style=label.style_none, textcolor=color.new(color.aqua, 30), size=size.normal)
-    ghostLowLabel := label.new(bar_index + 5, low60IPDA, "👻 SSL",
-         style=label.style_none, textcolor=color.new(color.aqua, 30), size=size.normal)
+    // BSL - subtle dotted line with small label
+    bslLine := line.new(bar_index - 20, high60IPDA, bar_index + 5, high60IPDA,
+         color=color.new(#FF5252, 60), width=1, style=line.style_dotted)
+    ghostHighLabel := label.new(bar_index + 6, high60IPDA, "BSL",
+         style=label.style_none, textcolor=color.new(#FF5252, 40), size=size.tiny)
+
+    // SSL - subtle dotted line with small label
+    sslLine := line.new(bar_index - 20, low60IPDA, bar_index + 5, low60IPDA,
+         color=color.new(#69F0AE, 60), width=1, style=line.style_dotted)
+    ghostLowLabel := label.new(bar_index + 6, low60IPDA, "SSL",
+         style=label.style_none, textcolor=color.new(#69F0AE, 40), size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// COMPOSITE TIER SIGNALS
+// COMPOSITE TIER SIGNALS (Only on TRUE high-confluence events)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-tier1Bull = i_showComposite and compositeTier == TIER_1 and dolDirection == DIR_BULL
-tier1Bear = i_showComposite and compositeTier == TIER_1 and dolDirection == DIR_BEAR
+// Tier 1 requires ACTUAL confluence events, not just high probability
+// Must have at least one of these triggers: Model2022, TurtleSoup, Judas, or CHoCH
+hasTriggerEvent = model2022Bull or model2022Bear or bullishTS or bearishTS or bullishJudas or bearishJudas or bullishCHoCH or bearishCHoCH
+
+tier1Bull = i_showComposite and compositeTier == TIER_1 and dolDirection == DIR_BULL and hasTriggerEvent
+tier1Bear = i_showComposite and compositeTier == TIER_1 and dolDirection == DIR_BEAR and hasTriggerEvent
 tier2Bull = i_showComposite and compositeTier == TIER_2 and dolDirection == DIR_BULL
 tier2Bear = i_showComposite and compositeTier == TIER_2 and dolDirection == DIR_BEAR
 
-// Only Tier 1 signals shown to reduce plot count
+// Tier 1 signals - clean badge style (only on trigger events)
 plotshape(tier1Bull and barstate.isconfirmed, title="Tier 1 Bull", style=shape.labelup,
-     location=location.belowbar, color=i_bullColor, text="🏆 T1", textcolor=color.white, size=size.normal)
+     location=location.belowbar, color=color.new(#00C853, 0), text="T1", textcolor=color.white, size=size.small)
 plotshape(tier1Bear and barstate.isconfirmed, title="Tier 1 Bear", style=shape.labeldown,
-     location=location.abovebar, color=i_bearColor, text="🏆 T1", textcolor=color.white, size=size.normal)
+     location=location.abovebar, color=color.new(#FF1744, 0), text="T1", textcolor=color.white, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DOL PROBABILITY DASHBOARD (GOD MODE INFO TABLE)
+// DOL PROBABILITY DASHBOARD (GOD MODE INFO TABLE) - SLEEK ARCADE DESIGN
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var table infoTable = table.new(position.top_right, 2, 14, bgcolor=color.new(color.black, 20), border_width=1)
+// Sleek dark arcade background colors
+var color tableBg = color.new(#0D0D0D, 5)
+var color tableBgAlt = color.new(#1A1A2E, 10)
+var color headerBg = color.new(#16213E, 0)
+var color accentLine = color.new(#0F3460, 0)
+var color textDim = color.new(#8892B0, 0)
+var color textBright = color.new(#E6F1FF, 0)
+
+var table infoTable = table.new(position.top_right, 2, 12, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
 
 if i_showDOLTable and barstate.islast
-    // Header
-    table.cell(infoTable, 0, 0, "🎮 PAC-MAN GOD MODE", text_color=i_pacmanColor, text_size=size.normal, bgcolor=color.new(color.black, 0))
-    table.merge_cells(infoTable, 0, 0, 1, 0)
+    // ═══ HEADER - Sleek title bar ═══
+    table.cell(infoTable, 0, 0, "◉ GOD MODE", text_color=i_pacmanColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 0, str.tostring(dolProbability, "#") + "%", text_color=dolProbability >= 70 ? i_bullColor : dolProbability >= 50 ? i_neutralColor : i_bearColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_right)
 
-    // DOL Direction
-    dirText = dolDirection == DIR_BULL ? "🟢 BULLISH" : dolDirection == DIR_BEAR ? "🔴 BEARISH" : "🟡 NEUTRAL"
+    // ═══ DIRECTION ROW - Main signal ═══
+    dirText = dolDirection == DIR_BULL ? "▲ LONG" : dolDirection == DIR_BEAR ? "▼ SHORT" : "◆ NEUTRAL"
     dirColor = dolDirection == DIR_BULL ? i_bullColor : dolDirection == DIR_BEAR ? i_bearColor : i_neutralColor
-    table.cell(infoTable, 0, 1, "DOL Direction:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 1, dirText, text_color=dirColor, text_size=size.small)
+    dirBg = dolDirection == DIR_BULL ? color.new(i_bullColor, 85) : dolDirection == DIR_BEAR ? color.new(i_bearColor, 85) : color.new(i_neutralColor, 90)
+    table.cell(infoTable, 0, 1, dirText, text_color=dirColor, text_size=size.normal, bgcolor=dirBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 1, 1, 1)
 
-    // Probability
-    table.cell(infoTable, 0, 2, "Probability:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 2, str.tostring(dolProbability, "#.0") + "%", text_color=color.white, text_size=size.small)
+    // ═══ BIAS ALIGNMENT ═══
+    htfIcon = htfBias == DIR_BULL ? "●" : htfBias == DIR_BEAR ? "●" : "○"
+    htfColor = htfBias == DIR_BULL ? i_bullColor : htfBias == DIR_BEAR ? i_bearColor : textDim
+    msIcon = msDirection == DIR_BULL ? "●" : msDirection == DIR_BEAR ? "●" : "○"
+    msColor = msDirection == DIR_BULL ? i_bullColor : msDirection == DIR_BEAR ? i_bearColor : textDim
+    aligned = (htfBias == msDirection and htfBias != 0)
+    table.cell(infoTable, 0, 2, "HTF " + htfIcon + "  MS " + msIcon, text_color=aligned ? i_bullColor : textDim, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 2, aligned ? "ALIGNED" : "—", text_color=aligned ? i_bullColor : textDim, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
-    // HTF Bias
-    htfText = htfBias == DIR_BULL ? "🟢 BULL" : htfBias == DIR_BEAR ? "🔴 BEAR" : "🟡 NEUT"
-    table.cell(infoTable, 0, 3, "HTF Bias:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 3, htfText, text_color=color.white, text_size=size.small)
+    // ═══ ZONE ═══
+    zoneText = inPremium ? "PREMIUM ▲" : inDiscount ? "DISCOUNT ▼" : inOTE ? "◉ OTE" : "EQUILIBRIUM"
+    zoneColor = inPremium ? i_bearColor : inDiscount ? i_bullColor : inOTE ? color.new(#00BCD4, 0) : textDim
+    zoneBg = inOTE ? color.new(#00BCD4, 90) : tableBg
+    table.cell(infoTable, 0, 3, "Zone", text_color=textDim, text_size=size.tiny, bgcolor=zoneBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 3, zoneText, text_color=zoneColor, text_size=size.small, bgcolor=zoneBg, text_halign=text.align_right)
 
-    // Market Structure
-    msText = msDirection == DIR_BULL ? "🟢 BULL" : msDirection == DIR_BEAR ? "🔴 BEAR" : "🟡 NEUT"
-    table.cell(infoTable, 0, 4, "MS Direction:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 4, msText, text_color=color.white, text_size=size.small)
+    // ═══ PATTERN NAME - Featured ═══
+    patternColor = compositeTier == TIER_1 ? i_bullColor : compositeTier == TIER_2 ? i_neutralColor : textDim
+    patternBg = compositeTier == TIER_1 ? color.new(i_bullColor, 88) : tableBgAlt
+    cleanPattern = str.replace_all(str.replace_all(str.replace_all(patternName, "🏆 ", ""), "🥈 ", ""), "🥉 ", "")
+    table.cell(infoTable, 0, 4, cleanPattern, text_color=patternColor, text_size=size.small, bgcolor=patternBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 4, 1, 4)
 
-    // PO3 Phase
-    table.cell(infoTable, 0, 5, "PO3 Phase:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 5, po3Phase, text_color=color.white, text_size=size.small)
+    // ═══ TURTLE SOUP STAGE ═══
+    tsText = tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? "◎ STALK" : tsStage == "TRAP" ? "◉ TRAP" : tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? "✓ CONFIRM" : tsStage == "INVALID" ? "✗ INVALID" : "—"
+    tsColor = tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? i_bullColor : tsStage == "TRAP" ? i_liqColor : tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? i_neutralColor : textDim
+    table.cell(infoTable, 0, 5, "Turtle Soup", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 5, tsText, text_color=tsColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
-    // Zone
-    zoneText = inPremium ? "PREMIUM" : inDiscount ? "DISCOUNT" : inOTE ? "OTE" : "EQUILIBRIUM"
-    zoneColor = inPremium ? i_bearColor : inDiscount ? i_bullColor : i_neutralColor
-    table.cell(infoTable, 0, 6, "Zone:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 6, zoneText, text_color=zoneColor, text_size=size.small)
+    // ═══ PO3 PHASE ═══
+    po3Short = po3Phase == "ACCUMULATION" ? "ACC" : po3Phase == "MANIPULATION" ? "MAN" : "DIST"
+    po3Color = po3Phase == "DISTRIBUTION" ? i_bullColor : po3Phase == "MANIPULATION" ? i_liqColor : textDim
+    table.cell(infoTable, 0, 6, "PO3", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 6, po3Short, text_color=po3Color, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
-    // Pattern Name (NEW!)
-    patternColor = compositeTier == TIER_1 ? color.new(color.lime, 0) :
-                   compositeTier == TIER_2 ? color.new(color.yellow, 0) : color.new(color.gray, 0)
-    table.cell(infoTable, 0, 7, "Pattern:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 7, patternName, text_color=patternColor, text_size=size.small)
+    // ═══ SESSION / KILLZONE ═══
+    sessText = asianSession ? "ASIA" : londonSession ? "LON" : nyAMSession ? "NY-AM" : nyPMSession ? "NY-PM" : "OFF"
+    kzActive = inSilverBullet or nyAMKZ or nyPMKZ or londonKZ
+    kzText = inSilverBullet ? "◉ SB" : kzActive ? "◉ KZ" : ""
+    sessColor = kzActive ? i_bullColor : textDim
+    table.cell(infoTable, 0, 7, sessText, text_color=sessColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 7, kzText, text_color=inSilverBullet ? color.new(#00E5FF, 0) : i_bullColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
-    // Composite Tier
-    tierText = compositeTier == TIER_1 ? "🏆 TIER 1" : compositeTier == TIER_2 ? "🥈 TIER 2" : "🥉 TIER 3"
-    table.cell(infoTable, 0, 8, "Composite:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 8, tierText, text_color=color.white, text_size=size.small)
+    // ═══ TARGET ═══
+    table.cell(infoTable, 0, 8, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 8, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
-    // Turtle Soup Stage (NEW!)
-    tsStageText = tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? "👀 STALKING" :
-                  tsStage == "TRAP" ? "🎯 TRAPPED" :
-                  tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? "🐢 CONFIRMED" :
-                  tsStage == "INVALID" ? "🚫 INVALID" : "—"
-    tsStageColor = tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? color.lime :
-                   tsStage == "TRAP" ? color.orange :
-                   tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? color.yellow : color.gray
-    table.cell(infoTable, 0, 9, "TS Stage:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 9, tsStageText, text_color=tsStageColor, text_size=size.small)
+    // ═══ CONFLUENCE COUNT ═══
+    confDots = confluenceCount >= 6 ? "●●●●●●" : confluenceCount >= 5 ? "●●●●●○" : confluenceCount >= 4 ? "●●●●○○" : confluenceCount >= 3 ? "●●●○○○" : confluenceCount >= 2 ? "●●○○○○" : "●○○○○○"
+    confColor = confluenceCount >= 5 ? i_bullColor : confluenceCount >= 3 ? i_neutralColor : textDim
+    table.cell(infoTable, 0, 9, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 9, confDots, text_color=confColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
-    // Session
-    sessText = asianSession ? "ASIAN" : londonSession ? "LONDON" : nyAMSession ? "NY AM" : nyPMSession ? "NY PM" : "OFF"
-    table.cell(infoTable, 0, 10, "Session:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 10, sessText, text_color=color.white, text_size=size.small)
+    // ═══ KEY FACTORS - Compact ═══
+    table.cell(infoTable, 0, 10, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 10, 1, 10)
 
-    // Killzone
-    kzText = inSilverBullet ? "🔫 SILVER BULLET" : nyAMKZ or nyPMKZ ? "🎯 NY KZ" : londonKZ ? "🎯 LON KZ" : asianKZ ? "🎯 ASIA KZ" : "NONE"
-    table.cell(infoTable, 0, 11, "Killzone:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 11, kzText, text_color=color.white, text_size=size.small)
-
-    // Key Factors
-    table.cell(infoTable, 0, 12, "Factors:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 12, dolReason, text_color=color.gray, text_size=size.tiny)
-
-    // Target
-    table.cell(infoTable, 0, 13, "Target:", text_color=color.white, text_size=size.small)
-    table.cell(infoTable, 1, 13, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small)
+    // ═══ TIER INDICATOR BAR ═══
+    tierBar = compositeTier == TIER_1 ? "████████████" : compositeTier == TIER_2 ? "████████░░░░" : "████░░░░░░░░"
+    tierColor = compositeTier == TIER_1 ? i_bullColor : compositeTier == TIER_2 ? i_neutralColor : textDim
+    table.cell(infoTable, 0, 11, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 11, 1, 11)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALERTS (Reduced to stay under 64 plot limit)
