@@ -1955,13 +1955,15 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 6, "Phase", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
     table.cell(infoTable, 1, 6, po3Icons + " " + po3Text, text_color=po3Color, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
-    // ═══ SESSION / KILLZONE ═══
-    sessText = asianSession ? "ASIA" : londonSession ? "LON" : nyAMSession ? "NY-AM" : nyPMSession ? "NY-PM" : "OFF"
+    // ═══ SESSION / KILLZONE (Dynamic) ═══
+    sessName = asianSession ? "ASIA" : londonSession ? "LONDON" : nyAMSession ? "NY-AM" : nyPMSession ? "NY-PM" : "OFF"
     kzActive = inSilverBullet or nyAMKZ or nyPMKZ or londonKZ
-    kzText = inSilverBullet ? "◉ SB" : kzActive ? "◉ KZ" : ""
-    sessColor = kzActive ? i_bullColor : textDim
-    table.cell(infoTable, 0, 7, sessText, text_color=sessColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 7, kzText, text_color=inSilverBullet ? color.new(#00E5FF, 0) : i_bullColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
+    kzIndicator = inSilverBullet ? " ◉ SB" : kzActive ? " ◉ KZ" : ""
+    sessDisplay = sessName + kzIndicator
+    sessColor = kzActive ? textBright : textDim
+    kzColor = inSilverBullet ? color.new(#00E5FF, 0) : i_pacmanColor  // Cyan for SB, Yellow for KZ
+    table.cell(infoTable, 0, 7, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 7, sessDisplay, text_color=kzActive ? kzColor : textDim, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
     // ═══ CONFLUENCE COUNT ═══
     confDots = confluenceCount >= 6 ? "●●●●●●" : confluenceCount >= 5 ? "●●●●●○" : confluenceCount >= 4 ? "●●●●○○" : confluenceCount >= 3 ? "●●●○○○" : confluenceCount >= 2 ? "●●○○○○" : "●○○○○○"
