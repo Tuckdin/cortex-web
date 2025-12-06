@@ -62,6 +62,24 @@ i_showKillzones = input.bool(true, "Highlight Killzones", group=grp_time)
 i_showSilverBullet = input.bool(true, "Silver Bullet Windows", group=grp_time)
 i_showMacros = input.bool(true, "Macro Windows (:50-:10)", group=grp_time)
 
+grp_sessions = "═══ 🎮 SESSION MAP (ICT Time Windows) ═══"
+i_showSessionBG = input.bool(true, "Show Session Backgrounds", group=grp_sessions, tooltip="Color-coded time windows based on ICT teachings")
+i_showSessionLines = input.bool(true, "Show Session Separators", group=grp_sessions, tooltip="Vertical lines between sessions")
+i_showSessionLabels = input.bool(true, "Show Session Labels", group=grp_sessions, tooltip="Labels describing what happens in each window")
+i_sessionBGOpacity = input.int(92, "Background Opacity", minval=80, maxval=98, group=grp_sessions)
+i_labelSize = input.string("small", "Label Size", options=["tiny", "small", "normal"], group=grp_sessions)
+
+grp_sessionColors = "═══ 🎨 SESSION COLORS ═══"
+i_asiaColor = input.color(color.new(#9C27B0, 90), "Asia (Accumulation)", group=grp_sessionColors)
+i_londonColor = input.color(color.new(#2196F3, 88), "London (Manipulation)", group=grp_sessionColors)
+i_nyamColor = input.color(color.new(#4CAF50, 88), "NY AM (Distribution)", group=grp_sessionColors)
+i_silverBulletAMColor = input.color(color.new(#00BCD4, 85), "Silver Bullet AM", group=grp_sessionColors)
+i_silverBulletPMColor = input.color(color.new(#00BCD4, 85), "Silver Bullet PM", group=grp_sessionColors)
+i_lunchColor = input.color(color.new(#F44336, 88), "NY Lunch (NO TRADE)", group=grp_sessionColors)
+i_nypmColor = input.color(color.new(#FF9800, 88), "NY PM Session", group=grp_sessionColors)
+i_offHoursColor = input.color(color.new(#424242, 95), "Off Hours (Grey Out)", group=grp_sessionColors)
+i_macroColor = input.color(color.new(#FFEB3B, 92), "Macro Windows (:50-:10)", group=grp_sessionColors)
+
 grp_colors = "═══ 🎨 PAC-MAN COLORS ═══"
 i_pacmanColor = input.color(color.new(#FFEB3B, 0), "PAC-MAN (Direction)", group=grp_colors)
 i_pelletColor = input.color(color.new(#FFFFFF, 20), "Pellets (Liquidity)", group=grp_colors)
@@ -137,6 +155,161 @@ isMonday = dayOfWeek == dayofweek.monday
 isMidnight = nyHour == 0 and nyMinute == 0
 is930Open = nyHour == 9 and nyMinute == 30
 is6PMReopen = nyHour == 18 and nyMinute == 0
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎮 DETAILED SESSION WINDOWS (All times NY/Eastern - ICT Standard)
+// ════════════════════════════════════════════════════════════════════════════════
+// PST is 3 hours behind ET, but Pine Script handles timezone conversion automatically
+
+// Asia Session (6 PM - 2 AM ET) - Accumulation Phase
+inAsiaSession = nyHour >= 18 or nyHour < 2
+
+// True Asia Range (8 PM - 12 AM ET) - Key accumulation
+inTrueAsiaRange = nyHour >= 20 or nyHour < 0
+
+// London Open Killzone (2 AM - 5 AM ET) - Manipulation Phase
+inLondonKZ = nyHour >= 2 and nyHour < 5
+
+// London Close / Pre-NY (5 AM - 8 AM ET) - Transition
+inLondonClose = nyHour >= 5 and nyHour < 8
+
+// NY Pre-Market (8 AM - 9:30 AM ET)
+inNYPreMarket = nyHour == 8 or (nyHour == 9 and nyMinute < 30)
+
+// NY Open (9:30 AM - 10 AM ET) - Initial Balance
+inNYOpen = (nyHour == 9 and nyMinute >= 30) or (nyHour == 10 and nyMinute == 0)
+
+// Silver Bullet AM (10 AM - 11 AM ET) - PRIME TRADING
+inSilverBulletAM = nyHour == 10
+
+// NY AM Session continuation (11 AM - 12 PM ET)
+inNYAMContinuation = nyHour == 11
+
+// NY Lunch (12 PM - 1:30 PM ET) - NO TRADE ZONE
+inLunchZone = nyHour == 12 or (nyHour == 13 and nyMinute < 30)
+
+// PM Macro Setup (1:30 PM - 2 PM ET) - Algorithm waking up
+inPMSetup = nyHour == 13 and nyMinute >= 30
+
+// Silver Bullet PM (2 PM - 3 PM ET) - PRIME TRADING
+inSilverBulletPM = nyHour == 14
+
+// NY PM Session (3 PM - 4 PM ET) - Final push to DOL
+inNYPMSession = nyHour == 15
+
+// After Hours (4 PM - 6 PM ET) - Low volume
+inAfterHours = nyHour >= 16 and nyHour < 18
+
+// Macro Windows (ICT: "50 minutes to 10 minutes after the hour")
+// AM Macros: 9:50-10:10, 10:50-11:10
+// PM Macros: 1:50-2:10, 2:50-3:10
+inMacro950 = nyHour == 9 and nyMinute >= 50
+inMacro1010 = nyHour == 10 and nyMinute <= 10
+inMacro1050 = nyHour == 10 and nyMinute >= 50
+inMacro1110 = nyHour == 11 and nyMinute <= 10
+inMacro150 = nyHour == 13 and nyMinute >= 50
+inMacro210 = nyHour == 14 and nyMinute <= 10
+inMacro250 = nyHour == 14 and nyMinute >= 50
+inMacro310 = nyHour == 15 and nyMinute <= 10
+
+inAnyMacro = inMacro950 or inMacro1010 or inMacro1050 or inMacro1110 or inMacro150 or inMacro210 or inMacro250 or inMacro310
+
+// Session start detection for separator lines
+sessionChange_Asia = nyHour == 18 and nyMinute == 0
+sessionChange_London = nyHour == 2 and nyMinute == 0
+sessionChange_LondonClose = nyHour == 5 and nyMinute == 0
+sessionChange_NYPre = nyHour == 8 and nyMinute == 0
+sessionChange_NYOpen = nyHour == 9 and nyMinute == 30
+sessionChange_SilverBulletAM = nyHour == 10 and nyMinute == 0
+sessionChange_NYAM = nyHour == 11 and nyMinute == 0
+sessionChange_Lunch = nyHour == 12 and nyMinute == 0
+sessionChange_PMSetup = nyHour == 13 and nyMinute == 30
+sessionChange_SilverBulletPM = nyHour == 14 and nyMinute == 0
+sessionChange_NYPM = nyHour == 15 and nyMinute == 0
+sessionChange_AfterHours = nyHour == 16 and nyMinute == 0
+
+// Determine current session name and description (ICT teachings from Cortex)
+var string currentSessionName = ""
+var string currentSessionDesc = ""
+var color currentSessionColor = color.gray
+var int sessionQuality = 0  // 0=avoid, 1=caution, 2=ok, 3=prime
+
+if inSilverBulletAM
+    currentSessionName := "⚡ SILVER BULLET AM"
+    currentSessionDesc := "PRIME: First FVG = Entry | Run to DOL"
+    currentSessionColor := i_silverBulletAMColor
+    sessionQuality := 3
+else if inSilverBulletPM
+    currentSessionName := "⚡ SILVER BULLET PM"
+    currentSessionDesc := "PRIME: First FVG = Entry | Final push"
+    currentSessionColor := i_silverBulletPMColor
+    sessionQuality := 3
+else if inLunchZone
+    currentSessionName := "⛔ NY LUNCH"
+    currentSessionDesc := "NO TRADE: Algorithm rests | Choppy"
+    currentSessionColor := i_lunchColor
+    sessionQuality := 0
+else if inLondonKZ
+    currentSessionName := "🇬🇧 LONDON KZ"
+    currentSessionDesc := "Manipulation: Judas swing possible"
+    currentSessionColor := i_londonColor
+    sessionQuality := 2
+else if inNYOpen
+    currentSessionName := "🔔 NY OPEN"
+    currentSessionDesc := "Initial Balance | Wait for sweep"
+    currentSessionColor := i_nyamColor
+    sessionQuality := 2
+else if inNYAMContinuation
+    currentSessionName := "📈 NY AM"
+    currentSessionDesc := "Continuation or reversal from SB"
+    currentSessionColor := i_nyamColor
+    sessionQuality := 2
+else if inPMSetup
+    currentSessionName := "⏰ PM SETUP"
+    currentSessionDesc := "Algorithm waking | Prep for SB PM"
+    currentSessionColor := i_nypmColor
+    sessionQuality := 1
+else if inNYPMSession
+    currentSessionName := "🎯 NY PM"
+    currentSessionDesc := "Final push to DOL | Last chance"
+    currentSessionColor := i_nypmColor
+    sessionQuality := 2
+else if inAsiaSession
+    currentSessionName := "🌙 ASIA"
+    currentSessionDesc := "Accumulation: Range forms here"
+    currentSessionColor := i_asiaColor
+    sessionQuality := 1
+else if inLondonClose
+    currentSessionName := "🌅 LONDON CLOSE"
+    currentSessionDesc := "Transition: Wait for NY setup"
+    currentSessionColor := i_offHoursColor
+    sessionQuality := 1
+else if inNYPreMarket
+    currentSessionName := "📊 NY PRE-MARKET"
+    currentSessionDesc := "News risk | Wait for 9:30 open"
+    currentSessionColor := i_offHoursColor
+    sessionQuality := 1
+else if inAfterHours
+    currentSessionName := "🌙 AFTER HOURS"
+    currentSessionDesc := "Low volume | Avoid trading"
+    currentSessionColor := i_offHoursColor
+    sessionQuality := 0
+else
+    currentSessionName := "💤 OFF HOURS"
+    currentSessionDesc := "No setup | Wait for killzone"
+    currentSessionColor := i_offHoursColor
+    sessionQuality := 0
+
+// Add macro highlight to session info
+string macroInfo = ""
+if inMacro950 or inMacro1010
+    macroInfo := " | 🎯 MACRO 9:50-10:10"
+else if inMacro1050 or inMacro1110
+    macroInfo := " | 🎯 MACRO 10:50-11:10"
+else if inMacro150 or inMacro210
+    macroInfo := " | 🎯 MACRO 1:50-2:10"
+else if inMacro250 or inMacro310
+    macroInfo := " | 🎯 MACRO 2:50-3:10"
 
 // ════════════════════════════════════════════════════════════════════════════════
 // 📊 KEY LEVELS - PELLETS & POWER PELLETS
@@ -832,6 +1005,148 @@ plotshape(showBearArrow and barstate.islast, title="PAC-MAN Bear", location=loca
 
 plotshape(bullishSweep, title="Bull Sweep", location=location.belowbar, style=shape.circle, color=#FFEB3B, size=size.small)
 plotshape(bearishSweep, title="Bear Sweep", location=location.abovebar, style=shape.circle, color=#FFEB3B, size=size.small)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎮 SESSION MAP - BACKGROUND COLORING
+// ════════════════════════════════════════════════════════════════════════════════
+
+// Determine background color based on session quality and type
+color sessionBgColor = na
+if i_showSessionBG
+    if inAnyMacro and i_showMacros
+        // Macro windows get special highlight overlay
+        sessionBgColor := i_macroColor
+    else if sessionQuality == 3  // Prime (Silver Bullet)
+        sessionBgColor := currentSessionColor
+    else if sessionQuality == 2  // Good (Killzones)
+        sessionBgColor := currentSessionColor
+    else if sessionQuality == 1  // Caution
+        sessionBgColor := currentSessionColor
+    else  // Avoid (Lunch, Off Hours)
+        sessionBgColor := currentSessionColor
+
+bgcolor(sessionBgColor, title="Session Background")
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎮 SESSION MAP - SEPARATOR LINES
+// ════════════════════════════════════════════════════════════════════════════════
+
+// Draw vertical separator lines at session transitions
+var line[] sessionLines = array.new_line()
+
+// Helper function to draw session separator
+drawSessionLine(bool condition, color lineColor, string sessionName) =>
+    if condition and i_showSessionLines
+        ln = line.new(bar_index, low - atr * 2, bar_index, high + atr * 8, color=lineColor, style=line.style_solid, width=2)
+        ln
+
+// Draw lines at major session changes
+if sessionChange_London and i_showSessionLines
+    line.new(bar_index, low - atr * 2, bar_index, high + atr * 10, color=i_londonColor, style=line.style_solid, width=3)
+if sessionChange_NYOpen and i_showSessionLines
+    line.new(bar_index, low - atr * 2, bar_index, high + atr * 10, color=i_nyamColor, style=line.style_solid, width=3)
+if sessionChange_SilverBulletAM and i_showSessionLines
+    line.new(bar_index, low - atr * 2, bar_index, high + atr * 10, color=i_silverBulletAMColor, style=line.style_solid, width=4)
+if sessionChange_Lunch and i_showSessionLines
+    line.new(bar_index, low - atr * 2, bar_index, high + atr * 10, color=i_lunchColor, style=line.style_solid, width=3)
+if sessionChange_SilverBulletPM and i_showSessionLines
+    line.new(bar_index, low - atr * 2, bar_index, high + atr * 10, color=i_silverBulletPMColor, style=line.style_solid, width=4)
+if sessionChange_NYPM and i_showSessionLines
+    line.new(bar_index, low - atr * 2, bar_index, high + atr * 10, color=i_nypmColor, style=line.style_solid, width=2)
+if sessionChange_AfterHours and i_showSessionLines
+    line.new(bar_index, low - atr * 2, bar_index, high + atr * 10, color=i_offHoursColor, style=line.style_solid, width=2)
+if sessionChange_Asia and i_showSessionLines
+    line.new(bar_index, low - atr * 2, bar_index, high + atr * 10, color=i_asiaColor, style=line.style_solid, width=2)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎮 SESSION MAP - TOP LABELS WITH ICT TEACHINGS
+// ════════════════════════════════════════════════════════════════════════════════
+
+// Session info label at top of chart
+labelSizeVal = i_labelSize == "tiny" ? size.tiny : i_labelSize == "small" ? size.small : size.normal
+
+// Draw session labels at session start
+if sessionChange_London and i_showSessionLabels
+    label.new(bar_index, high + atr * 12, "🇬🇧 LONDON OPEN\nManipulation phase\nJudas swing possible\nFake move before real",
+              color=color.new(i_londonColor, 20), textcolor=color.white, style=label.style_label_down, size=labelSizeVal)
+
+if sessionChange_NYOpen and i_showSessionLabels
+    label.new(bar_index, high + atr * 12, "🔔 NY OPEN 9:30\nInitial balance forming\nWait for liquidity sweep\nDon't chase the open",
+              color=color.new(i_nyamColor, 20), textcolor=color.white, style=label.style_label_down, size=labelSizeVal)
+
+if sessionChange_SilverBulletAM and i_showSessionLabels
+    label.new(bar_index, high + atr * 14, "⚡ SILVER BULLET AM\n★ PRIME TRADING ★\nFirst FVG = Entry\nTarget: DOL from setup",
+              color=color.new(i_silverBulletAMColor, 10), textcolor=color.white, style=label.style_label_down, size=labelSizeVal)
+
+if sessionChange_NYAM and i_showSessionLabels
+    label.new(bar_index, high + atr * 12, "📈 NY AM CONT.\nSB move continues\nOr reversal begins\nWatch for exhaustion",
+              color=color.new(i_nyamColor, 20), textcolor=color.white, style=label.style_label_down, size=labelSizeVal)
+
+if sessionChange_Lunch and i_showSessionLabels
+    label.new(bar_index, high + atr * 14, "⛔ NY LUNCH\n★ NO TRADE ZONE ★\nAlgorithm rests\nChoppy consolidation",
+              color=color.new(i_lunchColor, 10), textcolor=color.white, style=label.style_label_down, size=labelSizeVal)
+
+if sessionChange_PMSetup and i_showSessionLabels
+    label.new(bar_index, high + atr * 12, "⏰ PM SETUP\nAlgorithm waking up\nPrep for Silver Bullet\nLook for FVG forming",
+              color=color.new(i_nypmColor, 20), textcolor=color.white, style=label.style_label_down, size=labelSizeVal)
+
+if sessionChange_SilverBulletPM and i_showSessionLabels
+    label.new(bar_index, high + atr * 14, "⚡ SILVER BULLET PM\n★ PRIME TRADING ★\nFirst FVG = Entry\nFinal push to DOL",
+              color=color.new(i_silverBulletPMColor, 10), textcolor=color.white, style=label.style_label_down, size=labelSizeVal)
+
+if sessionChange_NYPM and i_showSessionLabels
+    label.new(bar_index, high + atr * 12, "🎯 NY PM\nFinal DOL run\nLast trading hour\nTake profits here",
+              color=color.new(i_nypmColor, 20), textcolor=color.white, style=label.style_label_down, size=labelSizeVal)
+
+if sessionChange_AfterHours and i_showSessionLabels
+    label.new(bar_index, high + atr * 12, "🌙 AFTER HOURS\nLow volume\nAvoid new trades\nReview & plan next day",
+              color=color.new(i_offHoursColor, 20), textcolor=color.white, style=label.style_label_down, size=labelSizeVal)
+
+if sessionChange_Asia and i_showSessionLabels
+    label.new(bar_index, high + atr * 12, "🌙 ASIA SESSION\nAccumulation phase\nRange being built\nH/L of day may form",
+              color=color.new(i_asiaColor, 20), textcolor=color.white, style=label.style_label_down, size=labelSizeVal)
+
+// Macro labels (smaller, within session)
+if inMacro950 and not inMacro950[1] and i_showSessionLabels and i_showMacros
+    label.new(bar_index, high + atr * 6, "🎯 MACRO\n9:50-10:10 ET",
+              color=color.new(i_macroColor, 30), textcolor=#000000, style=label.style_label_down, size=size.tiny)
+
+if inMacro1050 and not inMacro1050[1] and i_showSessionLabels and i_showMacros
+    label.new(bar_index, high + atr * 6, "🎯 MACRO\n10:50-11:10 ET",
+              color=color.new(i_macroColor, 30), textcolor=#000000, style=label.style_label_down, size=size.tiny)
+
+if inMacro150 and not inMacro150[1] and i_showSessionLabels and i_showMacros
+    label.new(bar_index, high + atr * 6, "🎯 MACRO\n1:50-2:10 ET",
+              color=color.new(i_macroColor, 30), textcolor=#000000, style=label.style_label_down, size=size.tiny)
+
+if inMacro250 and not inMacro250[1] and i_showSessionLabels and i_showMacros
+    label.new(bar_index, high + atr * 6, "🎯 MACRO\n2:50-3:10 ET",
+              color=color.new(i_macroColor, 30), textcolor=#000000, style=label.style_label_down, size=size.tiny)
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎮 SESSION INFO PANEL (Live status at glance)
+// ════════════════════════════════════════════════════════════════════════════════
+
+var table sessionPanel = na
+
+if barstate.islast and i_showSessionBG
+    if not na(sessionPanel)
+        table.delete(sessionPanel)
+
+    sessionPanel := table.new(position.top_center, 1, 3, bgcolor=color.new(#000000, 10), border_color=currentSessionColor, border_width=3)
+
+    // Quality indicator
+    string qualityStr = sessionQuality == 3 ? "★★★ PRIME" : sessionQuality == 2 ? "★★ GOOD" : sessionQuality == 1 ? "★ CAUTION" : "⛔ AVOID"
+    color qualityColor = sessionQuality == 3 ? #00E676 : sessionQuality == 2 ? #4CAF50 : sessionQuality == 1 ? #FFC107 : #F44336
+
+    // Session name with quality
+    table.cell(sessionPanel, 0, 0, currentSessionName, text_color=qualityColor, text_size=size.normal, bgcolor=color.new(#000000, 0))
+
+    // Session description
+    table.cell(sessionPanel, 0, 1, currentSessionDesc + macroInfo, text_color=color.white, text_size=size.small, bgcolor=color.new(#000000, 0))
+
+    // Quality rating
+    table.cell(sessionPanel, 0, 2, qualityStr, text_color=qualityColor, text_size=size.tiny, bgcolor=color.new(#000000, 0))
 
 // ════════════════════════════════════════════════════════════════════════════════
 // 🔔 ALERTS
