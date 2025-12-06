@@ -503,6 +503,9 @@ if bearishBOS or bearishCHoCH
 // ║                        TURTLE SOUP DETECTION (Enhanced with Stalking)          ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
+// ATR for stalk distance calculation
+atrVal = ta.atr(14)
+
 // Turtle Soup: Failed breakout with reversal
 tsBuffer = i_tsBuffer * f_tickSize()
 stalkDist = atrVal * 0.5  // Distance to start stalking
@@ -611,8 +614,7 @@ bullishJudas = i_showJudas and inJudasSession and not na(asianLow) and
 // ║                        ORDER BLOCK DETECTION                                   ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-// Displacement detection
-atrVal = ta.atr(14)
+// Displacement detection (atrVal defined earlier in Turtle Soup section)
 displacementUp = (close - open) > atrVal * 1.5 and close > open
 displacementDown = (open - close) > atrVal * 1.5 and close < open
 
