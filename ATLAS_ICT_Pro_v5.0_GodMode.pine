@@ -2875,12 +2875,9 @@ hasMSClear = msDirection == DIR_BULL or msDirection == DIR_BEAR
 hasCHoCH = bullishCHoCH or bearishCHoCH
 hasBOS = bullishBOS or bearishBOS
 
-if hasMSClear
-    foundationScore += 5
-    if hasCHoCH
-        foundationScore += 3  // CHoCH is stronger signal
-    else if hasBOS
-        foundationScore += 2  // BOS confirms structure
+// Market structure score (ternary to reduce scopes)
+foundationScore += hasMSClear ? 5 : 0
+foundationScore += hasMSClear and hasCHoCH ? 3 : hasMSClear and hasBOS ? 2 : 0
 
 // 1B. LIQUIDITY TARGET IDENTIFIED (0-10 points) - 7,892 Cortex mentions
 nearestBSL = array.size(bslLevels) > 0 ? array.get(bslLevels, array.size(bslLevels) - 1).level : na
@@ -2891,19 +2888,17 @@ distToBSL = not na(nearestBSL) ? math.abs(close - nearestBSL) : 9999
 distToSSL = not na(nearestSSL) ? math.abs(close - nearestSSL) : 9999
 isNearLiquidity = (msDirection == DIR_BULL and distToBSL < distToSSL * 0.7) or (msDirection == DIR_BEAR and distToSSL < distToBSL * 0.7)
 
-if hasLiquidityTarget
-    foundationScore += 6
-    if isNearLiquidity
-        foundationScore += 4  // Bonus for being close to target
+// Liquidity score (ternary to reduce scopes)
+foundationScore += hasLiquidityTarget ? 6 : 0
+foundationScore += hasLiquidityTarget and isNearLiquidity ? 4 : 0
 
 // 1C. HTF ALIGNMENT (0-10 points) - Critical for confluence
 hasHTFAlignment = (htfBias == DIR_BULL and msDirection == DIR_BULL) or (htfBias == DIR_BEAR and msDirection == DIR_BEAR)
 hasMTFAlignment = (mtfBiasW == 1 and mtfBiasD == 1 and mtfBias1H == 1) or (mtfBiasW == -1 and mtfBiasD == -1 and mtfBias1H == -1)
 
-if hasHTFAlignment
-    foundationScore += 6
-    if hasMTFAlignment
-        foundationScore += 4  // Full MTF alignment bonus
+// HTF score (ternary to reduce scopes)
+foundationScore += hasHTFAlignment ? 6 : 0
+foundationScore += hasHTFAlignment and hasMTFAlignment ? 4 : 0
 
 hasFoundationComplete := foundationScore >= 20  // Need 20/30 for valid foundation
 
@@ -2919,14 +2914,9 @@ var bool hasZoneAlignment = false
 isCorrectZone = (inDiscount and msDirection == DIR_BULL) or (inPremium and msDirection == DIR_BEAR)
 isWrongZone = (inPremium and msDirection == DIR_BULL) or (inDiscount and msDirection == DIR_BEAR)
 
-if isCorrectZone
-    zoneScore += 10
-else if isWrongZone
-    zoneScore -= 5  // Penalty for wrong zone
-
-// 2B. OTE ZONE (0-10 points) - 4,216 Cortex mentions - Primary entry zone
-if inOTE
-    zoneScore += 10
+// Zone score (ternary to reduce scopes)
+zoneScore += isCorrectZone ? 10 : isWrongZone ? -5 : 0
+zoneScore += inOTE ? 10 : 0  // OTE zone
 
 // 2C. ORDER BLOCK ENTRY (0-5 points) - 5,891 Cortex mentions
 atBullOB = false
@@ -2947,8 +2937,7 @@ if array.size(bearOBs) > 0
             break
 
 hasFreshOB = (atBullOB and msDirection == DIR_BULL) or (atBearOB and msDirection == DIR_BEAR)
-if hasFreshOB
-    zoneScore += 5
+zoneScore += hasFreshOB ? 5 : 0
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LAYER 2D: PD ARRAY PROXIMITY SCORING (0-15 points) - NEW COMPREHENSIVE SYSTEM
@@ -3076,25 +3065,20 @@ if array.size(bearFVGs) > 0
 hasFVGTarget = (bullFVGAbove and msDirection == DIR_BULL) or (bearFVGBelow and msDirection == DIR_BEAR)
 hasFVGPresent = array.size(bullFVGs) > 0 or array.size(bearFVGs) > 0
 
-if hasFVGTarget
-    confirmationScore += 5
-else if hasFVGPresent
-    confirmationScore += 2
+// Confirmation scores (ternary to reduce scopes)
+confirmationScore += hasFVGTarget ? 5 : hasFVGPresent ? 2 : 0
 
 // 3B. DISPLACEMENT (0-5 points) - 2,123 Cortex mentions
 hasDisplacement = (displacementUp and msDirection == DIR_BULL) or (displacementDown and msDirection == DIR_BEAR)
-if hasDisplacement
-    confirmationScore += 5
+confirmationScore += hasDisplacement ? 5 : 0
 
 // 3C. KILLZONE TIMING (0-5 points) - 3,892 Cortex mentions
 hasKillzone = londonKZ or nyAMKZ or nyPMKZ
-if hasKillzone
-    confirmationScore += 5
+confirmationScore += hasKillzone ? 5 : 0
 
 // 3D. SILVER BULLET WINDOW (0-5 points) - 3,456 Cortex mentions
 hasSilverBullet = inSilverBullet
-if hasSilverBullet
-    confirmationScore += 5
+confirmationScore += hasSilverBullet ? 5 : 0
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LAYER 4: COMBINATION BONUSES (0-25 points) - ICT's preferred confluences
@@ -3212,35 +3196,9 @@ hasJudas = bullishJudas or bearishJudas
 hasMMXM = mmxmBullConfirm or mmxmBearConfirm
 hasAMDFractal = amdFractalBull or amdFractalBear
 
-// High-conviction triggers (1.2x multiplier)
-if hasUnicorn
-    activeTrigger := "UNICORN"
-    triggerMultiplier := 1.25
-else if hasMMXM
-    activeTrigger := "MMXM"
-    triggerMultiplier := 1.2
-else if hasModel2022
-    activeTrigger := "2022 MODEL"
-    triggerMultiplier := 1.2
-else if hasTurtleSoup
-    activeTrigger := "TURTLE SOUP"
-    triggerMultiplier := 1.15
-else if hasAMDFractal
-    activeTrigger := "AMD FRACTAL"
-    triggerMultiplier := 1.1
-else if hasJudas
-    activeTrigger := "JUDAS SWING"
-    triggerMultiplier := 1.1
-// Standard triggers (1.0x multiplier)
-else if hasCHoCH
-    activeTrigger := "CHoCH"
-    triggerMultiplier := 1.0
-else if hasBOS
-    activeTrigger := "BOS"
-    triggerMultiplier := 0.9
-else if hasSilverBullet and hasKillzone
-    activeTrigger := "SILVER BULLET"
-    triggerMultiplier := 1.0
+// Trigger detection using ternary to reduce scopes (priority order)
+activeTrigger := hasUnicorn ? "UNICORN" : hasMMXM ? "MMXM" : hasModel2022 ? "2022 MODEL" : hasTurtleSoup ? "TURTLE SOUP" : hasAMDFractal ? "AMD FRACTAL" : hasJudas ? "JUDAS SWING" : hasCHoCH ? "CHoCH" : hasBOS ? "BOS" : hasSilverBullet and hasKillzone ? "SILVER BULLET" : "NONE"
+triggerMultiplier := hasUnicorn ? 1.25 : hasMMXM ? 1.2 : hasModel2022 ? 1.2 : hasTurtleSoup ? 1.15 : hasAMDFractal ? 1.1 : hasJudas ? 1.1 : hasCHoCH ? 1.0 : hasBOS ? 0.9 : hasSilverBullet and hasKillzone ? 1.0 : 0.7
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CALCULATE FINAL COMPOSITE SCORE
@@ -3394,24 +3352,8 @@ if pdhSwept or pdlSwept or pwhSwept or pwlSwept
 // FRUIT R:R TARGET SYSTEM (Pac-Man Bonus Fruits)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Determine current fruit based on R:R potential
-if not na(riskReward)
-    if riskReward >= 5
-        currentFruit := "🔑"      // Key - Full DOL (5000 pts)
-    else if riskReward >= 4
-        currentFruit := "🔔"      // Bell (3000 pts)
-    else if riskReward >= 3
-        currentFruit := "🍇"      // Grapes (1000 pts)
-    else if riskReward >= 2.5
-        currentFruit := "🍎"      // Apple (700 pts)
-    else if riskReward >= 2
-        currentFruit := "🍊"      // Orange (500 pts)
-    else if riskReward >= 1.5
-        currentFruit := "🍓"      // Strawberry (300 pts)
-    else
-        currentFruit := "🍒"      // Cherry (100 pts)
-else
-    currentFruit := ""
+// Determine current fruit based on R:R potential (ternary to reduce scopes)
+currentFruit := na(riskReward) ? "" : riskReward >= 5 ? "🔑" : riskReward >= 4 ? "🔔" : riskReward >= 3 ? "🍇" : riskReward >= 2.5 ? "🍎" : riskReward >= 2 ? "🍊" : riskReward >= 1.5 ? "🍓" : "🍒"
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                   📊 SETUP TRACKING & OUTCOME DETECTION 📊                     ║
