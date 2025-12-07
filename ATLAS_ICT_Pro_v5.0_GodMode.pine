@@ -3127,7 +3127,10 @@ if hasSilverBullet
 
 // Pre-calculate values needed for combo scoring
 hasModel2022 = model2022Bull or model2022Bear
+hasUnicorn = unicornBull or unicornBear
 var int confluenceCount = 0  // Will be updated in CONFLUENCE section below
+var float stopLoss = na      // Will be calculated later in visualization section
+var float riskReward = 0.0   // Will be calculated later in visualization section
 
 comboScore = 0.0
 
@@ -3342,10 +3345,9 @@ activeTrigger := "NONE"
 triggerMultiplier := 0.7  // Default: no trigger = 70% of score (capped at MODERATE)
 
 // Detect which trigger is active (priority order)
-// Note: hasModel2022 already defined above in COMBO section
+// Note: hasModel2022 and hasUnicorn already defined above in COMBO section
 hasTurtleSoup = bullishTS or bearishTS
 hasJudas = bullishJudas or bearishJudas
-hasUnicorn = unicornBull or unicornBear
 hasMMXM = mmxmBullConfirm or mmxmBearConfirm
 hasAMDFractal = amdFractalBull or amdFractalBear
 
@@ -4772,15 +4774,15 @@ frightenedWhite = #FFFFFF       // Flashing white (about to recover)
 
 // Calculate if ghosts should be frightened
 // Frightened when: price in OTE, heading toward the ghost, in killzone
-float distToBSL = high60IPDA - close
-float distToSSL = close - low60IPDA
-float rangeIPDA = high60IPDA - low60IPDA
+ghostDistToBSL = high60IPDA - close
+ghostDistToSSL = close - low60IPDA
+ghostRangeIPDA = high60IPDA - low60IPDA
 
 // BLINKY frightened: Price going up, in OTE, close to BSL
-bool blinkyFrightened = dolDirection == DIR_BULL and inOTE and (distToBSL / rangeIPDA < 0.3) and (inSilverBullet or isMacroTime)
+blinkyFrightened = dolDirection == DIR_BULL and inOTE and (ghostDistToBSL / ghostRangeIPDA < 0.3) and (inSilverBullet or isMacroTime)
 
 // CLYDE frightened: Price going down, in OTE, close to SSL
-bool clydeFrightened = dolDirection == DIR_BEAR and inOTE and (distToSSL / rangeIPDA < 0.3) and (inSilverBullet or isMacroTime)
+clydeFrightened = dolDirection == DIR_BEAR and inOTE and (ghostDistToSSL / ghostRangeIPDA < 0.3) and (inSilverBullet or isMacroTime)
 
 // Ghost visual states
 string blinkyState = blinkyFrightened ? "👻 FRIGHTENED!" : "👻 BLINKY"
@@ -5005,9 +5007,9 @@ if i_showComposite and barstate.islast and (compositeTier == TIER_1 or composite
     // STOP LOSS & RISK:REWARD CALCULATION
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Find optimal stop loss level
-    float stopLoss = na
-    string slReason = ""
+    // Find optimal stop loss level (using global var stopLoss)
+    stopLoss := na
+    slReason = ""
 
     if dolDirection == DIR_BULL
         // For longs, SL below: OB low, FVG low, recent swing low, or OTE bottom
@@ -5049,7 +5051,7 @@ if i_showComposite and barstate.islast and (compositeTier == TIER_1 or composite
     entryPrice = (ote62 + ote79) / 2  // Middle of OTE
     riskPips = math.abs(entryPrice - stopLoss)
     rewardPips = math.abs(dolTarget - entryPrice)
-    riskReward = riskPips > 0 ? rewardPips / riskPips : 0
+    riskReward := riskPips > 0 ? rewardPips / riskPips : 0
 
     // Draw target arrow to liquidity
     targetArrowColor = dolDirection == DIR_BULL ? color.new(#00E676, 20) : color.new(#FF1744, 20)
