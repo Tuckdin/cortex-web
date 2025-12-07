@@ -408,6 +408,42 @@ var bool discountSensitivity = false    // When 3+ confluences honor gradient le
 var int sensitivityCount = 0            // Number of confluences present
 var float sensitivityLevel = na         // The level being tested
 
+// Immediate Rebalance Pattern Detection
+// ICT: "Next day we open and trade back down... offering an immediate rebalance"
+var bool immediateRebalanceBull = false
+var bool immediateRebalanceBear = false
+var float rebalanceLevel = na
+var int rebalanceBar = 0
+
+// Market Maker Buy/Sell Model (9/18 EMA)
+// ICT: "Market makers will generally price markets lower to buy into that drop"
+var string mmModel = "NEUTRAL"          // "BUY_MODEL", "SELL_MODEL", "NEUTRAL"
+var bool mmModelBullish = false         // 9 < 18 = Buy Model active
+var bool mmModelBearish = false         // 9 > 18 = Sell Model active
+
+// Power of Three Maturity (Young vs Mature Swings)
+// ICT: "Daily swings are maturing into key support resistance"
+var int swingHighAge = 0                // Days since swing high formed
+var int swingLowAge = 0                 // Days since swing low formed
+var bool matureSwingHigh = false        // 5+ days = mature
+var bool matureSwingLow = false
+var bool youngSwingHigh = false         // 1-3 days = young
+var bool youngSwingLow = false
+
+// Longest Wick CE Detection
+// ICT: "Consequent encroachment of the longest wick... that's the one that matters"
+var float longestWickCE = na            // CE of the longest wick in lookback
+var float longestWickHigh = na
+var float longestWickLow = na
+var int longestWickBar = 0
+var int longestWickDirection = 0        // 1 = upper wick, -1 = lower wick
+
+// Institutional Order Flow Drill Entry
+// ICT: "Entry into a partial fair value gap"
+var bool iofDrillLong = false
+var bool iofDrillShort = false
+var float iofEntryLevel = na
+
 // Market Structure
 var int msDirection = 0
 var float lastSwingHigh = na
@@ -1963,6 +1999,178 @@ if hasSuspensionBlock
 discountSensitivity := sensitivityCount >= 3 and inDiscount
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║              IMMEDIATE REBALANCE PATTERN DETECTION                             ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+// ICT: "Next day we open and trade back down to the previous day's close...
+// offering an immediate rebalance... very strong reaction"
+
+// Pattern: Gap down → Sweep below prev close → Immediate reversal
+prevDayCloseForRebal = close[1]
+
+// Bullish Immediate Rebalance: Gapped down, swept below, now reversing up
+bullRebalancePattern = open < prevDayCloseForRebal and              // Gap down from prev close
+                       low < prevDayCloseForRebal * 0.998 and       // Swept below prev close
+                       close > prevDayCloseForRebal and              // Closed back above
+                       close > open                                   // Bullish candle
+
+// Bearish Immediate Rebalance: Gapped up, swept above, now reversing down
+bearRebalancePattern = open > prevDayCloseForRebal and              // Gap up from prev close
+                       high > prevDayCloseForRebal * 1.002 and      // Swept above prev close
+                       close < prevDayCloseForRebal and              // Closed back below
+                       close < open                                   // Bearish candle
+
+if bullRebalancePattern
+    immediateRebalanceBull := true
+    immediateRebalanceBear := false
+    rebalanceLevel := prevDayCloseForRebal
+    rebalanceBar := bar_index
+else if bearRebalancePattern
+    immediateRebalanceBull := false
+    immediateRebalanceBear := true
+    rebalanceLevel := prevDayCloseForRebal
+    rebalanceBar := bar_index
+else if bar_index - rebalanceBar > 10  // Reset after 10 bars
+    immediateRebalanceBull := false
+    immediateRebalanceBear := false
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║              MARKET MAKER BUY/SELL MODEL (9/18 EMA)                            ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+// ICT: "Market makers will generally price markets lower to buy into that drop [BUY MODEL]
+// versus the market maker sell model where they price markets higher to sell [SELL MODEL]"
+
+ema9 = ta.ema(close, 9)
+ema18 = ta.ema(close, 18)
+
+// Buy Model: 9 EMA below 18 EMA (expect buying into dips)
+// Sell Model: 9 EMA above 18 EMA (expect selling into rallies)
+if ema9 < ema18
+    mmModel := "BUY_MODEL"
+    mmModelBullish := true
+    mmModelBearish := false
+else if ema9 > ema18
+    mmModel := "SELL_MODEL"
+    mmModelBullish := false
+    mmModelBearish := true
+else
+    mmModel := "NEUTRAL"
+    mmModelBullish := false
+    mmModelBearish := false
+
+// EMA crossover detection for model changes
+mmModelCrossBull = ta.crossover(ema9, ema18)   // Transitioning to Sell Model
+mmModelCrossBear = ta.crossunder(ema9, ema18)  // Transitioning to Buy Model
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║              POWER OF THREE MATURITY (Young vs Mature Swings)                  ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+// ICT: "Daily swings are maturing into key support resistance...
+// avoid the New York open setups if daily swings are maturing"
+
+// Calculate swing ages in bars (convert to approximate days)
+barsPerDay = timeframe.isintraday ? (1440 / timeframe.multiplier) : 1
+
+// Update swing high age
+if not na(lastSwingHighBar)
+    swingHighAge := int((bar_index - lastSwingHighBar) / barsPerDay)
+else
+    swingHighAge := 0
+
+// Update swing low age
+if not na(lastSwingLowBar)
+    swingLowAge := int((bar_index - lastSwingLowBar) / barsPerDay)
+else
+    swingLowAge := 0
+
+// Classify swing maturity
+// Young: 1-3 days - can absorb more displacement
+// Mature: 5+ days - likely to reverse at next touch
+matureSwingHigh := swingHighAge >= 5
+matureSwingLow := swingLowAge >= 5
+youngSwingHigh := swingHighAge >= 1 and swingHighAge <= 3
+youngSwingLow := swingLowAge >= 1 and swingLowAge <= 3
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║              LONGEST WICK CE DETECTION                                         ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+// ICT: "Consequent encroachment of the longest wick... this is the longest one
+// so consequent encroachment is right there"
+
+// Find the longest wick in the lookback period
+wickLookback = 20
+longestUpperWick = 0.0
+longestLowerWick = 0.0
+longestUpperBar = 0
+longestLowerBar = 0
+
+for i = 0 to wickLookback - 1
+    upperWickI = high[i] - math.max(open[i], close[i])
+    lowerWickI = math.min(open[i], close[i]) - low[i]
+
+    if upperWickI > longestUpperWick
+        longestUpperWick := upperWickI
+        longestUpperBar := i
+
+    if lowerWickI > longestLowerWick
+        longestLowerWick := lowerWickI
+        longestLowerBar := i
+
+// Determine which wick is THE longest (upper or lower)
+if longestUpperWick > longestLowerWick
+    // Upper wick is longest - premium wick
+    longestWickDirection := 1
+    longestWickBar := bar_index - longestUpperBar
+    wickBase = math.max(open[longestUpperBar], close[longestUpperBar])
+    longestWickHigh := high[longestUpperBar]
+    longestWickLow := wickBase
+    longestWickCE := wickBase + longestUpperWick / 2  // CE = midpoint
+else
+    // Lower wick is longest - discount wick
+    longestWickDirection := -1
+    longestWickBar := bar_index - longestLowerBar
+    wickTop = math.min(open[longestLowerBar], close[longestLowerBar])
+    longestWickHigh := wickTop
+    longestWickLow := low[longestLowerBar]
+    longestWickCE := low[longestLowerBar] + longestLowerWick / 2  // CE = midpoint
+
+// Check if price is at the longest wick CE
+atLongestWickCE = not na(longestWickCE) and math.abs(close - longestWickCE) < close * 0.001
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║              INSTITUTIONAL ORDER FLOW DRILL ENTRY                              ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+// ICT: "Institutional order flow drill - which is an entry into a PARTIAL fair value gap"
+
+// IOF Drill: Enter at 50% of FVG (not full mitigation)
+iofDrillLong := false
+iofDrillShort := false
+iofEntryLevel := na
+
+// Check for bullish IOF Drill - enter at 50% into bearish FVG (SIBI)
+if array.size(bearFVGs) > 0 and msDirection == DIR_BULL
+    for i = 0 to math.min(array.size(bearFVGs) - 1, 3)
+        fvg = array.get(bearFVGs, i)
+        if not fvg.mitigated
+            fvgMid = (fvg.top + fvg.bottom) / 2
+            // Price is at the 50% level of FVG (partial fill)
+            if close <= fvg.top and close >= fvgMid and close > fvg.bottom
+                iofDrillLong := true
+                iofEntryLevel := fvgMid
+                break
+
+// Check for bearish IOF Drill - enter at 50% into bullish FVG (BISI)
+if array.size(bullFVGs) > 0 and msDirection == DIR_BEAR
+    for i = 0 to math.min(array.size(bullFVGs) - 1, 3)
+        fvg = array.get(bullFVGs, i)
+        if not fvg.mitigated
+            fvgMid = (fvg.top + fvg.bottom) / 2
+            // Price is at the 50% level of FVG (partial fill)
+            if close >= fvg.bottom and close <= fvgMid and close < fvg.top
+                iofDrillShort := true
+                iofEntryLevel := fvgMid
+                break
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        IPDA DATA RANGES                                        ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
@@ -2935,6 +3143,57 @@ if isHighProbTime and (hasSuspensionBlock or hasModel2022 or hasUnicorn)
     comboScore += 6  // Best day + best setup = maximum conviction
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// NEW HIDDEN GEM COMBOS (28-35) - From Cortex Deep Dive
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Combo 28: Immediate Rebalance Pattern (high probability bounce)
+if immediateRebalanceBull and msDirection == DIR_BULL
+    comboScore += 8  // ICT: "very strong reaction"
+if immediateRebalanceBear and msDirection == DIR_BEAR
+    comboScore += 8
+
+// Combo 29: Market Maker Model Alignment
+// Buy Model + Bullish bias = institutions buying dips
+// Sell Model + Bearish bias = institutions selling rallies
+if mmModelBullish and msDirection == DIR_BULL and inDiscount
+    comboScore += 5  // Aligned with MM buying
+if mmModelBearish and msDirection == DIR_BEAR and inPremium
+    comboScore += 5  // Aligned with MM selling
+
+// Combo 30: Young Swing + Strong Setup (can take more displacement)
+if youngSwingHigh and msDirection == DIR_BEAR and (hasSuspensionBlock or hasFVGPresent)
+    comboScore += 4  // Young swing = more room to move
+if youngSwingLow and msDirection == DIR_BULL and (hasSuspensionBlock or hasFVGPresent)
+    comboScore += 4
+
+// Combo 31: Mature Swing Warning (penalty - likely to reverse)
+// ICT: "avoid the New York open setups if daily swings are maturing"
+if matureSwingHigh and msDirection == DIR_BEAR and nyHour >= 9 and nyHour <= 11
+    comboScore -= 3  // Penalty - mature swing may reverse
+if matureSwingLow and msDirection == DIR_BULL and nyHour >= 9 and nyHour <= 11
+    comboScore -= 3
+
+// Combo 32: Longest Wick CE Test (ICT's special level)
+if atLongestWickCE
+    comboScore += 5  // Price at THE longest wick's CE
+
+// Combo 33: Longest Wick CE + Direction alignment
+if atLongestWickCE and longestWickDirection == -1 and msDirection == DIR_BULL
+    comboScore += 3  // Discount wick CE + bullish = bounce point
+if atLongestWickCE and longestWickDirection == 1 and msDirection == DIR_BEAR
+    comboScore += 3  // Premium wick CE + bearish = rejection point
+
+// Combo 34: IOF Drill Entry (institutional order flow)
+if iofDrillLong
+    comboScore += 6  // ICT: "entry into a partial fair value gap"
+if iofDrillShort
+    comboScore += 6
+
+// Combo 35: IOF Drill + OTE + Killzone (maximum precision entry)
+if (iofDrillLong or iofDrillShort) and inOTE and hasKillzone
+    comboScore += 4  // Additional bonus for perfect timing
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // LAYER 5: TRIGGER DETECTION - What fires the signal
 // High-conviction setups that represent complete ICT models
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3647,6 +3906,9 @@ if i_showDOL and i_showPacMan and barstate.islast
         suspPbColor = color.new(#00E676, 30)  // Bright green for Suspension Block (highest priority)
         viPbColor = color.new(#E040FB, 40)    // Magenta for Volume Imbalance
         lvPbColor = color.new(#FF1744, 40)    // Red for Liquidity Void
+        rejPbColor = color.new(#FFAB00, 35)   // Amber for Rejection Block (ICT hidden gem)
+        lwCEPbColor = color.new(#00BFA5, 35)  // Teal for Longest Wick CE (ICT hidden gem)
+        wgCEPbColor = color.new(#B388FF, 35)  // Light purple for Wick Gradient CE (ICT notepad)
         pathWidth = tradeReady ? 2 : highConf ? 2 : 1
         pathStyle = tradeReady ? line.style_solid : line.style_dashed
 
@@ -3854,7 +4116,72 @@ if i_showDOL and i_showPacMan and barstate.islast
                             pbColor := liqPbColor
 
                 // ─────────────────────────────────────────────────────────────
-                // PRIORITY 6: Equilibrium (50%) - Fair value of the move
+                // PRIORITY 6: REJECTION BLOCK (ICT Hidden Gem)
+                // Single candle close rejection - different from Order Block
+                // "This is the close that gets REJECTED" - ICT
+                // ─────────────────────────────────────────────────────────────
+                if na(pullbackY)
+                    if dolDirection == DIR_BULL
+                        if array.size(bullRejBlocks) > 0
+                            for j = 0 to math.min(array.size(bullRejBlocks) - 1, 5)
+                                rb = array.get(bullRejBlocks, j)
+                                if not rb.mitigated and rb.level < targetY and rb.level > moveLow
+                                    pullbackY := rb.level  // Retrace to rejection level
+                                    pbReason := "REJ"
+                                    pbColor := rejPbColor
+                                    break
+                    else if dolDirection == DIR_BEAR
+                        if array.size(bearRejBlocks) > 0
+                            for j = 0 to math.min(array.size(bearRejBlocks) - 1, 5)
+                                rb = array.get(bearRejBlocks, j)
+                                if not rb.mitigated and rb.level > targetY and rb.level < moveHigh
+                                    pullbackY := rb.level  // Retrace to rejection level
+                                    pbReason := "REJ"
+                                    pbColor := rejPbColor
+                                    break
+
+                // ─────────────────────────────────────────────────────────────
+                // PRIORITY 7: LONGEST WICK CE (ICT Hidden Gem)
+                // "Find THE longest wick, use ONLY its CE" - ICT
+                // ─────────────────────────────────────────────────────────────
+                if na(pullbackY)
+                    if not na(longestWickCE) and longestWickDirection != 0
+                        // Use longest wick CE if it's in our pullback zone
+                        if dolDirection == DIR_BULL and longestWickCE < targetY and longestWickCE > moveLow
+                            pullbackY := longestWickCE
+                            pbReason := "LW-CE"
+                            pbColor := lwCEPbColor
+                        else if dolDirection == DIR_BEAR and longestWickCE > targetY and longestWickCE < moveHigh
+                            pullbackY := longestWickCE
+                            pbReason := "LW-CE"
+                            pbColor := lwCEPbColor
+
+                // ─────────────────────────────────────────────────────────────
+                // PRIORITY 8: WICK GRADIENT CE (ICT Notepad System)
+                // "0/25/50/75/100% on wicks" - ICT's notepad levels
+                // ─────────────────────────────────────────────────────────────
+                if na(pullbackY)
+                    if dolDirection == DIR_BULL
+                        if array.size(discountWicks) > 0
+                            for j = 0 to math.min(array.size(discountWicks) - 1, 4)
+                                wg = array.get(discountWicks, j)
+                                if wg.active and wg.wick50 < targetY and wg.wick50 > moveLow
+                                    pullbackY := wg.wick50  // Retrace to wick CE (50%)
+                                    pbReason := "WG-CE"
+                                    pbColor := wgCEPbColor
+                                    break
+                    else if dolDirection == DIR_BEAR
+                        if array.size(premiumWicks) > 0
+                            for j = 0 to math.min(array.size(premiumWicks) - 1, 4)
+                                wg = array.get(premiumWicks, j)
+                                if wg.active and wg.wick50 > targetY and wg.wick50 < moveHigh
+                                    pullbackY := wg.wick50  // Retrace to wick CE (50%)
+                                    pbReason := "WG-CE"
+                                    pbColor := wgCEPbColor
+                                    break
+
+                // ─────────────────────────────────────────────────────────────
+                // PRIORITY 9: Equilibrium (50%) - Fair value of the move
                 // ─────────────────────────────────────────────────────────────
                 if na(pullbackY)
                     // Check if we're in a strong trend (use shallower pullback)
@@ -3867,7 +4194,7 @@ if i_showDOL and i_showPacMan and barstate.islast
                         pbReason := "EQ"
 
                 // ─────────────────────────────────────────────────────────────
-                // PRIORITY 7: OTE Zone (0.618-0.786) - Fallback
+                // PRIORITY 10: OTE Zone (0.618-0.786) - Fallback
                 // ─────────────────────────────────────────────────────────────
                 if na(pullbackY)
                     // Dynamic OTE based on volatility
@@ -3890,8 +4217,8 @@ if i_showDOL and i_showPacMan and barstate.islast
                 array.push(dolPathLines, pullbackLine)
 
                 // Pullback marker with reason
-                // Marker symbols: SUSP=★ VI=◆ LV=▼ FVG=◈ OB=■ LIQ=◇ EQ=◦ OTE=○
-                pbMarkerText = pbReason == "SUSP" ? "★" : pbReason == "VI" ? "◆" : pbReason == "LV" ? "▼" : pbReason == "FVG" ? "◈" : pbReason == "OB" ? "■" : pbReason == "LIQ" ? "◇" : pbReason == "EQ" ? "◦" : "○"
+                // Marker symbols: SUSP=★ VI=◆ LV=▼ FVG=◈ OB=■ LIQ=◇ REJ=◐ LW-CE=⊕ WG-CE=⊙ EQ=◦ OTE=○
+                pbMarkerText = pbReason == "SUSP" ? "★" : pbReason == "VI" ? "◆" : pbReason == "LV" ? "▼" : pbReason == "FVG" ? "◈" : pbReason == "OB" ? "■" : pbReason == "LIQ" ? "◇" : pbReason == "REJ" ? "◐" : pbReason == "LW-CE" ? "⊕" : pbReason == "WG-CE" ? "⊙" : pbReason == "EQ" ? "◦" : "○"
                 pbMarker = label.new(pullbackX, pullbackY, pbMarkerText,
                      style=label.style_none, textcolor=pbColor, size=size.tiny)
                 array.push(dolPathLabels, pbMarker)
@@ -4645,6 +4972,23 @@ plot(compositeTier, title="Composite Tier", display=display.none)
 // 26. Wick Gradient CE Test: +4 points
 // 27. High Prob Time + Strong Setup: +6 points
 //
+// HIDDEN GEM COMBOS (28-35) - From Cortex Deep Dive:
+// 28. Immediate Rebalance Pattern: +8 points (ICT: "very strong reaction")
+// 29. Market Maker Model Alignment: +5 points (9/18 EMA model alignment)
+// 30. Young Swing + Strong Setup: +4 points (1-3 day swings = more room)
+// 31. Mature Swing Warning: -3 points PENALTY (5+ day swings = reversal risk)
+// 32. Longest Wick CE Test: +5 points (ICT's special level)
+// 33. Longest Wick CE + Direction: +3 points (CE direction alignment)
+// 34. IOF Drill Entry: +6 points (partial FVG fill entry)
+// 35. IOF Drill + OTE + Killzone: +4 points (maximum precision)
+//
+// HIDDEN GEM FEATURES (v5.2):
+// - Immediate Rebalance Pattern - Gap → Sweep → Reverse pattern
+// - Market Maker Buy/Sell Model - 9/18 EMA state for bias
+// - Power of Three Maturity - Young vs Mature swing classification
+// - Longest Wick CE - Find THE longest wick, use ONLY its CE
+// - IOF Drill Entry - Partial (50%) FVG fill entry
+//
 // DOL PATH PULLBACK PRIORITIES:
 // 0. Suspension Block (★) - Bright Green
 // 1. Fair Value Gap (◈) - Purple
@@ -4652,8 +4996,11 @@ plot(compositeTier, title="Composite Tier", display=display.none)
 // 3. Order Block (■) - Blue
 // 4. Liquidity Void (▼) - Red
 // 5. Liquidity Sweep (◇) - Orange
-// 6. Equilibrium (◦) - Default
-// 7. OTE Zone (○) - Default
+// 6. Rejection Block (◐) - Amber (ICT Hidden Gem)
+// 7. Longest Wick CE (⊕) - Teal (ICT Hidden Gem)
+// 8. Wick Gradient CE (⊙) - Light Purple (ICT Notepad)
+// 9. Equilibrium (◦) - Default
+// 10. OTE Zone (○) - Default
 //
 // PAC-MAN THEME ELEMENTS:
 // 🟡 PAC-MAN = Current price position
