@@ -2050,21 +2050,22 @@ if i_showOTE and barstate.islast
     float ote705 = rangeLow + rangeSize * 0.705
     float ote79 = rangeLow + rangeSize * 0.79
 
-    // Draw dashed lines for each OTE level - all lines end at +20
-    oteLine62 := line.new(bar_index - 50, ote62, bar_index + 20, ote62,
+    // Draw dashed lines for each OTE level - end at +10 (left column, separate from BSL/SSL)
+    oteLine62 := line.new(bar_index - 50, ote62, bar_index + 10, ote62,
          color=color.new(oteLineColor, 50), width=1, style=line.style_dotted)
-    oteLine705 := line.new(bar_index - 50, ote705, bar_index + 20, ote705,
+    oteLine705 := line.new(bar_index - 50, ote705, bar_index + 10, ote705,
          color=color.new(oteLineColor, 10), width=2, style=line.style_dashed)
-    oteLine79 := line.new(bar_index - 50, ote79, bar_index + 20, ote79,
+    oteLine79 := line.new(bar_index - 50, ote79, bar_index + 10, ote79,
          color=color.new(oteLineColor, 50), width=1, style=line.style_dotted)
 
-    // Labels UNDER line, aligned to line end (using label_up style = text below point)
-    oteLabel62 := label.new(bar_index + 20, ote62, "62%",
-         style=label.style_label_up, color=color.new(color.black, 100), textcolor=color.new(oteLineColor, 30), size=size.tiny)
-    oteLabel705 := label.new(bar_index + 20, ote705, "OTE",
-         style=label.style_label_up, color=color.new(color.black, 100), textcolor=oteLineColor, size=size.small)
-    oteLabel79 := label.new(bar_index + 20, ote79, "79%",
-         style=label.style_label_up, color=color.new(color.black, 100), textcolor=color.new(oteLineColor, 30), size=size.tiny)
+    // Labels UNDER line, right-aligned so text end matches line end (all same size)
+    float labelOffset = rangeSize * 0.015
+    oteLabel62 := label.new(bar_index + 10, ote62 - labelOffset, "62%",
+         style=label.style_none, textcolor=color.new(oteLineColor, 30), size=size.tiny, textalign=text.align_right)
+    oteLabel705 := label.new(bar_index + 10, ote705 - labelOffset, "OTE",
+         style=label.style_none, textcolor=oteLineColor, size=size.tiny, textalign=text.align_right)
+    oteLabel79 := label.new(bar_index + 10, ote79 - labelOffset, "79%",
+         style=label.style_none, textcolor=color.new(oteLineColor, 30), size=size.tiny, textalign=text.align_right)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PREMIUM/DISCOUNT ZONES - Subtle reference lines
@@ -2205,17 +2206,18 @@ if i_showPacMan and barstate.islast
     if not na(sslLine)
         line.delete(sslLine)
 
-    // BSL - label UNDER line, aligned to line end
+    // BSL - label UNDER line, right-aligned (right column at +20)
     bslLine := line.new(bar_index - 40, high60IPDA, bar_index + 20, high60IPDA,
          color=color.new(#FF5252, 20), width=2, style=line.style_dashed)
-    cherryHighLabel := label.new(bar_index + 20, high60IPDA, "🍒 BSL",
-         style=label.style_label_up, color=color.new(color.black, 100), textcolor=color.new(#FF5252, 0), size=size.small)
+    float bslOffset = (high60IPDA - low60IPDA) * 0.015
+    cherryHighLabel := label.new(bar_index + 20, high60IPDA - bslOffset, "🍒 BSL",
+         style=label.style_none, textcolor=color.new(#FF5252, 0), size=size.small, textalign=text.align_right)
 
-    // SSL - label UNDER line, aligned to line end
+    // SSL - label UNDER line, right-aligned (right column at +20)
     sslLine := line.new(bar_index - 40, low60IPDA, bar_index + 20, low60IPDA,
          color=color.new(#69F0AE, 20), width=2, style=line.style_dashed)
-    cherryLowLabel := label.new(bar_index + 20, low60IPDA, "🍒 SSL",
-         style=label.style_label_up, color=color.new(color.black, 100), textcolor=color.new(#69F0AE, 0), size=size.small)
+    cherryLowLabel := label.new(bar_index + 20, low60IPDA - bslOffset, "🍒 SSL",
+         style=label.style_none, textcolor=color.new(#69F0AE, 0), size=size.small, textalign=text.align_right)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPOSITE TIER SIGNALS (Only on TRUE high-confluence events)
