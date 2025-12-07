@@ -353,6 +353,38 @@ var bool distributionStarted = false  // Has true move begun?
 var float amdEntryZoneTop = na  // Optimal entry zone after manipulation
 var float amdEntryZoneBottom = na
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// LIQUIDITY SEQUENCING - Multi-target DOL tracking
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Previous Day High/Low
+var float pdh = na
+var float pdl = na
+var bool pdhSwept = false
+var bool pdlSwept = false
+var int pdhSweptBar = na
+var int pdlSweptBar = na
+
+// Previous Week High/Low
+var float pwh = na
+var float pwl = na
+var bool pwhSwept = false
+var bool pwlSwept = false
+
+// Session liquidity sweep tracking
+var bool londonHighSwept = false
+var bool londonLowSwept = false
+var bool nyHighSwept = false
+var bool nyLowSwept = false
+
+// Day/Week tracking
+var int currentDay = na
+var int currentWeek = na
+var float dayHigh = na
+var float dayLow = na
+var float weekHigh = na
+var float weekLow = na
+
 // Composite Score
 var float compositeScore = 0.0
 var int compositeTier = 0
@@ -436,6 +468,106 @@ inCBDRSession = f_inSession(i_cbdrSession)
 
 // Judas Session
 inJudasSession = f_inSession(i_judasSession)
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                   LIQUIDITY LEVELS - PDH/PDL/PWH/PWL                           ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Detect new day (using NY timezone)
+newDay = dayofweek(time, i_timezone) != dayofweek(time[1], i_timezone)
+newWeek = weekofyear(time, i_timezone) != weekofyear(time[1], i_timezone)
+
+// Track daily high/low and update PDH/PDL on new day
+if newDay
+    // Store yesterday's range as PDH/PDL
+    pdh := dayHigh
+    pdl := dayLow
+    // Reset sweep flags for new day
+    pdhSwept := false
+    pdlSwept := false
+    pdhSweptBar := na
+    pdlSweptBar := na
+    londonHighSwept := false
+    londonLowSwept := false
+    nyHighSwept := false
+    nyLowSwept := false
+    // Reset today's tracking
+    dayHigh := high
+    dayLow := low
+else
+    // Update today's high/low
+    dayHigh := math.max(nz(dayHigh, high), high)
+    dayLow := math.min(nz(dayLow, low), low)
+
+// Track weekly high/low and update PWH/PWL on new week
+if newWeek
+    // Store last week's range as PWH/PWL
+    pwh := weekHigh
+    pwl := weekLow
+    // Reset sweep flags for new week
+    pwhSwept := false
+    pwlSwept := false
+    // Reset this week's tracking
+    weekHigh := high
+    weekLow := low
+else
+    // Update this week's high/low
+    weekHigh := math.max(nz(weekHigh, high), high)
+    weekLow := math.min(nz(weekLow, low), low)
+
+// Track London session high/low
+if londonSession
+    if not londonSession[1]
+        // Start of London session
+        londonHigh := high
+        londonLow := low
+    else
+        londonHigh := math.max(londonHigh, high)
+        londonLow := math.min(londonLow, low)
+
+// Track NY session high/low
+if nyAMSession or nyPMSession
+    if not (nyAMSession[1] or nyPMSession[1])
+        // Start of NY session
+        nyHigh := high
+        nyLow := low
+    else
+        nyHigh := math.max(nyHigh, high)
+        nyLow := math.min(nyLow, low)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LIQUIDITY SWEEP DETECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// PDH/PDL sweep detection
+if not pdhSwept and not na(pdh) and high > pdh
+    pdhSwept := true
+    pdhSweptBar := bar_index
+
+if not pdlSwept and not na(pdl) and low < pdl
+    pdlSwept := true
+    pdlSweptBar := bar_index
+
+// PWH/PWL sweep detection
+if not pwhSwept and not na(pwh) and high > pwh
+    pwhSwept := true
+
+if not pwlSwept and not na(pwl) and low < pwl
+    pwlSwept := true
+
+// London session sweep detection
+if not londonHighSwept and not na(londonHigh) and high > londonHigh and not londonSession
+    londonHighSwept := true
+
+if not londonLowSwept and not na(londonLow) and low < londonLow and not londonSession
+    londonLowSwept := true
+
+// NY session sweep detection
+if not nyHighSwept and not na(nyHigh) and high > nyHigh and not (nyAMSession or nyPMSession)
+    nyHighSwept := true
+
+if not nyLowSwept and not na(nyLow) and low < nyLow and not (nyAMSession or nyPMSession)
+    nyLowSwept := true
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        SWING POINT DETECTION                                   ║
@@ -2395,6 +2527,120 @@ if i_showPacMan and barstate.islast
          style=label.style_none, textcolor=color.new(#69F0AE, 0), size=size.small, textalign=text.align_right)
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// LIQUIDITY SEQUENCING - Visual Lines + Distance Labels (Column +40)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var line pdhLine = na
+var line pdlLine = na
+var line pwhLine = na
+var line pwlLine = na
+var line londonHiLine = na
+var line londonLoLine = na
+var label pdhLabel = na
+var label pdlLabel = na
+var label pwhLabel = na
+var label pwlLabel = na
+var label londonHiLabel = na
+var label londonLoLabel = na
+
+if barstate.islast
+    // Cleanup previous liquidity lines/labels
+    if not na(pdhLine)
+        line.delete(pdhLine)
+    if not na(pdlLine)
+        line.delete(pdlLine)
+    if not na(pwhLine)
+        line.delete(pwhLine)
+    if not na(pwlLine)
+        line.delete(pwlLine)
+    if not na(londonHiLine)
+        line.delete(londonHiLine)
+    if not na(londonLoLine)
+        line.delete(londonLoLine)
+    if not na(pdhLabel)
+        label.delete(pdhLabel)
+    if not na(pdlLabel)
+        label.delete(pdlLabel)
+    if not na(pwhLabel)
+        label.delete(pwhLabel)
+    if not na(pwlLabel)
+        label.delete(pwlLabel)
+    if not na(londonHiLabel)
+        label.delete(londonHiLabel)
+    if not na(londonLoLabel)
+        label.delete(londonLoLabel)
+
+    // Colors - swept levels are dimmed, active levels are bright
+    pdhColor = pdhSwept ? color.new(#FF9800, 70) : color.new(#FF9800, 30)
+    pdlColor = pdlSwept ? color.new(#FF9800, 70) : color.new(#FF9800, 30)
+    pwhColor = pwhSwept ? color.new(#E040FB, 70) : color.new(#E040FB, 30)
+    pwlColor = pwlSwept ? color.new(#E040FB, 70) : color.new(#E040FB, 30)
+    ldnColor = color.new(#2196F3, 40)
+
+    // Calculate pip distances (assuming forex with 4/5 decimal places)
+    float pipMult = syminfo.mintick >= 0.01 ? 1 : 10  // Adjust for JPY pairs
+    float pdhDist = not na(pdh) ? (pdh - close) / syminfo.mintick / pipMult : na
+    float pdlDist = not na(pdl) ? (pdl - close) / syminfo.mintick / pipMult : na
+    float pwhDist = not na(pwh) ? (pwh - close) / syminfo.mintick / pipMult : na
+    float pwlDist = not na(pwl) ? (pwl - close) / syminfo.mintick / pipMult : na
+    float ldnHiDist = not na(londonHigh) ? (londonHigh - close) / syminfo.mintick / pipMult : na
+    float ldnLoDist = not na(londonLow) ? (londonLow - close) / syminfo.mintick / pipMult : na
+
+    // Line style for swept vs active
+    sweptStyle = line.style_dotted
+    activeStyle = line.style_dashed
+
+    // PDH - Previous Day High
+    if not na(pdh)
+        pdhLine := line.new(bar_index - 20, pdh, bar_index + 40, pdh,
+             color=pdhColor, width=1, style=pdhSwept ? sweptStyle : activeStyle)
+        pdhText = pdhSwept ? "̶P̶D̶H̶ ✗" : "PDH " + str.tostring(pdhDist, "#") + "p"
+        pdhLabel := label.new(bar_index + 40, pdh, pdhText,
+             style=label.style_none, textcolor=pdhColor, size=size.tiny, textalign=text.align_left)
+
+    // PDL - Previous Day Low
+    if not na(pdl)
+        pdlLine := line.new(bar_index - 20, pdl, bar_index + 40, pdl,
+             color=pdlColor, width=1, style=pdlSwept ? sweptStyle : activeStyle)
+        pdlText = pdlSwept ? "̶P̶D̶L̶ ✗" : "PDL " + str.tostring(pdlDist, "#") + "p"
+        pdlLabel := label.new(bar_index + 40, pdl, pdlText,
+             style=label.style_none, textcolor=pdlColor, size=size.tiny, textalign=text.align_left)
+
+    // PWH - Previous Week High
+    if not na(pwh)
+        pwhLine := line.new(bar_index - 20, pwh, bar_index + 40, pwh,
+             color=pwhColor, width=1, style=pwhSwept ? sweptStyle : activeStyle)
+        pwhText = pwhSwept ? "̶P̶W̶H̶ ✗" : "PWH " + str.tostring(pwhDist, "#") + "p"
+        pwhLabel := label.new(bar_index + 40, pwh, pwhText,
+             style=label.style_none, textcolor=pwhColor, size=size.tiny, textalign=text.align_left)
+
+    // PWL - Previous Week Low
+    if not na(pwl)
+        pwlLine := line.new(bar_index - 20, pwl, bar_index + 40, pwl,
+             color=pwlColor, width=1, style=pwlSwept ? sweptStyle : activeStyle)
+        pwlText = pwlSwept ? "̶P̶W̶L̶ ✗" : "PWL " + str.tostring(pwlDist, "#") + "p"
+        pwlLabel := label.new(bar_index + 40, pwl, pwlText,
+             style=label.style_none, textcolor=pwlColor, size=size.tiny, textalign=text.align_left)
+
+    // London High (only show if not in London session)
+    if not na(londonHigh) and not londonSession
+        ldnHiColor = londonHighSwept ? color.new(#2196F3, 70) : ldnColor
+        londonHiLine := line.new(bar_index - 10, londonHigh, bar_index + 40, londonHigh,
+             color=ldnHiColor, width=1, style=londonHighSwept ? sweptStyle : line.style_dotted)
+        ldnHiText = londonHighSwept ? "̶L̶D̶N̶ ̶H̶i̶ ✗" : "LDN Hi " + str.tostring(ldnHiDist, "#") + "p"
+        londonHiLabel := label.new(bar_index + 40, londonHigh, ldnHiText,
+             style=label.style_none, textcolor=ldnHiColor, size=size.tiny, textalign=text.align_left)
+
+    // London Low (only show if not in London session)
+    if not na(londonLow) and not londonSession
+        ldnLoColor = londonLowSwept ? color.new(#2196F3, 70) : ldnColor
+        londonLoLine := line.new(bar_index - 10, londonLow, bar_index + 40, londonLow,
+             color=ldnLoColor, width=1, style=londonLowSwept ? sweptStyle : line.style_dotted)
+        ldnLoText = londonLowSwept ? "̶L̶D̶N̶ ̶L̶o̶ ✗" : "LDN Lo " + str.tostring(ldnLoDist, "#") + "p"
+        londonLoLabel := label.new(bar_index + 40, londonLow, ldnLoText,
+             style=label.style_none, textcolor=ldnLoColor, size=size.tiny, textalign=text.align_left)
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // COMPOSITE TIER SIGNALS (Only on TRUE high-confluence events)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2493,7 +2739,7 @@ var color accentLine = color.new(#0F3460, 0)
 var color textDim = color.new(#8892B0, 0)
 var color textBright = color.new(#E6F1FF, 0)
 
-var table infoTable = table.new(position.middle_right, 2, 12, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
+var table infoTable = table.new(position.middle_right, 2, 14, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
 
 if i_showDOLTable and barstate.islast
     // ═══ HEADER - Merged and centered ═══
@@ -2574,20 +2820,69 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
     table.cell(infoTable, 1, 8, confDisplay, text_color=confColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
-    // ═══ TARGET ═══
-    table.cell(infoTable, 0, 9, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 9, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
+    // ═══ PRIMARY DOL TARGET ═══
+    float pipMult2 = syminfo.mintick >= 0.01 ? 1 : 10
+    float dolDist = not na(dolTarget) ? (dolTarget - close) / syminfo.mintick / pipMult2 : na
+    dolTargetText = not na(dolTarget) ? str.tostring(dolTarget, format.mintick) + " (" + str.tostring(dolDist, "#") + "p)" : "—"
+    table.cell(infoTable, 0, 9, "DOL Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 9, dolTargetText, text_color=dirColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
+
+    // ═══ LIQUIDITY SEQUENCE (Next targets) ═══
+    // Build target list based on direction
+    liqSeq = ""
+    if dolDirection == DIR_BULL
+        // Show upside targets: nearest first
+        if not pdhSwept and not na(pdh) and pdh > close
+            liqSeq := liqSeq + "PDH "
+        if not pwhSwept and not na(pwh) and pwh > close
+            liqSeq := liqSeq + "PWH "
+        if not londonHighSwept and not na(londonHigh) and londonHigh > close and not londonSession
+            liqSeq := liqSeq + "LDN↑ "
+    else if dolDirection == DIR_BEAR
+        // Show downside targets: nearest first
+        if not pdlSwept and not na(pdl) and pdl < close
+            liqSeq := liqSeq + "PDL "
+        if not pwlSwept and not na(pwl) and pwl < close
+            liqSeq := liqSeq + "PWL "
+        if not londonLowSwept and not na(londonLow) and londonLow < close and not londonSession
+            liqSeq := liqSeq + "LDN↓ "
+    liqSeq := liqSeq == "" ? "—" : liqSeq
+    liqSeqColor = dolDirection == DIR_BULL ? i_bullColor : dolDirection == DIR_BEAR ? i_bearColor : textDim
+    table.cell(infoTable, 0, 10, "Liq Path", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 10, liqSeq, text_color=liqSeqColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+
+    // ═══ SWEPT LIQUIDITY ═══
+    sweptLiq = ""
+    if pdhSwept
+        sweptLiq := sweptLiq + "P̶D̶H̶ "
+    if pdlSwept
+        sweptLiq := sweptLiq + "P̶D̶L̶ "
+    if pwhSwept
+        sweptLiq := sweptLiq + "P̶W̶H̶ "
+    if pwlSwept
+        sweptLiq := sweptLiq + "P̶W̶L̶ "
+    if londonHighSwept
+        sweptLiq := sweptLiq + "L̶D̶N̶↑ "
+    if londonLowSwept
+        sweptLiq := sweptLiq + "L̶D̶N̶↓ "
+    if asianHighSwept
+        sweptLiq := sweptLiq + "A̶S̶N̶↑ "
+    if asianLowSwept
+        sweptLiq := sweptLiq + "A̶S̶N̶↓ "
+    sweptLiq := sweptLiq == "" ? "None" : sweptLiq
+    table.cell(infoTable, 0, 11, "Swept", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 11, sweptLiq, text_color=color.new(#FF5252, 30), text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_right)
 
     // ═══ KEY FACTORS ═══
-    table.cell(infoTable, 0, 10, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 10, 1, 10)
+    table.cell(infoTable, 0, 12, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 12, 1, 12)
 
     // ═══ TIER INDICATOR BAR (5-Tier System) ═══
     tierLabel = compositeTier == TIER_1 ? "ELITE" : compositeTier == TIER_2 ? "PREMIUM" : compositeTier == TIER_3 ? "STRONG" : compositeTier == TIER_4 ? "MODERATE" : "WEAK"
     tierBar = compositeTier == TIER_1 ? "████████████ " + tierLabel : compositeTier == TIER_2 ? "██████████░░ " + tierLabel : compositeTier == TIER_3 ? "████████░░░░ " + tierLabel : compositeTier == TIER_4 ? "██████░░░░░░ " + tierLabel : "████░░░░░░░░ " + tierLabel
     tierColor = compositeTier == TIER_1 ? #00E676 : compositeTier == TIER_2 ? #69F0AE : compositeTier == TIER_3 ? #FFD740 : compositeTier == TIER_4 ? #FF9800 : #FF5252
-    table.cell(infoTable, 0, 11, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 11, 1, 11)
+    table.cell(infoTable, 0, 13, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 13, 1, 13)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALERTS (Reduced to stay under 64 plot limit)
