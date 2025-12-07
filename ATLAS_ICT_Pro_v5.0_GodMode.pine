@@ -195,6 +195,27 @@ grp_style = "🎨 VISUAL STYLE"
 i_tableStyle = input.string("Minimal", "Dashboard Style", options=["Minimal", "Classic", "Compact"], group=grp_style)
 i_boxTransparency = input.int(88, "Zone Box Transparency", minval=70, maxval=95, group=grp_style)
 i_labelStyle = input.string("Clean", "Label Style", options=["Clean", "Badge", "Minimal"], group=grp_style)
+i_cleanMode = input.bool(false, "🧹 Clean Mode (Hide Arcade Visuals)", tooltip="Disables Pac-Man themed elements for a professional trading view", group=grp_style)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TRUE DAY SETTINGS (6PM-6PM NY)
+// ═══════════════════════════════════════════════════════════════════════════════
+grp_trueday = "🌙 TRUE DAY"
+i_showTrueDay = input.bool(true, "Show True Day Levels", tooltip="ICT's True Day runs from 6PM NY to 6PM NY", group=grp_trueday)
+i_showTrueDayOpen = input.bool(true, "Show True Day Open Line", tooltip="Mark the 6PM NY opening price", group=grp_trueday)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LONDON CLOSE SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════════
+grp_londonclose = "🇬🇧 LONDON CLOSE"
+i_showLondonClose = input.bool(true, "Show London Close Manipulation", tooltip="Detects manipulation during London close (11AM-12PM NY)", group=grp_londonclose)
+i_lcSession = input.session("1100-1200", "London Close Session", group=grp_londonclose)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WEBHOOK SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════════
+grp_webhook = "📡 WEBHOOK"
+i_enableWebhook = input.bool(false, "Enable Webhook Alerts", tooltip="Send JSON alerts for external logging", group=grp_webhook)
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        CONSTANTS & ENUMS                                       ║
@@ -754,6 +775,69 @@ inCBDRSession = f_inSession(i_cbdrSession)
 
 // Judas Session
 inJudasSession = f_inSession(i_judasSession)
+
+// London Close Session (11AM-12PM NY)
+inLondonCloseSession = f_inSession(i_lcSession)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TRUE DAY DETECTION (6PM-6PM NY) - ICT's Institutional Trading Day
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var float trueDayOpen = na
+var float trueDayHigh = na
+var float trueDayLow = na
+var bool trueDayReset = false
+
+// Detect 6PM NY (True Day Open)
+isTrueDayOpen = nyHour == 18 and nyMinute == 0
+
+if isTrueDayOpen and i_showTrueDay
+    trueDayOpen := close
+    trueDayHigh := high
+    trueDayLow := low
+    trueDayReset := true
+else
+    trueDayReset := false
+    if i_showTrueDay and not na(trueDayHigh)
+        if high > trueDayHigh
+            trueDayHigh := high
+        if low < trueDayLow
+            trueDayLow := low
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LONDON CLOSE MANIPULATION DETECTION (11AM-12PM NY)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var float londonCloseHigh = na
+var float londonCloseLow = na
+var bool inLondonClose = false
+var string lcManipulation = "NONE"
+
+if inLondonCloseSession and i_showLondonClose
+    if not inLondonClose[1]
+        londonCloseHigh := high
+        londonCloseLow := low
+        inLondonClose := true
+        lcManipulation := "NONE"
+    else
+        if high > londonCloseHigh
+            londonCloseHigh := high
+        if low < londonCloseLow
+            londonCloseLow := low
+else if inLondonClose[1] and not inLondonCloseSession
+    inLondonClose := false
+
+// Detect manipulation during London Close
+if inLondonClose
+    if high > londonCloseHigh[1] and close < open
+        lcManipulation := "SWEEP_HIGH"
+    else if low < londonCloseLow[1] and close > open
+        lcManipulation := "SWEEP_LOW"
+
+// London Close reversal signal
+lcReversal = not inLondonClose and lcManipulation != "NONE" and
+             ((lcManipulation == "SWEEP_HIGH" and msDirection == DIR_BEAR) or
+              (lcManipulation == "SWEEP_LOW" and msDirection == DIR_BULL))
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                   LIQUIDITY LEVELS - PDH/PDL/PWH/PWL                           ║
@@ -5507,10 +5591,55 @@ alertcondition(hasWickGradientCE, title="📝 Wick Gradient CE Test", message="�
 tuesdayPrimeSetup = isTuesday and nyHour >= 8 and nyHour < 11 and (hasSuspensionBlock or hasModel2022)
 alertcondition(tuesdayPrimeSetup, title="🏆 Tuesday PRIME Setup", message="🏆 TUESDAY PRIME SETUP on {{ticker}} - Best day + best setup = Maximum conviction!")
 
+// London Close alerts
+alertcondition(lcReversal and dolDirection == DIR_BULL, title="🇬🇧 LC Reversal Long", message="🇬🇧 LONDON CLOSE REVERSAL LONG on {{ticker}} - Post-manipulation bullish setup!")
+alertcondition(lcReversal and dolDirection == DIR_BEAR, title="🇬🇧 LC Reversal Short", message="🇬🇧 LONDON CLOSE REVERSAL SHORT on {{ticker}} - Post-manipulation bearish setup!")
+
 // Plot probability for external use
 plot(dolProbability, title="DOL Probability", display=display.none)
 plot(dolDirection, title="DOL Direction", display=display.none)
 plot(compositeTier, title="Composite Tier", display=display.none)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🌙 TRUE DAY VISUALIZATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var line trueDayOpenLine = na
+var label trueDayOpenLabel = na
+
+if i_showTrueDayOpen and barstate.islast and not na(trueDayOpen) and not i_cleanMode
+    if not na(trueDayOpenLine)
+        line.delete(trueDayOpenLine)
+    if not na(trueDayOpenLabel)
+        label.delete(trueDayOpenLabel)
+
+    trueDayOpenLine := line.new(bar_index - 50, trueDayOpen, bar_index + 10, trueDayOpen,
+         color=color.new(#9C27B0, 40), width=1, style=line.style_dashed)
+    trueDayOpenLabel := label.new(bar_index + 10, trueDayOpen, "TD Open",
+         style=label.style_none, textcolor=color.new(#9C27B0, 20), size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🇬🇧 LONDON CLOSE VISUALIZATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+bgcolor(i_showLondonClose and inLondonClose and not i_cleanMode ? color.new(#FF6F00, 95) : na, title="London Close")
+
+plotshape(i_showLondonClose and lcReversal and not i_cleanMode, title="LC Reversal",
+     style=shape.diamond, location=location.abovebar, color=color.new(#FF6F00, 0),
+     text="LC", textcolor=color.white, size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📡 WEBHOOK ALERTS (JSON Format)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+webhookPayload = '{"ticker":"' + syminfo.ticker + '",' +
+                 '"tier":' + str.tostring(compositeTier) + ',' +
+                 '"pattern":"' + patternName + '",' +
+                 '"direction":"' + (dolDirection == DIR_BULL ? "LONG" : dolDirection == DIR_BEAR ? "SHORT" : "NEUTRAL") + '",' +
+                 '"confluence":' + str.tostring(confluenceCount) + ',' +
+                 '"session":"' + (inSilverBullet ? "SILVER_BULLET" : nyAMKZ ? "NY_AM_KZ" : londonKZ ? "LONDON_KZ" : "NONE") + '"}'
+
+alertcondition(newSetupGenerated and i_enableWebhook, title="📡 Webhook: New Setup", message=webhookPayload)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // END OF ATLAS ICT PRO v5.0 - GOD MODE [PAC-MAN EDITION]
