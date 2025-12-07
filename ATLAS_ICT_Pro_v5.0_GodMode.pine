@@ -2050,22 +2050,22 @@ if i_showOTE and barstate.islast
     float ote705 = rangeLow + rangeSize * 0.705
     float ote79 = rangeLow + rangeSize * 0.79
 
-    // Draw dashed lines for each OTE level - end at +10 (left column, separate from BSL/SSL)
+    // Draw dashed lines for each OTE level - subtle reference lines (dimmer)
     oteLine62 := line.new(bar_index - 50, ote62, bar_index + 10, ote62,
-         color=color.new(oteLineColor, 50), width=1, style=line.style_dotted)
+         color=color.new(oteLineColor, 75), width=1, style=line.style_dotted)
     oteLine705 := line.new(bar_index - 50, ote705, bar_index + 10, ote705,
-         color=color.new(oteLineColor, 10), width=2, style=line.style_dashed)
+         color=color.new(oteLineColor, 60), width=1, style=line.style_dotted)
     oteLine79 := line.new(bar_index - 50, ote79, bar_index + 10, ote79,
-         color=color.new(oteLineColor, 50), width=1, style=line.style_dotted)
+         color=color.new(oteLineColor, 75), width=1, style=line.style_dotted)
 
-    // Labels UNDER line, right-aligned so text end matches line end (all same size)
+    // Labels UNDER line, right-aligned (dimmer to match lines)
     float labelOffset = rangeSize * 0.015
     oteLabel62 := label.new(bar_index + 10, ote62 - labelOffset, "62%",
-         style=label.style_none, textcolor=color.new(oteLineColor, 30), size=size.tiny, textalign=text.align_right)
+         style=label.style_none, textcolor=color.new(oteLineColor, 60), size=size.tiny, textalign=text.align_right)
     oteLabel705 := label.new(bar_index + 10, ote705 - labelOffset, "OTE",
-         style=label.style_none, textcolor=oteLineColor, size=size.tiny, textalign=text.align_right)
+         style=label.style_none, textcolor=color.new(oteLineColor, 50), size=size.tiny, textalign=text.align_right)
     oteLabel79 := label.new(bar_index + 10, ote79 - labelOffset, "79%",
-         style=label.style_none, textcolor=color.new(oteLineColor, 30), size=size.tiny, textalign=text.align_right)
+         style=label.style_none, textcolor=color.new(oteLineColor, 60), size=size.tiny, textalign=text.align_right)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PREMIUM/DISCOUNT ZONES - Subtle reference lines
@@ -2085,10 +2085,12 @@ var line cbdrGridSD1High = na
 var line cbdrGridSD1Low = na
 var label cbdrLabelHigh = na
 var label cbdrLabelLow = na
+var label cbdrLabelSD1High = na
+var label cbdrLabelSD1Low = na
 
 // Draw CBDR as subtle grid on last bar only
 if barstate.islast and i_showCBDR
-    // Clean up previous grid lines
+    // Clean up previous grid lines and labels
     if not na(cbdrGridHigh)
         line.delete(cbdrGridHigh)
     if not na(cbdrGridLow)
@@ -2101,6 +2103,10 @@ if barstate.islast and i_showCBDR
         label.delete(cbdrLabelHigh)
     if not na(cbdrLabelLow)
         label.delete(cbdrLabelLow)
+    if not na(cbdrLabelSD1High)
+        label.delete(cbdrLabelSD1High)
+    if not na(cbdrLabelSD1Low)
+        label.delete(cbdrLabelSD1Low)
 
     // Subtle grid color
     cbdrGridColor = color.new(color.teal, 85)
@@ -2108,25 +2114,29 @@ if barstate.islast and i_showCBDR
 
     // CBDR High/Low - subtle dotted lines extending full width
     if not na(cbdrHigh)
-        cbdrGridHigh := line.new(bar_index - 200, cbdrHigh, bar_index + 50, cbdrHigh,
+        cbdrGridHigh := line.new(bar_index - 200, cbdrHigh, bar_index + 30, cbdrHigh,
              color=cbdrGridColor, width=1, style=line.style_dotted, extend=extend.left)
-        cbdrLabelHigh := label.new(bar_index + 50, cbdrHigh, "CBDR",
-             style=label.style_none, textcolor=color.new(color.teal, 60), size=size.tiny, textalign=text.align_left)
+        cbdrLabelHigh := label.new(bar_index + 30, cbdrHigh, "CBDR Hi",
+             style=label.style_none, textcolor=color.new(color.teal, 50), size=size.tiny, textalign=text.align_left)
 
     if not na(cbdrLow)
-        cbdrGridLow := line.new(bar_index - 200, cbdrLow, bar_index + 50, cbdrLow,
+        cbdrGridLow := line.new(bar_index - 200, cbdrLow, bar_index + 30, cbdrLow,
              color=cbdrGridColor, width=1, style=line.style_dotted, extend=extend.left)
-        cbdrLabelLow := label.new(bar_index + 50, cbdrLow, "CBDR",
-             style=label.style_none, textcolor=color.new(color.teal, 60), size=size.tiny, textalign=text.align_left)
+        cbdrLabelLow := label.new(bar_index + 30, cbdrLow, "CBDR Lo",
+             style=label.style_none, textcolor=color.new(color.teal, 50), size=size.tiny, textalign=text.align_left)
 
-    // SD Projections - even more subtle
+    // SD Projections - even more subtle, with labels
     if i_showCBDRProjections and not na(cbdrSD1High)
-        cbdrGridSD1High := line.new(bar_index - 200, cbdrSD1High, bar_index + 50, cbdrSD1High,
+        cbdrGridSD1High := line.new(bar_index - 200, cbdrSD1High, bar_index + 30, cbdrSD1High,
              color=cbdrSDColor, width=1, style=line.style_dotted, extend=extend.left)
+        cbdrLabelSD1High := label.new(bar_index + 30, cbdrSD1High, "SD+",
+             style=label.style_none, textcolor=color.new(color.teal, 70), size=size.tiny, textalign=text.align_left)
 
     if i_showCBDRProjections and not na(cbdrSD1Low)
-        cbdrGridSD1Low := line.new(bar_index - 200, cbdrSD1Low, bar_index + 50, cbdrSD1Low,
+        cbdrGridSD1Low := line.new(bar_index - 200, cbdrSD1Low, bar_index + 30, cbdrSD1Low,
              color=cbdrSDColor, width=1, style=line.style_dotted, extend=extend.left)
+        cbdrLabelSD1Low := label.new(bar_index + 30, cbdrSD1Low, "SD-",
+             style=label.style_none, textcolor=color.new(color.teal, 70), size=size.tiny, textalign=text.align_left)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NWOG ZONE - Multi-week display with progressive fading
