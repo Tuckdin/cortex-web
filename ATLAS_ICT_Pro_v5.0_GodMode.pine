@@ -725,8 +725,8 @@ bullishOB = close[1] < open[1] and displacementUp and close > high[1]
 bearishOB = close[1] > open[1] and displacementDown and close < low[1]
 
 // ICT-style Order Block colors (blue for bullish, orange for bearish - per ICT videos)
-obBullColor = #2962FF  // Bright ICT blue
-obBearColor = #FF6D00  // ICT orange
+obBullColor = #A3C4F3  // Pastel blue
+obBearColor = #FFCB9A  // Pastel peach
 
 // Create and manage Order Blocks - ICT style with labels
 if bullishOB and i_showOB
@@ -850,8 +850,8 @@ minFVGSize = i_fvgMinSize * f_tickSize()
 
 // ICT-style FVG colors (gold/amber for visibility)
 // ICT-style FVG colors (pink - per ICT videos)
-fvgBullColor = #FF4081  // Hot pink for bullish FVG
-fvgBearColor = #F50057  // Deep pink for bearish FVG
+fvgBullColor = #FFB5D0  // Pastel pink for bullish FVG
+fvgBearColor = #FFA5C9  // Pastel rose for bearish FVG
 
 // Create FVGs - ICT style with labels
 if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
@@ -912,9 +912,9 @@ f_updateFVGMitigation(bearFVGs, false)
 var array<FVG> bullIFVGs = array.new<FVG>()
 var array<FVG> bearIFVGs = array.new<FVG>()
 
-// ICT-style IFVG colors (bright purple - inverted zones)
-ifvgBearClr = #AA00FF  // Bright purple for bearish IFVG
-ifvgBullClr = #D500F9  // Vivid purple for bullish IFVG
+// Pastel IFVG colors (soft purple - inverted zones)
+ifvgBearClr = #D4A5E8  // Pastel purple for bearish IFVG
+ifvgBullClr = #E1BEE7  // Pastel lavender for bullish IFVG
 
 // Check for IFVG creation from mitigated FVGs
 f_checkIFVG(array<FVG> fvgs, array<FVG> ifvgs, bool wasBull) =>
@@ -1286,8 +1286,8 @@ bullishRejection = i_showRejBlock and totalRange > 0 and lowerWick / totalRange 
 bearishRejection = i_showRejBlock and totalRange > 0 and upperWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close < open and inPremium
 
 // ICT-style Rejection Block colors (green/red - per ICT discount/premium)
-rbBullColor = #00E676  // Bright green for bullish rejection (discount)
-rbBearColor = #FF1744  // Bright red for bearish rejection (premium)
+rbBullColor = #B8F5CD  // Pastel mint for bullish rejection (discount)
+rbBearColor = #FFABAB  // Pastel coral for bearish rejection (premium)
 rbDotsColor = #FFEB3B  // Pac-Man yellow for strength dots
 
 // RB Strength scoring function
@@ -2097,8 +2097,8 @@ if barstate.islast
             float l = array.get(nwogLows, i)
             float ce = array.get(nwogCEs, i)
 
-            // ICT blue for NWOG - progressive fading for older weeks
-            nwogColor = #2196F3  // ICT blue
+            // Pastel blue for NWOG - progressive fading for older weeks
+            nwogColor = #B3E0FF  // Pastel sky blue
             int fadeLevel = 0 + (i * 15)  // 0, 15, 30, 45, 60 for 5 weeks
             int bgFade = 70 + (i * 5)     // 70, 75, 80, 85, 90 for 5 weeks
             fadeLevel := math.min(fadeLevel, 70)
@@ -2128,7 +2128,7 @@ if barstate.islast
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var box orgBox = na
-gapColor = #F50057  // ICT pink for Opening Range Gap
+gapColor = #FFB5D0  // Pastel pink for Opening Range Gap
 
 if hasORG and not na(orgHigh) and not na(orgLow) and barstate.islast
     if not na(orgBox)
@@ -2262,9 +2262,9 @@ if i_showComposite and barstate.islast and (compositeTier == TIER_1 or composite
     ote62 = dolDirection == DIR_BULL ? swingLow + swingRange * 0.62 : swingHigh - swingRange * 0.62
     ote79 = dolDirection == DIR_BULL ? swingLow + swingRange * 0.79 : swingHigh - swingRange * 0.79
 
-    // Entry zone box color based on tier (pastel colors)
-    entryBoxColor = compositeTier == TIER_1 ? color.new(#A8E6CF, 80) : color.new(#C8F7DC, 82)
-    entryBorderColor = compositeTier == TIER_1 ? color.new(#A8E6CF, 20) : color.new(#C8F7DC, 30)
+    // Entry zone box GLOW effect (bright, vibrant colors)
+    entryBoxColor = compositeTier == TIER_1 ? color.new(#00FF88, 70) : color.new(#00E676, 75)
+    entryBorderColor = compositeTier == TIER_1 ? color.new(#00FF88, 0) : color.new(#00E676, 10)
 
     // Draw entry zone box (OTE area)
     if dolDirection == DIR_BULL
