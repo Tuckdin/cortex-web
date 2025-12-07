@@ -4758,180 +4758,41 @@ if i_showDOL and i_showPacMan and barstate.islast
             array.push(dolPathLines, simpleLine)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 👻 GHOST LIQUIDITY TARGETS - PAC-MAN ARCADE MODE 👻
-// BLINKY (Red) = BSL - Aggressive chaser, most dangerous
-// CLYDE (Orange) = SSL - Shy, retreats when price approaches
-// FRIGHTENED MODE = Blue ghost when price in OTE heading toward target
+// 👻 GHOST LIQUIDITY TARGETS - PAC-MAN ARCADE MODE (Simplified)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var label blinkyLabel = na      // BSL Ghost
-var label clydeLabel = na       // SSL Ghost
-var line bslLine = na
-var line sslLine = na
+var label blinkyLabel = na
+var label clydeLabel = na
 
-// Ghost colors
-blinkyRed = #FF0000             // Classic Blinky red
-clydeOrange = #FFB852           // Classic Clyde orange
-frightenedBlue = #2121FF        // Frightened ghost blue
-frightenedWhite = #FFFFFF       // Flashing white (about to recover)
-
-// Calculate if ghosts should be frightened
-// Frightened when: price in OTE, heading toward the ghost, in killzone
-ghostDistToBSL = high60IPDA - close
-ghostDistToSSL = close - low60IPDA
-ghostRangeIPDA = high60IPDA - low60IPDA
-
-// BLINKY frightened: Price going up, in OTE, close to BSL
-blinkyFrightened = dolDirection == DIR_BULL and inOTE and (ghostDistToBSL / ghostRangeIPDA < 0.3) and (inSilverBullet or isMacroTime)
-
-// CLYDE frightened: Price going down, in OTE, close to SSL
-clydeFrightened = dolDirection == DIR_BEAR and inOTE and (ghostDistToSSL / ghostRangeIPDA < 0.3) and (inSilverBullet or isMacroTime)
-
-// Ghost visual states
-string blinkyState = blinkyFrightened ? "👻 FRIGHTENED!" : "👻 BLINKY"
-string clydeState = clydeFrightened ? "👻 FRIGHTENED!" : "👻 CLYDE"
-
-if i_showPacMan and barstate.islast
-    if not na(blinkyLabel)
-        label.delete(blinkyLabel)
-    if not na(clydeLabel)
-        label.delete(clydeLabel)
-    if not na(bslLine)
-        line.delete(bslLine)
-    if not na(sslLine)
-        line.delete(sslLine)
-
-    float ghostOffset = (high60IPDA - low60IPDA) * 0.015
-
-    // BLINKY (BSL) - Red ghost, turns blue when frightened
-    blinkyColor = blinkyFrightened ? frightenedBlue : blinkyRed
-    bslLineColor = blinkyFrightened ? color.new(frightenedBlue, 20) : color.new(blinkyRed, 20)
-    bslLine := line.new(bar_index - 40, high60IPDA, bar_index + 20, high60IPDA,
-         color=bslLineColor, width=2, style=line.style_dashed)
-    blinkyLabel := label.new(bar_index + 20, high60IPDA - ghostOffset, blinkyState + " BSL",
-         style=label.style_none, textcolor=blinkyColor, size=size.small, textalign=text.align_right)
-
-    // CLYDE (SSL) - Orange ghost, turns blue when frightened
-    clydeColor = clydeFrightened ? frightenedBlue : clydeOrange
-    sslLineColor = clydeFrightened ? color.new(frightenedBlue, 20) : color.new(clydeOrange, 20)
-    sslLine := line.new(bar_index - 40, low60IPDA, bar_index + 20, low60IPDA,
-         color=sslLineColor, width=2, style=line.style_dashed)
-    clydeLabel := label.new(bar_index + 20, low60IPDA - ghostOffset, clydeState + " SSL",
-         style=label.style_none, textcolor=clydeColor, size=size.small, textalign=text.align_right)
+if i_showPacMan and barstate.islast and not i_cleanMode
+    label.delete(blinkyLabel)
+    label.delete(clydeLabel)
+    blinkyLabel := label.new(bar_index + 20, high60IPDA, "👻 BSL", style=label.style_none, textcolor=#FF0000, size=size.small)
+    clydeLabel := label.new(bar_index + 20, low60IPDA, "👻 SSL", style=label.style_none, textcolor=#FFB852, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LIQUIDITY SEQUENCING - Visual Lines + Distance Labels (Column +40)
+// LIQUIDITY SEQUENCING - Visual Lines (Simplified)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var line pdhLine = na
-var line pdlLine = na
-var line pwhLine = na
-var line pwlLine = na
-var line londonHiLine = na
-var line londonLoLine = na
-var label pdhLabel = na
-var label pdlLabel = na
-var label pwhLabel = na
-var label pwlLabel = na
-var label londonHiLabel = na
-var label londonLoLabel = na
+var line pdhLine = na, var line pdlLine = na, var line pwhLine = na, var line pwlLine = na
+var label pdhLabel = na, var label pdlLabel = na, var label pwhLabel = na, var label pwlLabel = na
 
 if barstate.islast
-    // Cleanup previous liquidity lines/labels
-    if not na(pdhLine)
-        line.delete(pdhLine)
-    if not na(pdlLine)
-        line.delete(pdlLine)
-    if not na(pwhLine)
-        line.delete(pwhLine)
-    if not na(pwlLine)
-        line.delete(pwlLine)
-    if not na(londonHiLine)
-        line.delete(londonHiLine)
-    if not na(londonLoLine)
-        line.delete(londonLoLine)
-    if not na(pdhLabel)
-        label.delete(pdhLabel)
-    if not na(pdlLabel)
-        label.delete(pdlLabel)
-    if not na(pwhLabel)
-        label.delete(pwhLabel)
-    if not na(pwlLabel)
-        label.delete(pwlLabel)
-    if not na(londonHiLabel)
-        label.delete(londonHiLabel)
-    if not na(londonLoLabel)
-        label.delete(londonLoLabel)
+    line.delete(pdhLine), line.delete(pdlLine), line.delete(pwhLine), line.delete(pwlLine)
+    label.delete(pdhLabel), label.delete(pdlLabel), label.delete(pwhLabel), label.delete(pwlLabel)
 
-    // Colors - swept levels are dimmed, active levels are bright
-    pdhColor = pdhSwept ? color.new(#FF9800, 70) : color.new(#FF9800, 30)
-    pdlColor = pdlSwept ? color.new(#FF9800, 70) : color.new(#FF9800, 30)
-    pwhColor = pwhSwept ? color.new(#E040FB, 70) : color.new(#E040FB, 30)
-    pwlColor = pwlSwept ? color.new(#E040FB, 70) : color.new(#E040FB, 30)
-    ldnColor = color.new(#2196F3, 40)
-
-    // Calculate pip distances (assuming forex with 4/5 decimal places)
-    float pipMult = syminfo.mintick >= 0.01 ? 1 : 10  // Adjust for JPY pairs
-    float pdhDist = not na(pdh) ? (pdh - close) / syminfo.mintick / pipMult : na
-    float pdlDist = not na(pdl) ? (pdl - close) / syminfo.mintick / pipMult : na
-    float pwhDist = not na(pwh) ? (pwh - close) / syminfo.mintick / pipMult : na
-    float pwlDist = not na(pwl) ? (pwl - close) / syminfo.mintick / pipMult : na
-    float ldnHiDist = not na(londonHigh) ? (londonHigh - close) / syminfo.mintick / pipMult : na
-    float ldnLoDist = not na(londonLow) ? (londonLow - close) / syminfo.mintick / pipMult : na
-
-    // Line style for swept vs active
-    sweptStyle = line.style_dotted
-    activeStyle = line.style_dashed
-
-    // PDH - Previous Day High
     if not na(pdh)
-        pdhLine := line.new(bar_index - 20, pdh, bar_index + 40, pdh,
-             color=pdhColor, width=1, style=pdhSwept ? sweptStyle : activeStyle)
-        pdhText = pdhSwept ? "̶P̶D̶H̶ ✗" : "PDH " + str.tostring(pdhDist, "#") + "p"
-        pdhLabel := label.new(bar_index + 40, pdh, pdhText,
-             style=label.style_none, textcolor=pdhColor, size=size.tiny, textalign=text.align_left)
-
-    // PDL - Previous Day Low
+        pdhLine := line.new(bar_index - 20, pdh, bar_index + 40, pdh, color=color.new(#FF9800, pdhSwept ? 70 : 30), width=1)
+        pdhLabel := label.new(bar_index + 40, pdh, pdhSwept ? "PDH ✗" : "PDH", style=label.style_none, textcolor=#FF9800, size=size.tiny)
     if not na(pdl)
-        pdlLine := line.new(bar_index - 20, pdl, bar_index + 40, pdl,
-             color=pdlColor, width=1, style=pdlSwept ? sweptStyle : activeStyle)
-        pdlText = pdlSwept ? "̶P̶D̶L̶ ✗" : "PDL " + str.tostring(pdlDist, "#") + "p"
-        pdlLabel := label.new(bar_index + 40, pdl, pdlText,
-             style=label.style_none, textcolor=pdlColor, size=size.tiny, textalign=text.align_left)
-
-    // PWH - Previous Week High
+        pdlLine := line.new(bar_index - 20, pdl, bar_index + 40, pdl, color=color.new(#FF9800, pdlSwept ? 70 : 30), width=1)
+        pdlLabel := label.new(bar_index + 40, pdl, pdlSwept ? "PDL ✗" : "PDL", style=label.style_none, textcolor=#FF9800, size=size.tiny)
     if not na(pwh)
-        pwhLine := line.new(bar_index - 20, pwh, bar_index + 40, pwh,
-             color=pwhColor, width=1, style=pwhSwept ? sweptStyle : activeStyle)
-        pwhText = pwhSwept ? "̶P̶W̶H̶ ✗" : "PWH " + str.tostring(pwhDist, "#") + "p"
-        pwhLabel := label.new(bar_index + 40, pwh, pwhText,
-             style=label.style_none, textcolor=pwhColor, size=size.tiny, textalign=text.align_left)
-
-    // PWL - Previous Week Low
+        pwhLine := line.new(bar_index - 20, pwh, bar_index + 40, pwh, color=color.new(#E040FB, pwhSwept ? 70 : 30), width=1)
+        pwhLabel := label.new(bar_index + 40, pwh, pwhSwept ? "PWH ✗" : "PWH", style=label.style_none, textcolor=#E040FB, size=size.tiny)
     if not na(pwl)
-        pwlLine := line.new(bar_index - 20, pwl, bar_index + 40, pwl,
-             color=pwlColor, width=1, style=pwlSwept ? sweptStyle : activeStyle)
-        pwlText = pwlSwept ? "̶P̶W̶L̶ ✗" : "PWL " + str.tostring(pwlDist, "#") + "p"
-        pwlLabel := label.new(bar_index + 40, pwl, pwlText,
-             style=label.style_none, textcolor=pwlColor, size=size.tiny, textalign=text.align_left)
-
-    // London High (only show if not in London session)
-    if not na(londonHigh) and not londonSession
-        ldnHiColor = londonHighSwept ? color.new(#2196F3, 70) : ldnColor
-        londonHiLine := line.new(bar_index - 10, londonHigh, bar_index + 40, londonHigh,
-             color=ldnHiColor, width=1, style=londonHighSwept ? sweptStyle : line.style_dotted)
-        ldnHiText = londonHighSwept ? "̶L̶D̶N̶ ̶H̶i̶ ✗" : "LDN Hi " + str.tostring(ldnHiDist, "#") + "p"
-        londonHiLabel := label.new(bar_index + 40, londonHigh, ldnHiText,
-             style=label.style_none, textcolor=ldnHiColor, size=size.tiny, textalign=text.align_left)
-
-    // London Low (only show if not in London session)
-    if not na(londonLow) and not londonSession
-        ldnLoColor = londonLowSwept ? color.new(#2196F3, 70) : ldnColor
-        londonLoLine := line.new(bar_index - 10, londonLow, bar_index + 40, londonLow,
-             color=ldnLoColor, width=1, style=londonLowSwept ? sweptStyle : line.style_dotted)
-        ldnLoText = londonLowSwept ? "̶L̶D̶N̶ ̶L̶o̶ ✗" : "LDN Lo " + str.tostring(ldnLoDist, "#") + "p"
-        londonLoLabel := label.new(bar_index + 40, londonLow, ldnLoText,
-             style=label.style_none, textcolor=ldnLoColor, size=size.tiny, textalign=text.align_left)
+        pwlLine := line.new(bar_index - 20, pwl, bar_index + 40, pwl, color=color.new(#E040FB, pwlSwept ? 70 : 30), width=1)
+        pwlLabel := label.new(bar_index + 40, pwl, pwlSwept ? "PWL ✗" : "PWL", style=label.style_none, textcolor=#E040FB, size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPOSITE TIER SIGNALS (Only on TRUE high-confluence events)
