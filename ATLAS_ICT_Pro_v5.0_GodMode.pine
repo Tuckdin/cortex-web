@@ -2076,13 +2076,57 @@ plot(i_showPDZones ? discountZone : na, "Discount Zone", color=color.new(i_bullC
 plot(i_showEQ ? equilibrium : na, "Equilibrium", color=color.new(#78909C, 60), linewidth=1, style=plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CBDR PROJECTIONS
+// CBDR GRID - Subtle background grid lines (toggle-able)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-plot(i_showCBDRProjections and not na(cbdrSD1High) ? cbdrSD1High : na, "CBDR SD+ High", color=color.new(color.teal, 50), linewidth=1, style=plot.style_linebr)
-plot(i_showCBDRProjections and not na(cbdrSD1Low) ? cbdrSD1Low : na, "CBDR SD- Low", color=color.new(color.teal, 50), linewidth=1, style=plot.style_linebr)
-plot(i_showCBDR and not na(cbdrHigh) ? cbdrHigh : na, "CBDR High", color=color.new(color.teal, 30), linewidth=2, style=plot.style_linebr)
-plot(i_showCBDR and not na(cbdrLow) ? cbdrLow : na, "CBDR Low", color=color.new(color.teal, 30), linewidth=2, style=plot.style_linebr)
+var line cbdrGridHigh = na
+var line cbdrGridLow = na
+var line cbdrGridSD1High = na
+var line cbdrGridSD1Low = na
+var label cbdrLabelHigh = na
+var label cbdrLabelLow = na
+
+// Draw CBDR as subtle grid on last bar only
+if barstate.islast and i_showCBDR
+    // Clean up previous grid lines
+    if not na(cbdrGridHigh)
+        line.delete(cbdrGridHigh)
+    if not na(cbdrGridLow)
+        line.delete(cbdrGridLow)
+    if not na(cbdrGridSD1High)
+        line.delete(cbdrGridSD1High)
+    if not na(cbdrGridSD1Low)
+        line.delete(cbdrGridSD1Low)
+    if not na(cbdrLabelHigh)
+        label.delete(cbdrLabelHigh)
+    if not na(cbdrLabelLow)
+        label.delete(cbdrLabelLow)
+
+    // Subtle grid color
+    cbdrGridColor = color.new(color.teal, 85)
+    cbdrSDColor = color.new(color.teal, 90)
+
+    // CBDR High/Low - subtle dotted lines extending full width
+    if not na(cbdrHigh)
+        cbdrGridHigh := line.new(bar_index - 200, cbdrHigh, bar_index + 50, cbdrHigh,
+             color=cbdrGridColor, width=1, style=line.style_dotted, extend=extend.left)
+        cbdrLabelHigh := label.new(bar_index + 50, cbdrHigh, "CBDR",
+             style=label.style_none, textcolor=color.new(color.teal, 60), size=size.tiny, textalign=text.align_left)
+
+    if not na(cbdrLow)
+        cbdrGridLow := line.new(bar_index - 200, cbdrLow, bar_index + 50, cbdrLow,
+             color=cbdrGridColor, width=1, style=line.style_dotted, extend=extend.left)
+        cbdrLabelLow := label.new(bar_index + 50, cbdrLow, "CBDR",
+             style=label.style_none, textcolor=color.new(color.teal, 60), size=size.tiny, textalign=text.align_left)
+
+    // SD Projections - even more subtle
+    if i_showCBDRProjections and not na(cbdrSD1High)
+        cbdrGridSD1High := line.new(bar_index - 200, cbdrSD1High, bar_index + 50, cbdrSD1High,
+             color=cbdrSDColor, width=1, style=line.style_dotted, extend=extend.left)
+
+    if i_showCBDRProjections and not na(cbdrSD1Low)
+        cbdrGridSD1Low := line.new(bar_index - 200, cbdrSD1Low, bar_index + 50, cbdrSD1Low,
+             color=cbdrSDColor, width=1, style=line.style_dotted, extend=extend.left)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NWOG ZONE - Multi-week display with progressive fading
