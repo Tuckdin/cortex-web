@@ -3194,23 +3194,6 @@ if i_showComposite and barstate.islast and (compositeTier == TIER_1 or composite
     rewardPips = math.abs(dolTarget - entryPrice)
     riskReward = riskPips > 0 ? rewardPips / riskPips : 0
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // "TAKE THE TRADE" SIGNAL - Ultimate confirmation
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    // Requirements for TAKE THE TRADE:
-    // 1. TIER 1 or TIER 2 setup
-    // 2. In Silver Bullet PRIME window OR Macro Time
-    // 3. Risk:Reward >= 2.0
-    // 4. Has active trigger (not just confluence)
-    // 5. Price in OTE zone
-
-    takeTheTrade = (compositeTier == TIER_1 or compositeTier == TIER_2) and
-                   (sbPrime or (isMacroTime and hasKillzone)) and
-                   riskReward >= 2.0 and
-                   isAnyTrigger and
-                   inOTE
-
     // Draw target arrow to liquidity
     targetArrowColor = dolDirection == DIR_BULL ? color.new(#00E676, 20) : color.new(#FF1744, 20)
 
