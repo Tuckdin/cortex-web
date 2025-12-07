@@ -1799,21 +1799,17 @@ var line[] nwogCELines = array.new_line(0)
 
 // Clean up old boxes and lines on last bar
 if barstate.islast
-    // Delete existing boxes
-    if array.size(nwogBoxes) > 0
-        for i = 0 to array.size(nwogBoxes) - 1
-            box.delete(array.get(nwogBoxes, i))
-        array.clear(nwogBoxes)
+    // Delete existing boxes using while loop (safer for empty arrays)
+    while array.size(nwogBoxes) > 0
+        box.delete(array.pop(nwogBoxes))
 
     // Delete existing CE lines
-    if array.size(nwogCELines) > 0
-        for i = 0 to array.size(nwogCELines) - 1
-            line.delete(array.get(nwogCELines, i))
-        array.clear(nwogCELines)
+    while array.size(nwogCELines) > 0
+        line.delete(array.pop(nwogCELines))
 
     // Draw new boxes for each stored NWOG
-    if i_showNWOG and array.size(nwogHighs) > 0
-        int nwogCount = array.size(nwogHighs)
+    int nwogCount = array.size(nwogHighs)
+    if i_showNWOG and nwogCount > 0
         for i = 0 to nwogCount - 1
             float h = array.get(nwogHighs, i)
             float l = array.get(nwogLows, i)
