@@ -444,6 +444,34 @@ var bool iofDrillLong = false
 var bool iofDrillShort = false
 var float iofEntryLevel = na
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🕹️ PAC-MAN ARCADE STATE VARIABLES 🕹️
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Game State: ATTRACT, READY, PLAYING, POWER_MODE, LEVEL_COMPLETE, GAME_OVER
+var string gameState = "ATTRACT"
+var int arcadeScore = 0                  // Running score based on confluences
+var int highScore = 0                    // Best score this session
+var int comboCount = 0                   // Consecutive confluence hits
+var int comboMultiplier = 1              // Score multiplier from combos
+
+// Power Mode (all conditions aligned)
+var bool powerModeActive = false
+var int powerModeTimer = 0               // Bars remaining in power mode
+var int POWER_MODE_DURATION = 15         // Bars of power mode
+
+// Fruit R:R Targets (appears when in a trade setup)
+// 🍒=1R, 🍓=1.5R, 🍊=2R, 🍎=2.5R, 🍇=3R, 🚀=4R, 🔔=5R, 🔑=DOL
+var string currentFruit = ""
+var float fruitTarget = na
+
+// Ghost Eaten Scoring (when liquidity is swept)
+var int ghostsEaten = 0                  // Count of sweeps this session
+var int lastGhostPoints = 0              // Points from last ghost eaten
+
+// Level System (based on composite tier)
+var int currentLevel = 1
+
 // Market Structure
 var int msDirection = 0
 var float lastSwingHigh = na
@@ -3455,6 +3483,93 @@ else
         patternName := "⚠️ NO SETUP"
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                   🕹️ PAC-MAN ARCADE GAME STATE LOGIC 🕹️                        ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GAME STATE MACHINE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Power Mode: All conditions aligned - eat the ghosts!
+powerModeCondition = compositeTier <= TIER_2 and inOTE and hasKillzone and isAnyTrigger
+
+if powerModeCondition and not powerModeActive
+    powerModeActive := true
+    powerModeTimer := POWER_MODE_DURATION
+
+if powerModeActive
+    powerModeTimer := powerModeTimer - 1
+    if powerModeTimer <= 0
+        powerModeActive := false
+
+// Game State Transitions
+if powerModeActive
+    gameState := "POWER_MODE"
+else if compositeTier == TIER_1
+    gameState := "BONUS_STAGE"
+else if compositeTier == TIER_2 or compositeTier == TIER_3
+    gameState := "PLAYING"
+else if compositeTier == TIER_4 and confluenceCount >= 3
+    gameState := "READY"
+else
+    gameState := "ATTRACT"
+
+// Level based on composite tier (inverted - higher tier = higher level)
+currentLevel := compositeTier == TIER_1 ? 5 : compositeTier == TIER_2 ? 4 : compositeTier == TIER_3 ? 3 : compositeTier == TIER_4 ? 2 : 1
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ARCADE SCORING SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Calculate score based on composite score (scaled to arcade points)
+basePoints = compositeScore * 100
+
+// Combo system - consecutive bars with good confluence
+if confluenceCount >= 5
+    comboCount := comboCount + 1
+    comboMultiplier := math.min(comboCount, 8)  // Max 8x multiplier
+else if confluenceCount < 3
+    comboCount := 0
+    comboMultiplier := 1
+
+// Calculate arcade score
+arcadeScore := int(basePoints * comboMultiplier)
+
+// Update high score
+if arcadeScore > highScore
+    highScore := arcadeScore
+
+// Ghost eaten scoring (when liquidity is swept)
+if pdhSwept or pdlSwept or pwhSwept or pwlSwept
+    ghostsEaten := ghostsEaten + 1
+    // Classic Pac-Man ghost scoring: 200, 400, 800, 1600
+    ghostIndex = math.min(ghostsEaten, 4)
+    lastGhostPoints := ghostIndex == 1 ? 200 : ghostIndex == 2 ? 400 : ghostIndex == 3 ? 800 : 1600
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FRUIT R:R TARGET SYSTEM (Pac-Man Bonus Fruits)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Determine current fruit based on R:R potential
+if not na(riskReward)
+    if riskReward >= 5
+        currentFruit := "🔑"      // Key - Full DOL (5000 pts)
+    else if riskReward >= 4
+        currentFruit := "🔔"      // Bell (3000 pts)
+    else if riskReward >= 3
+        currentFruit := "🍇"      // Grapes (1000 pts)
+    else if riskReward >= 2.5
+        currentFruit := "🍎"      // Apple (700 pts)
+    else if riskReward >= 2
+        currentFruit := "🍊"      // Orange (500 pts)
+    else if riskReward >= 1.5
+        currentFruit := "🍓"      // Strawberry (300 pts)
+    else
+        currentFruit := "🍒"      // Cherry (100 pts)
+else
+    currentFruit := ""
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        🎨 VISUAL RENDERING                                     ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
@@ -4300,36 +4415,66 @@ if i_showDOL and i_showPacMan and barstate.islast
             array.push(dolPathLines, simpleLine)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LIQUIDITY TARGETS (Institutional Levels) - Clean minimal
+// 👻 GHOST LIQUIDITY TARGETS - PAC-MAN ARCADE MODE 👻
+// BLINKY (Red) = BSL - Aggressive chaser, most dangerous
+// CLYDE (Orange) = SSL - Shy, retreats when price approaches
+// FRIGHTENED MODE = Blue ghost when price in OTE heading toward target
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var label cherryHighLabel = na
-var label cherryLowLabel = na
+var label blinkyLabel = na      // BSL Ghost
+var label clydeLabel = na       // SSL Ghost
 var line bslLine = na
 var line sslLine = na
 
+// Ghost colors
+blinkyRed = #FF0000             // Classic Blinky red
+clydeOrange = #FFB852           // Classic Clyde orange
+frightenedBlue = #2121FF        // Frightened ghost blue
+frightenedWhite = #FFFFFF       // Flashing white (about to recover)
+
+// Calculate if ghosts should be frightened
+// Frightened when: price in OTE, heading toward the ghost, in killzone
+float distToBSL = high60IPDA - close
+float distToSSL = close - low60IPDA
+float rangeIPDA = high60IPDA - low60IPDA
+
+// BLINKY frightened: Price going up, in OTE, close to BSL
+bool blinkyFrightened = dolDirection == DIR_BULL and inOTE and (distToBSL / rangeIPDA < 0.3) and (inSilverBullet or isMacroTime)
+
+// CLYDE frightened: Price going down, in OTE, close to SSL
+bool clydeFrightened = dolDirection == DIR_BEAR and inOTE and (distToSSL / rangeIPDA < 0.3) and (inSilverBullet or isMacroTime)
+
+// Ghost visual states
+string blinkyState = blinkyFrightened ? "👻 FRIGHTENED!" : "👻 BLINKY"
+string clydeState = clydeFrightened ? "👻 FRIGHTENED!" : "👻 CLYDE"
+
 if i_showPacMan and barstate.islast
-    if not na(cherryHighLabel)
-        label.delete(cherryHighLabel)
-    if not na(cherryLowLabel)
-        label.delete(cherryLowLabel)
+    if not na(blinkyLabel)
+        label.delete(blinkyLabel)
+    if not na(clydeLabel)
+        label.delete(clydeLabel)
     if not na(bslLine)
         line.delete(bslLine)
     if not na(sslLine)
         line.delete(sslLine)
 
-    // BSL - label UNDER line, right-aligned (right column at +20)
-    bslLine := line.new(bar_index - 40, high60IPDA, bar_index + 20, high60IPDA,
-         color=color.new(#FF5252, 20), width=2, style=line.style_dashed)
-    float bslOffset = (high60IPDA - low60IPDA) * 0.015
-    cherryHighLabel := label.new(bar_index + 20, high60IPDA - bslOffset, "🍒 BSL",
-         style=label.style_none, textcolor=color.new(#FF5252, 0), size=size.small, textalign=text.align_right)
+    float ghostOffset = (high60IPDA - low60IPDA) * 0.015
 
-    // SSL - label UNDER line, right-aligned (right column at +20)
+    // BLINKY (BSL) - Red ghost, turns blue when frightened
+    blinkyColor = blinkyFrightened ? frightenedBlue : blinkyRed
+    bslLineColor = blinkyFrightened ? color.new(frightenedBlue, 20) : color.new(blinkyRed, 20)
+    bslLine := line.new(bar_index - 40, high60IPDA, bar_index + 20, high60IPDA,
+         color=bslLineColor, width=2, style=line.style_dashed)
+    blinkyLabel := label.new(bar_index + 20, high60IPDA - ghostOffset, blinkyState + " BSL",
+         style=label.style_none, textcolor=blinkyColor, size=size.small, textalign=text.align_right)
+
+    // CLYDE (SSL) - Orange ghost, turns blue when frightened
+    clydeColor = clydeFrightened ? frightenedBlue : clydeOrange
+    sslLineColor = clydeFrightened ? color.new(frightenedBlue, 20) : color.new(clydeOrange, 20)
     sslLine := line.new(bar_index - 40, low60IPDA, bar_index + 20, low60IPDA,
-         color=color.new(#69F0AE, 20), width=2, style=line.style_dashed)
-    cherryLowLabel := label.new(bar_index + 20, low60IPDA - bslOffset, "🍒 SSL",
-         style=label.style_none, textcolor=color.new(#69F0AE, 0), size=size.small, textalign=text.align_right)
+         color=sslLineColor, width=2, style=line.style_dashed)
+    clydeLabel := label.new(bar_index + 20, low60IPDA - ghostOffset, clydeState + " SSL",
+         style=label.style_none, textcolor=clydeColor, size=size.small, textalign=text.align_right)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LIQUIDITY SEQUENCING - Visual Lines + Distance Labels (Column +40)
@@ -4611,29 +4756,60 @@ if i_showComposite and barstate.islast and (compositeTier == TIER_1 or composite
 // DOL PROBABILITY DASHBOARD (GOD MODE INFO TABLE) - SLEEK ARCADE DESIGN
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Sleek dark arcade background colors
+// 🕹️ PAC-MAN ARCADE CABINET COLORS 🕹️
 var color tableBg = color.new(#0D0D0D, 5)
 var color tableBgAlt = color.new(#1A1A2E, 10)
-var color headerBg = color.new(#16213E, 0)
+var color headerBg = color.new(#000033, 0)          // Classic arcade blue-black
 var color accentLine = color.new(#0F3460, 0)
 var color textDim = color.new(#8892B0, 0)
 var color textBright = color.new(#E6F1FF, 0)
+var color arcadeYellow = color.new(#FFD700, 0)      // Pac-Man yellow
+var color arcadeBlue = color.new(#2121DE, 0)        // Maze blue
+var color powerPelletPink = color.new(#FFB8FF, 0)   // Power pellet
 
-var table infoTable = table.new(position.middle_right, 2, 22, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
+// Expanded table for arcade display (25 rows)
+var table infoTable = table.new(position.middle_right, 2, 25, bgcolor=tableBg, border_width=0, border_color=color.new(arcadeBlue, 50), frame_width=3, frame_color=color.new(arcadeBlue, 30))
 
 if i_showDOLTable and barstate.islast
-    // ═══ HEADER - Merged and centered ═══
-    probColor = compositeScore >= 70 ? i_bullColor : compositeScore >= 50 ? i_neutralColor : i_bearColor
-    headerText = "◉ ATLAS PRO " + str.tostring(compositeScore, "#") + "%"
-    table.cell(infoTable, 0, 0, headerText, text_color=i_pacmanColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 🕹️ ARCADE HEADER - Score Display
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Row 0: HIGH SCORE
+    highScoreText = "HIGH SCORE: " + str.tostring(highScore)
+    table.cell(infoTable, 0, 0, highScoreText, text_color=color.new(#FF0000, 0), text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 0, 1, 0)
 
-    // ═══ DIRECTION ROW - Main signal ═══
+    // Row 1: CURRENT SCORE with combo
+    comboText = comboMultiplier > 1 ? " x" + str.tostring(comboMultiplier) + "🔥" : ""
+    scoreText = "SCORE: " + str.tostring(arcadeScore) + comboText
+    scoreColor = comboMultiplier >= 4 ? powerPelletPink : comboMultiplier >= 2 ? arcadeYellow : textBright
+    table.cell(infoTable, 0, 1, scoreText, text_color=scoreColor, text_size=size.small, bgcolor=headerBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 1, 1, 1)
+
+    // Row 2: GAME STATE + LEVEL
+    gameStateText = gameState == "POWER_MODE" ? "⚡ POWER MODE ⚡" : gameState == "BONUS_STAGE" ? "🌟 BONUS STAGE 🌟" : gameState == "PLAYING" ? "🎮 PLAYING" : gameState == "READY" ? "▶ READY!" : "INSERT COIN"
+    gameStateBg = gameState == "POWER_MODE" ? color.new(#2121FF, 70) : gameState == "BONUS_STAGE" ? color.new(#FFD700, 70) : headerBg
+    gameStateColor = gameState == "POWER_MODE" ? #FFFFFF : gameState == "BONUS_STAGE" ? #000000 : gameState == "PLAYING" ? arcadeYellow : gameState == "READY" ? #00FF00 : textDim
+    levelText = "  LVL " + str.tostring(currentLevel)
+    table.cell(infoTable, 0, 2, gameStateText + levelText, text_color=gameStateColor, text_size=size.small, bgcolor=gameStateBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 2, 1, 2)
+
+    // Row 3: PAC-MAN VISUAL + FRUIT TARGET
+    pacmanDir = dolDirection == DIR_BULL ? "ᗧ" : dolDirection == DIR_BEAR ? "ᗤ" : "◯"
+    pelletTrail = "●●●●"
+    ghostIcon = dolDirection == DIR_BULL ? "👻" : dolDirection == DIR_BEAR ? "👻" : ""
+    fruitDisplay = currentFruit != "" ? " " + currentFruit : ""
+    pacmanRow = pacmanDir + pelletTrail + ghostIcon + fruitDisplay
+    table.cell(infoTable, 0, 3, pacmanRow, text_color=arcadeYellow, text_size=size.normal, bgcolor=color.new(#000000, 0), text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 3, 1, 3)
+
+    // Row 4: DIRECTION with arcade style
     dirText = dolDirection == DIR_BULL ? "▲ LONG" : dolDirection == DIR_BEAR ? "▼ SHORT" : "◆ NEUTRAL"
     dirColor = dolDirection == DIR_BULL ? i_bullColor : dolDirection == DIR_BEAR ? i_bearColor : i_neutralColor
     dirBg = dolDirection == DIR_BULL ? color.new(i_bullColor, 85) : dolDirection == DIR_BEAR ? color.new(i_bearColor, 85) : color.new(i_neutralColor, 90)
-    table.cell(infoTable, 0, 1, dirText, text_color=dirColor, text_size=size.normal, bgcolor=dirBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 1, 1, 1)
+    table.cell(infoTable, 0, 4, dirText, text_color=dirColor, text_size=size.normal, bgcolor=dirBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 4, 1, 4)
 
     // ═══ MTF BIAS (ICT Multi-Timeframe) ═══
     wArrow = mtfBiasW == 1 ? "↑" : mtfBiasW == -1 ? "↓" : "—"
@@ -4648,28 +4824,28 @@ if i_showDOLTable and barstate.islast
     mtfColor = mtfAligned ? (bullCount > bearCount ? i_bullColor : i_bearColor) : textDim
 
     mtfDisplay = "W" + wArrow + " D" + dArrow + " 1H" + h1Arrow + " 15m" + m15Arrow + " 5m" + m5Arrow
-    table.cell(infoTable, 0, 2, "MTF Bias", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 2, mtfDisplay, text_color=mtfColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
+    table.cell(infoTable, 0, 5, "MTF Bias", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 5, mtfDisplay, text_color=mtfColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
     // ═══ ZONE ═══
     zoneText = inPremium ? "PREMIUM ▲" : inDiscount ? "DISCOUNT ▼" : inOTE ? "◉ OTE" : "EQUILIBRIUM"
     zoneColor = inPremium ? i_bearColor : inDiscount ? i_bullColor : inOTE ? color.new(#00BCD4, 0) : textDim
     zoneBg = inOTE ? color.new(#00BCD4, 90) : tableBg
-    table.cell(infoTable, 0, 3, "Zone", text_color=textDim, text_size=size.tiny, bgcolor=zoneBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 3, zoneText, text_color=zoneColor, text_size=size.small, bgcolor=zoneBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 6, "Zone", text_color=textDim, text_size=size.tiny, bgcolor=zoneBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 6, zoneText, text_color=zoneColor, text_size=size.small, bgcolor=zoneBg, text_halign=text.align_right)
 
     // ═══ PATTERN NAME - Featured (5-Tier Colors) ═══
     patternColor = compositeTier == TIER_1 ? #00E676 : compositeTier == TIER_2 ? #69F0AE : compositeTier == TIER_3 ? #FFD740 : compositeTier == TIER_4 ? #FF9800 : #FF5252
     patternBg = compositeTier == TIER_1 ? color.new(#00E676, 88) : compositeTier == TIER_2 ? color.new(#69F0AE, 90) : tableBgAlt
     cleanPattern = str.replace_all(str.replace_all(str.replace_all(str.replace_all(str.replace_all(str.replace_all(patternName, "💎 ", ""), "🏆 ", ""), "⭐ ", ""), "🥈 ", ""), "🥉 ", ""), "⚠️ ", "")
-    table.cell(infoTable, 0, 4, cleanPattern, text_color=patternColor, text_size=size.small, bgcolor=patternBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 4, 1, 4)
+    table.cell(infoTable, 0, 7, cleanPattern, text_color=patternColor, text_size=size.small, bgcolor=patternBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 7, 1, 7)
 
     // ═══ TURTLE SOUP STAGE ═══
     tsText = tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? "◎ STALK" : tsStage == "TRAP" ? "◉ TRAP" : tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? "✓ CONFIRM" : tsStage == "INVALID" ? "✗ INVALID" : "—"
     tsColor = tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? i_bullColor : tsStage == "TRAP" ? i_liqColor : tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? i_neutralColor : textDim
-    table.cell(infoTable, 0, 5, "Turtle Soup", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 5, tsText, text_color=tsColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 8, "Turtle Soup", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 8, tsText, text_color=tsColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
     // ═══ AMD PHASE (Judas-Aware) ═══
     amdIcon = amdPhase == 1 ? "◐" : amdPhase == 2 ? "◉" : amdPhase == 3 ? "●" : "○"
@@ -4682,8 +4858,8 @@ if i_showDOLTable and barstate.islast
     amdDisplayColor = manipulationComplete ? (expectedDirection == 1 ? i_bullColor : i_bearColor) :
                       asianHighSwept ? i_bearColor : asianLowSwept ? i_bullColor : i_pacmanColor
     amdBg = manipulationComplete ? color.new(amdDisplayColor, 88) : tableBgAlt
-    table.cell(infoTable, 0, 6, "AMD", text_color=textDim, text_size=size.tiny, bgcolor=amdBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 6, amdIcon + " " + amdShortStatus, text_color=amdDisplayColor, text_size=size.small, bgcolor=amdBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 9, "AMD", text_color=textDim, text_size=size.tiny, bgcolor=amdBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 9, amdIcon + " " + amdShortStatus, text_color=amdDisplayColor, text_size=size.small, bgcolor=amdBg, text_halign=text.align_right)
 
     // ═══ SESSION / KILLZONE ═══
     sessName = asianSession ? "ASIA" : londonSession ? "LONDON" : nyAMSession ? "NY-AM" : nyPMSession ? "NY-PM" : "OFF"
@@ -4691,21 +4867,21 @@ if i_showDOLTable and barstate.islast
     kzIndicator = inSilverBullet ? " ◉ SB" : kzActive ? " ◉ KZ" : ""
     sessDisplay = sessName + kzIndicator
     sessKzColor = inSilverBullet ? color.new(#00E5FF, 0) : i_pacmanColor
-    table.cell(infoTable, 0, 7, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 7, sessDisplay, text_color=kzActive ? sessKzColor : textDim, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 10, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 10, sessDisplay, text_color=kzActive ? sessKzColor : textDim, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
     // ═══ CONFLUENCE ═══
     confDisplay = str.tostring(confluenceCount) + "/16"
     confColor = confluenceCount >= 10 ? #00E676 : confluenceCount >= 7 ? #69F0AE : confluenceCount >= 5 ? #FFD740 : textDim
-    table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 8, confDisplay, text_color=confColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
+    table.cell(infoTable, 0, 11, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 11, confDisplay, text_color=confColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
     // ═══ PRIMARY DOL TARGET ═══
     float pipMult2 = syminfo.mintick >= 0.01 ? 1 : 10
     float dolDist = not na(dolTarget) ? (dolTarget - close) / syminfo.mintick / pipMult2 : na
     dolTargetText = not na(dolTarget) ? str.tostring(dolTarget, format.mintick) + " (" + str.tostring(dolDist, "#") + "p)" : "—"
-    table.cell(infoTable, 0, 9, "DOL Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 9, dolTargetText, text_color=dirColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 12, "DOL Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 12, dolTargetText, text_color=dirColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
     // ═══ LIQUIDITY SEQUENCE (Next targets) ═══
     // Build target list based on direction
@@ -4728,41 +4904,50 @@ if i_showDOLTable and barstate.islast
             liqSeq := liqSeq + "LDN↓ "
     liqSeq := liqSeq == "" ? "—" : liqSeq
     liqSeqColor = dolDirection == DIR_BULL ? i_bullColor : dolDirection == DIR_BEAR ? i_bearColor : textDim
-    table.cell(infoTable, 0, 10, "Liq Path", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 10, liqSeq, text_color=liqSeqColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+    table.cell(infoTable, 0, 13, "Liq Path", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 13, liqSeq, text_color=liqSeqColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
 
-    // ═══ SWEPT LIQUIDITY ═══
+    // ═══ SWEPT LIQUIDITY (Ghost Eaten!) ═══
     sweptLiq = ""
+    ghostEatenCount = 0
     if pdhSwept
-        sweptLiq := sweptLiq + "P̶D̶H̶ "
+        sweptLiq := sweptLiq + "💨P̶D̶H̶ "
+        ghostEatenCount += 1
     if pdlSwept
-        sweptLiq := sweptLiq + "P̶D̶L̶ "
+        sweptLiq := sweptLiq + "💨P̶D̶L̶ "
+        ghostEatenCount += 1
     if pwhSwept
-        sweptLiq := sweptLiq + "P̶W̶H̶ "
+        sweptLiq := sweptLiq + "💨P̶W̶H̶ "
+        ghostEatenCount += 1
     if pwlSwept
-        sweptLiq := sweptLiq + "P̶W̶L̶ "
+        sweptLiq := sweptLiq + "💨P̶W̶L̶ "
+        ghostEatenCount += 1
     if londonHighSwept
-        sweptLiq := sweptLiq + "L̶D̶N̶↑ "
+        sweptLiq := sweptLiq + "💨L̶D̶N̶↑ "
+        ghostEatenCount += 1
     if londonLowSwept
-        sweptLiq := sweptLiq + "L̶D̶N̶↓ "
+        sweptLiq := sweptLiq + "💨L̶D̶N̶↓ "
+        ghostEatenCount += 1
     if asianHighSwept
-        sweptLiq := sweptLiq + "A̶S̶N̶↑ "
+        sweptLiq := sweptLiq + "💨A̶S̶N̶↑ "
+        ghostEatenCount += 1
     if asianLowSwept
-        sweptLiq := sweptLiq + "A̶S̶N̶↓ "
+        sweptLiq := sweptLiq + "💨A̶S̶N̶↓ "
+        ghostEatenCount += 1
     sweptLiq := sweptLiq == "" ? "None" : sweptLiq
-    table.cell(infoTable, 0, 11, "Swept", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 11, sweptLiq, text_color=color.new(#FF5252, 30), text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 14, "👻 Eaten", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 14, sweptLiq, text_color=color.new(#2121FF, 30), text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_right)
 
     // ═══ KEY FACTORS ═══
-    table.cell(infoTable, 0, 12, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 12, 1, 12)
+    table.cell(infoTable, 0, 15, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 15, 1, 15)
 
     // ═══ TIER INDICATOR BAR (5-Tier System) ═══
     tierLabel = compositeTier == TIER_1 ? "ELITE" : compositeTier == TIER_2 ? "PREMIUM" : compositeTier == TIER_3 ? "STRONG" : compositeTier == TIER_4 ? "MODERATE" : "WEAK"
     tierBar = compositeTier == TIER_1 ? "████████████ " + tierLabel : compositeTier == TIER_2 ? "██████████░░ " + tierLabel : compositeTier == TIER_3 ? "████████░░░░ " + tierLabel : compositeTier == TIER_4 ? "██████░░░░░░ " + tierLabel : "████░░░░░░░░ " + tierLabel
     tierColor = compositeTier == TIER_1 ? #00E676 : compositeTier == TIER_2 ? #69F0AE : compositeTier == TIER_3 ? #FFD740 : compositeTier == TIER_4 ? #FF9800 : #FF5252
-    table.cell(infoTable, 0, 13, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 13, 1, 13)
+    table.cell(infoTable, 0, 16, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 16, 1, 16)
 
     // ═══ TIME WINDOW (Silver Bullet + Macro) ═══
     timeWindow = inSilverBullet ? "◉ SILVER BULLET " + sbPhase :
@@ -4770,14 +4955,14 @@ if i_showDOLTable and barstate.islast
                  isPowerHour ? "◉ POWER HOUR" : "—"
     timeColor = sbPrime ? #00E5FF : inSilverBullet ? color.new(#00E5FF, 30) : isMacroTime ? #FFD740 : isPowerHour ? #FF9800 : textDim
     timeBg = sbPrime ? color.new(#00E5FF, 85) : tableBg
-    table.cell(infoTable, 0, 14, "Time", text_color=textDim, text_size=size.tiny, bgcolor=timeBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 14, timeWindow, text_color=timeColor, text_size=size.small, bgcolor=timeBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 17, "Time", text_color=textDim, text_size=size.tiny, bgcolor=timeBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 17, timeWindow, text_color=timeColor, text_size=size.small, bgcolor=timeBg, text_halign=text.align_right)
 
     // ═══ DAY TYPE (Seek & Destroy etc.) ═══
     dayType = isSeekDestroyDay ? "⚡ SEEK & DESTROY" : isExpansionDay ? "📈 EXPANSION" : isAccumulationDay ? "📊 ACCUMULATION" : "—"
     dayTypeColor = isSeekDestroyDay ? #FF9800 : isExpansionDay ? #69F0AE : isAccumulationDay ? #00BCD4 : textDim
-    table.cell(infoTable, 0, 15, "Day", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 15, dayType, text_color=dayTypeColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
+    table.cell(infoTable, 0, 18, "Day", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 18, dayType, text_color=dayTypeColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
     // ═══ PD ARRAY STATUS (Suspension Block, VI, Liquidity Void, NDOG, ORG) ═══
     // Build PD Array status display
@@ -4805,43 +4990,44 @@ if i_showDOLTable and barstate.islast
     pdArrayDisplay = pdArrayCount2 > 0 ? pdArrayStatus : "—"
     pdArrayColor = pdArrayCount2 >= 3 ? #00E676 : pdArrayCount2 >= 2 ? #69F0AE : pdArrayCount2 >= 1 ? #FFD740 : textDim
     pdArrayBg = hasSuspensionBlock ? color.new(#00E676, 85) : tableBg
-    table.cell(infoTable, 0, 16, "PD Arrays", text_color=textDim, text_size=size.tiny, bgcolor=pdArrayBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 16, pdArrayDisplay, text_color=pdArrayColor, text_size=size.tiny, bgcolor=pdArrayBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 19, "PD Arrays", text_color=textDim, text_size=size.tiny, bgcolor=pdArrayBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 19, pdArrayDisplay, text_color=pdArrayColor, text_size=size.tiny, bgcolor=pdArrayBg, text_halign=text.align_right)
 
-    // ═══ R:R DISPLAY (if Stop Loss calculated) ═══
-    rrDisplayText = not na(stopLoss) ? "SL:" + str.tostring(stopLoss, format.mintick) + " R:R " + str.tostring(riskReward, "#.#") : "—"
+    // ═══ R:R DISPLAY with Fruit Target ═══
+    fruitPoints = currentFruit == "🔑" ? "5000" : currentFruit == "🔔" ? "3000" : currentFruit == "🍇" ? "1000" : currentFruit == "🍎" ? "700" : currentFruit == "🍊" ? "500" : currentFruit == "🍓" ? "300" : "100"
+    rrDisplayText = not na(stopLoss) ? currentFruit + " R:R " + str.tostring(riskReward, "#.#") + " (+" + fruitPoints + "pts)" : "—"
     rrDisplayColor = riskReward >= 3 ? #00E676 : riskReward >= 2 ? #69F0AE : riskReward >= 1 ? #FFD740 : textDim
-    table.cell(infoTable, 0, 17, "Risk", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 17, rrDisplayText, text_color=rrDisplayColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+    table.cell(infoTable, 0, 20, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 20, rrDisplayText, text_color=rrDisplayColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
 
     // ═══ MARKET CONDITION (High/Low Resistance Liquidity Run) ═══
     mktCondText = isJaggedMarket ? "⚡ HIGH RES" : isSmoothMarket ? "🌊 LOW RES" : "— NEUTRAL"
     mktCondColor = isJaggedMarket ? #FF9800 : isSmoothMarket ? #00E676 : textDim
     mktCondBg = isJaggedMarket ? color.new(#FF9800, 90) : isSmoothMarket ? color.new(#00E676, 90) : tableBg
-    table.cell(infoTable, 0, 18, "Market", text_color=textDim, text_size=size.tiny, bgcolor=mktCondBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 18, mktCondText, text_color=mktCondColor, text_size=size.tiny, bgcolor=mktCondBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 21, "Market", text_color=textDim, text_size=size.tiny, bgcolor=mktCondBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 21, mktCondText, text_color=mktCondColor, text_size=size.tiny, bgcolor=mktCondBg, text_halign=text.align_right)
 
     // ═══ TIME RISK (ICT's Weekly Rhythm) ═══
     timeRiskText = timeRiskReason != "" ? timeRiskReason + " " + str.tostring(timeRiskMultiplier, "#.#") + "x" : "—"
     timeRiskColor = isHighProbTime ? #00E676 : isLowProbTime ? #FF5252 : textDim
     timeRiskBg = isHighProbTime ? color.new(#00E676, 90) : isLowProbTime ? color.new(#FF5252, 90) : tableBgAlt
-    table.cell(infoTable, 0, 19, "Time Risk", text_color=textDim, text_size=size.tiny, bgcolor=timeRiskBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 19, timeRiskText, text_color=timeRiskColor, text_size=size.tiny, bgcolor=timeRiskBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 22, "Time Risk", text_color=textDim, text_size=size.tiny, bgcolor=timeRiskBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 22, timeRiskText, text_color=timeRiskColor, text_size=size.tiny, bgcolor=timeRiskBg, text_halign=text.align_right)
 
     // ═══ DISCOUNT SENSITIVITY ═══
     sensText = discountSensitivity ? "◉ SENS " + str.tostring(sensitivityCount) + " conf" : "—"
     sensColor = discountSensitivity ? #00E676 : textDim
     sensBg = discountSensitivity ? color.new(#00E676, 85) : tableBg
-    table.cell(infoTable, 0, 20, "Sensitivity", text_color=textDim, text_size=size.tiny, bgcolor=sensBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 20, sensText, text_color=sensColor, text_size=size.tiny, bgcolor=sensBg, text_halign=text.align_right)
+    table.cell(infoTable, 0, 23, "Sensitivity", text_color=textDim, text_size=size.tiny, bgcolor=sensBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 23, sensText, text_color=sensColor, text_size=size.tiny, bgcolor=sensBg, text_halign=text.align_right)
 
-    // ═══ TAKE THE TRADE SIGNAL ═══
+    // ═══ TAKE THE TRADE SIGNAL (POWER PELLET CONSUMED!) ═══
     takeItActive = takeTradeSignalBull or takeTradeSignalBear
-    takeItText = takeItActive ? "🚀 TAKE THE TRADE!" : "—"
-    takeItColor = takeItActive ? #00FF00 : textDim
-    takeItBg = takeItActive ? color.new(#00FF00, 80) : headerBg
-    table.cell(infoTable, 0, 21, takeItText, text_color=takeItColor, text_size=size.small, bgcolor=takeItBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 21, 1, 21)
+    takeItText = powerModeActive ? "⚡ POWER MODE! EAT THE GHOSTS! ⚡" : takeItActive ? "🚀 TAKE THE TRADE!" : "—"
+    takeItColor = powerModeActive ? #FFFFFF : takeItActive ? #00FF00 : textDim
+    takeItBg = powerModeActive ? color.new(#2121FF, 50) : takeItActive ? color.new(#00FF00, 80) : headerBg
+    table.cell(infoTable, 0, 24, takeItText, text_color=takeItColor, text_size=size.small, bgcolor=takeItBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 24, 1, 24)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // "TAKE THE TRADE" VISUAL SIGNAL
