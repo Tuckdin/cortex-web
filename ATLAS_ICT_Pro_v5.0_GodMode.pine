@@ -725,8 +725,8 @@ bullishOB = close[1] < open[1] and displacementUp and close > high[1]
 bearishOB = close[1] > open[1] and displacementDown and close < low[1]
 
 // ICT-style Order Block colors (blue for bullish, orange for bearish - per ICT videos)
-obBullColor = #A3C4F3  // Pastel blue
-obBearColor = #FFCB9A  // Pastel peach
+obBullColor = #90CAF9  // Pastel blue
+obBearColor = #FFAB91  // Pastel coral/orange
 
 // Create and manage Order Blocks - ICT style with labels
 if bullishOB and i_showOB
@@ -850,8 +850,8 @@ minFVGSize = i_fvgMinSize * f_tickSize()
 
 // ICT-style FVG colors (gold/amber for visibility)
 // ICT-style FVG colors (pink - per ICT videos)
-fvgBullColor = #FFB5D0  // Pastel pink for bullish FVG
-fvgBearColor = #FFA5C9  // Pastel rose for bearish FVG
+fvgBullColor = #FFE082  // Pastel gold/amber for bullish FVG
+fvgBearColor = #F48FB1  // Pastel magenta for bearish FVG
 
 // Create FVGs - ICT style with labels
 if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
@@ -912,9 +912,9 @@ f_updateFVGMitigation(bearFVGs, false)
 var array<FVG> bullIFVGs = array.new<FVG>()
 var array<FVG> bearIFVGs = array.new<FVG>()
 
-// Pastel IFVG colors (soft purple - inverted zones)
-ifvgBearClr = #D4A5E8  // Pastel purple for bearish IFVG
-ifvgBullClr = #E1BEE7  // Pastel lavender for bullish IFVG
+// Pastel IFVG colors (teal/cyan - distinct from FVG)
+ifvgBearClr = #80DEEA  // Pastel cyan for bearish IFVG
+ifvgBullClr = #A5D6A7  // Pastel green for bullish IFVG
 
 // Check for IFVG creation from mitigated FVGs
 f_checkIFVG(array<FVG> fvgs, array<FVG> ifvgs, bool wasBull) =>
@@ -1286,8 +1286,8 @@ bullishRejection = i_showRejBlock and totalRange > 0 and lowerWick / totalRange 
 bearishRejection = i_showRejBlock and totalRange > 0 and upperWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close < open and inPremium
 
 // ICT-style Rejection Block colors (green/red - per ICT discount/premium)
-rbBullColor = #B8F5CD  // Pastel mint for bullish rejection (discount)
-rbBearColor = #FFABAB  // Pastel coral for bearish rejection (premium)
+rbBullColor = #C5E1A5  // Pastel lime for bullish rejection (discount)
+rbBearColor = #EF9A9A  // Pastel red for bearish rejection (premium)
 rbDotsColor = #FFEB3B  // Pac-Man yellow for strength dots
 
 // RB Strength scoring function
@@ -2050,21 +2050,21 @@ if i_showOTE and barstate.islast
     float ote705 = rangeLow + rangeSize * 0.705
     float ote79 = rangeLow + rangeSize * 0.79
 
-    // Draw dashed lines for each OTE level
-    oteLine62 := line.new(bar_index - 30, ote62, bar_index + 10, ote62,
+    // Draw dashed lines for each OTE level - extended for visibility
+    oteLine62 := line.new(bar_index - 40, ote62, bar_index + 25, ote62,
          color=color.new(oteLineColor, 40), width=1, style=line.style_dashed)
-    oteLine705 := line.new(bar_index - 30, ote705, bar_index + 10, ote705,
+    oteLine705 := line.new(bar_index - 40, ote705, bar_index + 25, ote705,
          color=color.new(oteLineColor, 20), width=2, style=line.style_dashed)
-    oteLine79 := line.new(bar_index - 30, ote79, bar_index + 10, ote79,
+    oteLine79 := line.new(bar_index - 40, ote79, bar_index + 25, ote79,
          color=color.new(oteLineColor, 40), width=1, style=line.style_dashed)
 
-    // Labels for OTE levels (70.5% brighter but same size)
-    oteLabel62 := label.new(bar_index + 11, ote62, "62%",
-         style=label.style_none, textcolor=color.new(oteLineColor, 50), size=size.tiny)
-    oteLabel705 := label.new(bar_index + 11, ote705, "━ OTE 70.5% ━",
+    // Labels for OTE levels - positioned right at line end
+    oteLabel62 := label.new(bar_index + 26, ote62, "62%",
+         style=label.style_none, textcolor=color.new(oteLineColor, 40), size=size.tiny)
+    oteLabel705 := label.new(bar_index + 26, ote705, "OTE 70.5%",
          style=label.style_none, textcolor=oteLineColor, size=size.tiny)
-    oteLabel79 := label.new(bar_index + 11, ote79, "79%",
-         style=label.style_none, textcolor=color.new(oteLineColor, 50), size=size.tiny)
+    oteLabel79 := label.new(bar_index + 26, ote79, "79%",
+         style=label.style_none, textcolor=color.new(oteLineColor, 40), size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PREMIUM/DISCOUNT ZONES - Subtle reference lines
@@ -2108,8 +2108,8 @@ if barstate.islast
             float l = array.get(nwogLows, i)
             float ce = array.get(nwogCEs, i)
 
-            // Pastel blue for NWOG - progressive fading for older weeks
-            nwogColor = #B3E0FF  // Pastel sky blue
+            // Pastel periwinkle for NWOG - progressive fading for older weeks
+            nwogColor = #B39DDB  // Pastel purple/periwinkle
             int fadeLevel = 0 + (i * 15)  // 0, 15, 30, 45, 60 for 5 weeks
             int bgFade = 70 + (i * 5)     // 70, 75, 80, 85, 90 for 5 weeks
             fadeLevel := math.min(fadeLevel, 70)
@@ -2139,7 +2139,7 @@ if barstate.islast
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var box orgBox = na
-gapColor = #FFB5D0  // Pastel pink for Opening Range Gap
+gapColor = #FFCC80  // Pastel orange for Opening Range Gap
 
 if hasORG and not na(orgHigh) and not na(orgLow) and barstate.islast
     if not na(orgBox)
@@ -2210,16 +2210,16 @@ if i_showPacMan and barstate.islast
     if not na(sslLine)
         line.delete(sslLine)
 
-    // BSL - Cherries on both sides 🍒
-    bslLine := line.new(bar_index - 20, high60IPDA, bar_index + 5, high60IPDA,
-         color=color.new(#FF5252, 40), width=2, style=line.style_dashed)
-    cherryHighLabel := label.new(bar_index + 6, high60IPDA, "🍒 BSL 🍒",
+    // BSL - Cherries extended out past line
+    bslLine := line.new(bar_index - 30, high60IPDA, bar_index + 15, high60IPDA,
+         color=color.new(#FF5252, 30), width=2, style=line.style_dashed)
+    cherryHighLabel := label.new(bar_index + 20, high60IPDA, "🍒 BSL 🍒",
          style=label.style_none, textcolor=color.new(#FF5252, 0), size=size.normal)
 
-    // SSL - Cherries on both sides 🍒
-    sslLine := line.new(bar_index - 20, low60IPDA, bar_index + 5, low60IPDA,
-         color=color.new(#69F0AE, 40), width=2, style=line.style_dashed)
-    cherryLowLabel := label.new(bar_index + 6, low60IPDA, "🍒 SSL 🍒",
+    // SSL - Cherries extended out past line
+    sslLine := line.new(bar_index - 30, low60IPDA, bar_index + 15, low60IPDA,
+         color=color.new(#69F0AE, 30), width=2, style=line.style_dashed)
+    cherryLowLabel := label.new(bar_index + 20, low60IPDA, "🍒 SSL 🍒",
          style=label.style_none, textcolor=color.new(#69F0AE, 0), size=size.normal)
 
 // ═══════════════════════════════════════════════════════════════════════════════
