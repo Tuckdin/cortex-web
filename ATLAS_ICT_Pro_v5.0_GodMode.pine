@@ -2604,7 +2604,8 @@ if i_showDOL and i_showPacMan and barstate.islast
                     array.set(wpStrength, j + 1, tempStr)
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // DRAW MULTI-WAYPOINT PATH
+    // DRAW REALISTIC ZIGZAG PATH WITH PULLBACKS
+    // Price doesn't go straight - it retraces to OTE before continuing
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Limit to max 5 waypoints for clean visualization
@@ -2614,10 +2615,15 @@ if i_showDOL and i_showPacMan and barstate.islast
         // Starting point
         prevX = bar_index + 2
         prevY = close
-        xSpacing = 12  // bars between waypoints
+        xSpacingToTarget = 8   // bars to reach target
+        xSpacingPullback = 4   // bars for pullback
+
+        // OTE retracement levels (Fib 0.62 - 0.79)
+        oteRetrace = 0.705  // Middle of OTE zone
 
         // Choose colors based on setup quality
         pathColor = tradeReady ? pacmanYellow : highConf ? pacmanGold : color.new(pacmanCyan, 40)
+        pullbackColor = tradeReady ? color.new(pacmanYellow, 40) : highConf ? color.new(pacmanGold, 50) : color.new(pacmanCyan, 60)
         pathWidth = tradeReady ? 2 : highConf ? 2 : 1
         pathStyle = tradeReady ? line.style_solid : line.style_dashed
 
@@ -2628,43 +2634,65 @@ if i_showDOL and i_showPacMan and barstate.islast
                  style=label.style_none, textcolor=pacmanYellow, size=size.large)
             array.push(dolPathLabels, pacmanLabel)
 
-        // Draw path through each waypoint
+        // Draw realistic zigzag path through each waypoint
         for i = 0 to maxWaypoints - 1
             wpLevel = array.get(wpLevels, i)
             wpName = array.get(wpNames, i)
             wpStr = array.get(wpStrength, i)
 
-            // Calculate position for this waypoint
-            wpX = prevX + xSpacing
-            wpY = wpLevel
+            // Calculate the move from previous point to this target
+            moveSize = wpLevel - prevY
 
-            // Draw line segment from previous point to this waypoint
-            newLine = line.new(prevX, prevY, wpX, wpY,
+            // ═══ STEP 1: Draw line from previous point TO the target ═══
+            targetX = prevX + xSpacingToTarget
+            targetY = wpLevel
+
+            targetLine = line.new(prevX, prevY, targetX, targetY,
                  color=pathColor, width=pathWidth, style=pathStyle)
-            array.push(dolPathLines, newLine)
+            array.push(dolPathLines, targetLine)
 
-            // Draw waypoint marker
+            // Draw waypoint marker at target
             if tradeReady
-                // Large yellow dots for trade ready
                 dotSize = wpStr >= 80 ? size.large : wpStr >= 50 ? size.normal : size.small
-                dotLabel = label.new(wpX, wpY, "●",
+                dotLabel = label.new(targetX, targetY, "●",
                      style=label.style_none, textcolor=pacmanYellow, size=dotSize)
                 array.push(dolPathLabels, dotLabel)
             else
-                // Smaller dots for other states
-                dotLabel = label.new(wpX, wpY, "•",
+                dotLabel = label.new(targetX, targetY, "•",
                      style=label.style_none, textcolor=pathColor, size=size.small)
                 array.push(dolPathLabels, dotLabel)
 
-            // Add waypoint name label (below for bull, above for bear)
-            labelY = dolDirection == DIR_BULL ? wpY * 0.9998 : wpY * 1.0002
-            nameLabel = label.new(wpX, labelY, wpName,
+            // Add waypoint name label
+            labelY = dolDirection == DIR_BULL ? targetY * 0.9998 : targetY * 1.0002
+            nameLabel = label.new(targetX, labelY, wpName,
                  style=label.style_none, textcolor=color.new(pathColor, 20), size=size.tiny, textalign=text.align_center)
             array.push(dolPathLabels, nameLabel)
 
-            // Update previous point for next segment
-            prevX := wpX
-            prevY := wpY
+            // ═══ STEP 2: Draw PULLBACK from target (if not last waypoint) ═══
+            if i < maxWaypoints - 1
+                // Calculate pullback level (OTE retracement of the move just made)
+                // For bullish: pullback DOWN from target
+                // For bearish: pullback UP from target
+                pullbackY = targetY - (moveSize * oteRetrace)
+                pullbackX = targetX + xSpacingPullback
+
+                // Draw pullback line (thinner, more transparent)
+                pullbackLine = line.new(targetX, targetY, pullbackX, pullbackY,
+                     color=pullbackColor, width=1, style=line.style_dotted)
+                array.push(dolPathLines, pullbackLine)
+
+                // Small pullback marker
+                pbMarker = label.new(pullbackX, pullbackY, "◦",
+                     style=label.style_none, textcolor=pullbackColor, size=size.tiny)
+                array.push(dolPathLabels, pbMarker)
+
+                // Update previous point to pullback location for next segment
+                prevX := pullbackX
+                prevY := pullbackY
+            else
+                // Last waypoint - no pullback needed
+                prevX := targetX
+                prevY := targetY
 
         // Add final target marker
         if tradeReady
