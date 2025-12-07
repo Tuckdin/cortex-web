@@ -1363,17 +1363,15 @@ totalRange = high - low
 minWickRatio = 0.6  // Wick must be 60%+ of total range
 minWickATR = atrVal * 0.5  // Minimum wick size
 
-// Bullish Rejection Block: Long lower wick rejecting from discount
+// Bullish Rejection Block: Long lower wick rejecting (discount check done later)
 bullishRejBlock = lowerWick > totalRange * minWickRatio and
                   lowerWick > minWickATR and
-                  close > open and
-                  inDiscount
+                  close > open
 
-// Bearish Rejection Block: Long upper wick rejecting from premium
+// Bearish Rejection Block: Long upper wick rejecting (premium check done later)
 bearishRejBlock = upperWick > totalRange * minWickRatio and
                   upperWick > minWickATR and
-                  close < open and
-                  inPremium
+                  close < open
 
 // Store rejection block levels for reference
 var float lastBullRejLevel = na
@@ -1530,17 +1528,9 @@ type RejBlock
 
 var array<RejBlock> rejBlocks = array.new<RejBlock>()
 
-// Calculate candle metrics
-bodySize = math.abs(close - open)
-upperWick = high - math.max(close, open)
-lowerWick = math.min(close, open) - low
-totalRange = high - low
-
-// Rejection criteria: wick > 60% of range, body < 40% of range
+// Rejection criteria thresholds (candle metrics already calculated above)
 wickThreshold = 0.6
 bodyThreshold = 0.4
-
-// NOTE: Rejection Block detection moved after Premium/Discount zone calculation
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        LIQUIDITY DETECTION                                     ║
@@ -1864,25 +1854,9 @@ rejBlockColor = #CE93D8  // Light purple for rejection blocks
 // 1. Long wick (60%+ of candle range)
 // 2. Close against the wick direction (rejection)
 // 3. In premium or discount zone
+// Note: bullishRejBlock/bearishRejBlock already defined earlier in REJECTION BLOCK DETECTION section
 
-candleRange = high - low
-upperWick = high - math.max(open, close)
-lowerWick = math.min(open, close) - low
-bodySize = math.abs(close - open)
-
-// Bullish Rejection Block: Down close candle with long lower wick (rejected low)
-bullishRejBlock = close < open and                           // Down close
-                  lowerWick > candleRange * 0.6 and          // Long lower wick (60%+)
-                  candleRange > ta.atr(14) * 0.5 and        // Significant candle
-                  close < (high + low) / 2                   // Close in lower half
-
-// Bearish Rejection Block: Up close candle with long upper wick (rejected high)
-bearishRejBlock = close > open and                           // Up close
-                  upperWick > candleRange * 0.6 and          // Long upper wick (60%+)
-                  candleRange > ta.atr(14) * 0.5 and        // Significant candle
-                  close > (high + low) / 2                   // Close in upper half
-
-// Create Rejection Blocks
+// Create Rejection Blocks (using definitions from above)
 if bullishRejBlock and i_showRejBlock
     newRB = RejectionBlock.new(close, high, low, bar_index, DIR_BULL, false,
          box.new(bar_index - 1, close, bar_index + 15, low,
@@ -3729,13 +3703,16 @@ else
 // - Has valid stop loss and target
 // - Not already tracking an active trade
 
-newSetupGenerated = (compositeTier <= TIER_3) and isAnyTrigger and not na(stopLoss) and not na(dolTarget) and not hasActiveTrade and barstate.isconfirmed
+// Calculate stop loss for tracking (using swing levels)
+trackingStopLoss = dolDirection == DIR_BULL ? lastSwingLow : lastSwingHigh
+
+newSetupGenerated = (compositeTier <= TIER_3) and isAnyTrigger and not na(trackingStopLoss) and not na(dolTarget) and not hasActiveTrade and barstate.isconfirmed
 
 if newSetupGenerated
     // Record the new setup
     hasActiveTrade := true
     activeEntry := close
-    activeStop := stopLoss
+    activeStop := trackingStopLoss
     activeTarget := dolTarget
     activeDirection := dolDirection
     activeBar := bar_index
