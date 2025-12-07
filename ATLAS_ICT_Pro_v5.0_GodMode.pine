@@ -259,6 +259,46 @@ type SwingPoint
     int bar
     int direction
 
+// Volume Imbalance Type (VI)
+type VolumeImbalance
+    float top
+    float bottom
+    int startBar
+    int direction  // 1 = bullish (gap up), -1 = bearish (gap down)
+    bool filled
+    box visual
+
+// Suspension Block Type (Single candle with VI at both ends)
+type SuspensionBlock
+    float top        // Volume Imbalance HIGH
+    float bottom     // Volume Imbalance LOW
+    float bodyHigh   // Candle body high
+    float bodyLow    // Candle body low
+    int startBar
+    int direction    // 1 = bullish (up close), -1 = bearish (down close)
+    bool mitigated
+    bool inverted    // Becomes inversion when traded through
+    box visual
+    label nameLabel
+
+// Liquidity Void Type (Large single candle with no overlapping wicks)
+type LiquidityVoid
+    float top
+    float bottom
+    int startBar
+    int direction
+    bool filled
+    box visual
+
+// Opening Gap Type (NDOG, ORG, etc.)
+type OpeningGap
+    float top
+    float bottom
+    int startBar
+    string gapType   // "NDOG", "ORG", "NWOG"
+    bool filled
+    box visual
+
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        GLOBAL VARIABLES                                        ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -278,6 +318,34 @@ var array<LiqLevel> sslLevels = array.new<LiqLevel>()
 // Swing Points
 var array<SwingPoint> swingHighs = array.new<SwingPoint>()
 var array<SwingPoint> swingLows = array.new<SwingPoint>()
+
+// Arrays for Volume Imbalances
+var array<VolumeImbalance> bullVIs = array.new<VolumeImbalance>()
+var array<VolumeImbalance> bearVIs = array.new<VolumeImbalance>()
+
+// Arrays for Suspension Blocks
+var array<SuspensionBlock> bullSuspBlocks = array.new<SuspensionBlock>()
+var array<SuspensionBlock> bearSuspBlocks = array.new<SuspensionBlock>()
+
+// Arrays for Liquidity Voids
+var array<LiquidityVoid> bullLiqVoids = array.new<LiquidityVoid>()
+var array<LiquidityVoid> bearLiqVoids = array.new<LiquidityVoid>()
+
+// Arrays for Opening Gaps (NDOG, ORG)
+var array<OpeningGap> openingGaps = array.new<OpeningGap>()
+
+// NDOG (New Day Opening Gap)
+var float ndogHigh = na
+var float ndogLow = na
+var float ndogCE = na
+var bool ndogFilled = false
+
+// ORG (Opening Range Gap) - First 5 min of session
+var float orgHigh = na
+var float orgLow = na
+var float orgCE = na
+var bool orgFilled = false
+var bool orgTracking = false
 
 // Market Structure
 var int msDirection = 0
@@ -1252,6 +1320,248 @@ if hasEQL and i_showEQL
     array.push(sslLevels, newLiq)
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        VOLUME IMBALANCE (VI) DETECTION                         ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+// Volume Imbalance: Gap between consecutive candle bodies (not wicks)
+// Bullish VI: Current candle body low > previous candle body high
+// Bearish VI: Current candle body high < previous candle body low
+
+viColor = #B388FF  // Pastel purple for VI
+
+// Body calculations
+currBodyHigh = math.max(close, open)
+currBodyLow = math.min(close, open)
+prevBodyHigh = math.max(close[1], open[1])
+prevBodyLow = math.min(close[1], open[1])
+
+// Minimum VI size (to filter noise)
+minVISize = atrVal * 0.3
+
+// Bullish VI: Gap up between bodies
+bullishVI = currBodyLow > prevBodyHigh and (currBodyLow - prevBodyHigh) >= minVISize
+viTopBull = currBodyLow
+viBottomBull = prevBodyHigh
+
+// Bearish VI: Gap down between bodies
+bearishVI = currBodyHigh < prevBodyLow and (prevBodyLow - currBodyHigh) >= minVISize
+viTopBear = prevBodyLow
+viBottomBear = currBodyHigh
+
+// Create VI boxes
+if bullishVI and i_showFVG
+    newVI = VolumeImbalance.new(viTopBull, viBottomBull, bar_index, DIR_BULL, false,
+         box.new(bar_index - 1, viTopBull, bar_index + 10, viBottomBull,
+                 border_color=viColor, bgcolor=color.new(viColor, 85),
+                 border_width=1, border_style=line.style_dotted,
+                 text="VI", text_color=viColor, text_size=size.tiny, text_halign=text.align_right))
+    if array.size(bullVIs) >= 10
+        oldVI = array.shift(bullVIs)
+        if not na(oldVI.visual)
+            box.delete(oldVI.visual)
+    array.push(bullVIs, newVI)
+
+if bearishVI and i_showFVG
+    newVI = VolumeImbalance.new(viTopBear, viBottomBear, bar_index, DIR_BEAR, false,
+         box.new(bar_index - 1, viTopBear, bar_index + 10, viBottomBear,
+                 border_color=viColor, bgcolor=color.new(viColor, 85),
+                 border_width=1, border_style=line.style_dotted,
+                 text="VI", text_color=viColor, text_size=size.tiny, text_halign=text.align_right))
+    if array.size(bearVIs) >= 10
+        oldVI = array.shift(bearVIs)
+        if not na(oldVI.visual)
+            box.delete(oldVI.visual)
+    array.push(bearVIs, newVI)
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        SUSPENSION BLOCK DETECTION                              ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+// Suspension Block: Single candle with Volume Imbalance at BOTH ends
+// "Being suspended between two volume imbalances" - ICT
+// Extremely powerful PD Array - acts like FVG but single candle
+
+suspBlockBullColor = #81D4FA  // Light blue for bullish
+suspBlockBearColor = #FFAB91  // Light coral for bearish
+
+// Check for VI at both ends of a single candle
+// VI HIGH: Gap between this candle's body high and next candle's body low
+// VI LOW: Gap between previous candle's body high and this candle's body low
+
+// For detection, we look back one bar to confirm the candle[1] has VI at both ends
+prevCandleBodyHigh = math.max(close[1], open[1])
+prevCandleBodyLow = math.min(close[1], open[1])
+prevPrevBodyHigh = math.max(close[2], open[2])
+currBodyLowForSusp = math.min(close, open)
+currBodyHighForSusp = math.max(close, open)
+
+// VI at LOW end of candle[1]: prevPrev body high < candle[1] body low
+viAtLow = prevPrevBodyHigh < prevCandleBodyLow and (prevCandleBodyLow - prevPrevBodyHigh) > minVISize * 0.5
+
+// VI at HIGH end of candle[1]: candle[1] body high < current body low (for bullish)
+// OR current body high < candle[1] body low (for bearish confirmation after)
+viAtHighBull = prevCandleBodyHigh < currBodyLowForSusp and (currBodyLowForSusp - prevCandleBodyHigh) > minVISize * 0.5
+viAtHighBear = currBodyHighForSusp < prevCandleBodyLow and (prevCandleBodyLow - currBodyHighForSusp) > minVISize * 0.5
+
+// Bullish Suspension Block: Up close candle with VI at both ends
+bullishSuspBlock = viAtLow and viAtHighBull and close[1] > open[1]
+suspBlockTopBull = currBodyLowForSusp  // VI HIGH level
+suspBlockBottomBull = prevPrevBodyHigh  // VI LOW level
+
+// Bearish Suspension Block: Down close candle with VI at both ends
+bearishSuspBlock = viAtLow and viAtHighBear and close[1] < open[1]
+suspBlockTopBear = prevCandleBodyLow  // Higher VI level
+suspBlockBottomBear = currBodyHighForSusp  // Lower VI level
+
+// Create Suspension Block boxes
+if bullishSuspBlock and i_showFVG
+    newSB = SuspensionBlock.new(suspBlockTopBull, suspBlockBottomBull, prevCandleBodyHigh, prevCandleBodyLow,
+         bar_index - 1, DIR_BULL, false, false,
+         box.new(bar_index - 2, suspBlockTopBull, bar_index + 15, suspBlockBottomBull,
+                 border_color=suspBlockBullColor, bgcolor=color.new(suspBlockBullColor, 75),
+                 border_width=2, border_style=line.style_solid,
+                 text="SUSP", text_color=suspBlockBullColor, text_size=size.tiny, text_halign=text.align_right),
+         label.new(bar_index - 1, suspBlockTopBull, "⬡",
+                   style=label.style_none, textcolor=suspBlockBullColor, size=size.small))
+    if array.size(bullSuspBlocks) >= 5
+        oldSB = array.shift(bullSuspBlocks)
+        if not na(oldSB.visual)
+            box.delete(oldSB.visual)
+        if not na(oldSB.nameLabel)
+            label.delete(oldSB.nameLabel)
+    array.push(bullSuspBlocks, newSB)
+
+if bearishSuspBlock and i_showFVG
+    newSB = SuspensionBlock.new(suspBlockTopBear, suspBlockBottomBear, prevCandleBodyHigh, prevCandleBodyLow,
+         bar_index - 1, DIR_BEAR, false, false,
+         box.new(bar_index - 2, suspBlockTopBear, bar_index + 15, suspBlockBottomBear,
+                 border_color=suspBlockBearColor, bgcolor=color.new(suspBlockBearColor, 75),
+                 border_width=2, border_style=line.style_solid,
+                 text="SUSP", text_color=suspBlockBearColor, text_size=size.tiny, text_halign=text.align_right),
+         label.new(bar_index - 1, suspBlockTopBear, "⬡",
+                   style=label.style_none, textcolor=suspBlockBearColor, size=size.small))
+    if array.size(bearSuspBlocks) >= 5
+        oldSB = array.shift(bearSuspBlocks)
+        if not na(oldSB.visual)
+            box.delete(oldSB.visual)
+        if not na(oldSB.nameLabel)
+            label.delete(oldSB.nameLabel)
+    array.push(bearSuspBlocks, newSB)
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        LIQUIDITY VOID DETECTION                                ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+// Liquidity Void: Large displacement candle where price moved too fast
+// Creates an area price will likely return to fill
+
+liqVoidColor = #CE93D8  // Pastel purple
+
+// Large candle detection (> 2x ATR)
+largeCandle = totalRange > atrVal * 2
+
+// Check if the large candle has no overlapping wicks from surrounding candles
+// This creates a "void" in price delivery
+noOverlapHigh = high[1] < low and high[2] < low  // Gap up void
+noOverlapLow = low[1] > high and low[2] > high   // Gap down void
+
+// Bullish Liquidity Void: Large up candle with gap
+bullishLiqVoid = largeCandle and close > open and noOverlapHigh
+liqVoidTopBull = low
+liqVoidBottomBull = math.max(high[1], high[2])
+
+// Bearish Liquidity Void: Large down candle with gap
+bearishLiqVoid = largeCandle and close < open and noOverlapLow
+liqVoidTopBear = math.min(low[1], low[2])
+liqVoidBottomBear = high
+
+// Create Liquidity Void boxes
+if bullishLiqVoid and i_showFVG
+    newLV = LiquidityVoid.new(liqVoidTopBull, liqVoidBottomBull, bar_index, DIR_BULL, false,
+         box.new(bar_index - 2, liqVoidTopBull, bar_index + 12, liqVoidBottomBull,
+                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 80),
+                 border_width=1, border_style=line.style_dashed,
+                 text="VOID", text_color=liqVoidColor, text_size=size.tiny, text_halign=text.align_right))
+    if array.size(bullLiqVoids) >= 5
+        oldLV = array.shift(bullLiqVoids)
+        if not na(oldLV.visual)
+            box.delete(oldLV.visual)
+    array.push(bullLiqVoids, newLV)
+
+if bearishLiqVoid and i_showFVG
+    newLV = LiquidityVoid.new(liqVoidTopBear, liqVoidBottomBear, bar_index, DIR_BEAR, false,
+         box.new(bar_index - 2, liqVoidTopBear, bar_index + 12, liqVoidBottomBear,
+                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 80),
+                 border_width=1, border_style=line.style_dashed,
+                 text="VOID", text_color=liqVoidColor, text_size=size.tiny, text_halign=text.align_right))
+    if array.size(bearLiqVoids) >= 5
+        oldLV = array.shift(bearLiqVoids)
+        if not na(oldLV.visual)
+            box.delete(oldLV.visual)
+    array.push(bearLiqVoids, newLV)
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        NDOG (NEW DAY OPENING GAP) DETECTION                    ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+// NDOG: Gap between previous day's close and current day's open
+
+ndogColor = #FFF59D  // Pastel yellow
+
+// Detect new day
+isNewTradingDay = ta.change(time("D")) != 0
+
+if isNewTradingDay
+    prevDayClose = close[1]
+    todayOpen = open
+
+    // Check for gap
+    gapUp = todayOpen > prevDayClose
+    gapDown = todayOpen < prevDayClose
+    gapSize = math.abs(todayOpen - prevDayClose)
+
+    // Only track significant gaps (> 0.1% of price)
+    if gapSize > close * 0.001
+        ndogHigh := gapUp ? todayOpen : prevDayClose
+        ndogLow := gapUp ? prevDayClose : todayOpen
+        ndogCE := (ndogHigh + ndogLow) / 2
+        ndogFilled := false
+
+// Check if NDOG is filled
+if not na(ndogHigh) and not ndogFilled
+    if low <= ndogCE and high >= ndogCE
+        ndogFilled := true
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        ORG (OPENING RANGE GAP) DETECTION                       ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+// ORG: First 5 minutes of NY session range - often acts as magnet
+
+orgColor = #A5D6A7  // Pastel green
+
+// Track opening range during first 5 minutes of NY session
+nySessionStart = nyHour == 9 and nyMinute >= 30 and nyMinute < 35
+
+if nySessionStart
+    if not orgTracking
+        orgHigh := high
+        orgLow := low
+        orgTracking := true
+        orgFilled := false
+    else
+        orgHigh := math.max(orgHigh, high)
+        orgLow := math.min(orgLow, low)
+else if orgTracking and nyHour == 9 and nyMinute >= 35
+    // Opening range complete
+    orgCE := (orgHigh + orgLow) / 2
+    orgTracking := false
+
+// Reset at end of day
+if nyHour == 16
+    orgTracking := false
+
+// Check if ORG CE is touched
+if not na(orgCE) and not orgFilled and not orgTracking
+    if low <= orgCE and high >= orgCE
+        orgFilled := true
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        IPDA DATA RANGES                                        ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
@@ -1921,7 +2231,103 @@ hasFreshOB = (atBullOB and msDirection == DIR_BULL) or (atBearOB and msDirection
 if hasFreshOB
     zoneScore += 5
 
-hasZoneAlignment := zoneScore >= 15  // Need 15/25 for good zone
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYER 2D: PD ARRAY PROXIMITY SCORING (0-15 points) - NEW COMPREHENSIVE SYSTEM
+// Each PD array adds value when price is near it and direction aligned
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pdArrayScore = 0.0
+var bool hasSuspensionBlock = false
+var bool hasVolumeImbalance = false
+var bool hasLiquidityVoid = false
+hasSuspensionBlock := false
+hasVolumeImbalance := false
+hasLiquidityVoid := false
+
+// Check Suspension Blocks (MOST POWERFUL - 5 points)
+// ICT: "Extremely powerful PD Array - one of the most powerful"
+if array.size(bullSuspBlocks) > 0 and msDirection == DIR_BULL
+    for i = 0 to math.min(array.size(bullSuspBlocks) - 1, 3)
+        sb = array.get(bullSuspBlocks, i)
+        if not sb.mitigated and close <= sb.top and close >= sb.bottom * 0.995
+            hasSuspensionBlock := true
+            pdArrayScore += 5
+            break
+        else if not sb.mitigated and close > sb.top and close < sb.top * 1.01
+            hasSuspensionBlock := true
+            pdArrayScore += 3  // Nearby but not in
+            break
+
+if array.size(bearSuspBlocks) > 0 and msDirection == DIR_BEAR
+    for i = 0 to math.min(array.size(bearSuspBlocks) - 1, 3)
+        sb = array.get(bearSuspBlocks, i)
+        if not sb.mitigated and close >= sb.bottom and close <= sb.top * 1.005
+            hasSuspensionBlock := true
+            pdArrayScore += 5
+            break
+        else if not sb.mitigated and close < sb.bottom and close > sb.bottom * 0.99
+            hasSuspensionBlock := true
+            pdArrayScore += 3
+            break
+
+// Check Volume Imbalances (3 points)
+if array.size(bullVIs) > 0 and msDirection == DIR_BULL
+    for i = 0 to math.min(array.size(bullVIs) - 1, 5)
+        vi = array.get(bullVIs, i)
+        if not vi.filled and close >= vi.bottom and close <= vi.top
+            hasVolumeImbalance := true
+            pdArrayScore += 3
+            break
+
+if array.size(bearVIs) > 0 and msDirection == DIR_BEAR
+    for i = 0 to math.min(array.size(bearVIs) - 1, 5)
+        vi = array.get(bearVIs, i)
+        if not vi.filled and close >= vi.bottom and close <= vi.top
+            hasVolumeImbalance := true
+            pdArrayScore += 3
+            break
+
+// Check Liquidity Voids (3 points - price drawn to fill)
+if array.size(bullLiqVoids) > 0 and msDirection == DIR_BULL
+    for i = 0 to math.min(array.size(bullLiqVoids) - 1, 3)
+        lv = array.get(bullLiqVoids, i)
+        if not lv.filled and close >= lv.bottom and close <= lv.top
+            hasLiquidityVoid := true
+            pdArrayScore += 3
+            break
+
+if array.size(bearLiqVoids) > 0 and msDirection == DIR_BEAR
+    for i = 0 to math.min(array.size(bearLiqVoids) - 1, 3)
+        lv = array.get(bearLiqVoids, i)
+        if not lv.filled and close >= lv.bottom and close <= lv.top
+            hasLiquidityVoid := true
+            pdArrayScore += 3
+            break
+
+// Check NDOG (2 points - New Day Opening Gap)
+hasNDOGAlignment = false
+if not na(ndogCE) and not ndogFilled
+    if msDirection == DIR_BULL and close < ndogCE and close > ndogLow
+        hasNDOGAlignment := true
+        pdArrayScore += 2
+    else if msDirection == DIR_BEAR and close > ndogCE and close < ndogHigh
+        hasNDOGAlignment := true
+        pdArrayScore += 2
+
+// Check ORG (2 points - Opening Range Gap)
+hasORGAlignment = false
+if not na(orgCE) and not orgFilled and not orgTracking
+    if msDirection == DIR_BULL and close < orgCE and close > orgLow
+        hasORGAlignment := true
+        pdArrayScore += 2
+    else if msDirection == DIR_BEAR and close > orgCE and close < orgHigh
+        hasORGAlignment := true
+        pdArrayScore += 2
+
+// Add PD Array score to zone score (capped contribution)
+zoneScore += math.min(pdArrayScore, 15)
+
+hasZoneAlignment := zoneScore >= 15  // Need 15/40 for good zone (expanded)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LAYER 3: CONFIRMATION SCORE (0-20 points) - Validates entry
@@ -2026,6 +2432,45 @@ if hasRejBlock and isCorrectZone
 // Combo 12: Power Hour + High Confluence (institutional activity)
 if isPowerHour and confluenceCount >= 5
     comboScore += 3
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYER 4B: PD ARRAY COMBO BONUSES - NEW ICT CONCEPTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Combo 13: Suspension Block + OTE (ICT's most powerful entry)
+if hasSuspensionBlock and inOTE
+    comboScore += 8  // Major bonus - ICT says this is extremely powerful
+
+// Combo 14: Suspension Block + FVG stacked (double PD array)
+if hasSuspensionBlock and hasFVGPresent
+    comboScore += 5
+
+// Combo 15: Volume Imbalance + Order Block (VI confirms OB)
+if hasVolumeImbalance and hasFreshOB
+    comboScore += 4
+
+// Combo 16: Liquidity Void + Displacement (strong move into void)
+if hasLiquidityVoid and hasDisplacement
+    comboScore += 4
+
+// Combo 17: NDOG + Silver Bullet (gap fill during SB window)
+if hasNDOGAlignment and sbPrime
+    comboScore += 5
+
+// Combo 18: ORG + Macro Time (opening range play at macro)
+if hasORGAlignment and isMacroTime
+    comboScore += 4
+
+// Combo 19: Multiple PD Arrays stacked (confluence of PD arrays)
+pdArrayCount = (hasSuspensionBlock ? 1 : 0) + (hasVolumeImbalance ? 1 : 0) + (hasLiquidityVoid ? 1 : 0) + (hasFVGPresent ? 1 : 0) + (hasFreshOB ? 1 : 0)
+if pdArrayCount >= 3
+    comboScore += 6  // Stacked PD arrays = high probability
+else if pdArrayCount >= 2
+    comboScore += 3
+
+// Combo 20: Suspension Block + Killzone (time + price confluence)
+if hasSuspensionBlock and hasKillzone
+    comboScore += 4
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LAYER 5: TRIGGER DETECTION - What fires the signal
@@ -2722,6 +3167,9 @@ if i_showDOL and i_showPacMan and barstate.islast
         fvgPbColor = color.new(#7C4DFF, 40)   // Purple for FVG pullback
         obPbColor = color.new(#2196F3, 40)    // Blue for OB pullback
         liqPbColor = color.new(#FF9800, 40)   // Orange for liquidity sweep
+        suspPbColor = color.new(#00E676, 30)  // Bright green for Suspension Block (highest priority)
+        viPbColor = color.new(#E040FB, 40)    // Magenta for Volume Imbalance
+        lvPbColor = color.new(#FF1744, 40)    // Red for Liquidity Void
         pathWidth = tradeReady ? 2 : highConf ? 2 : 1
         pathStyle = tradeReady ? line.style_solid : line.style_dashed
 
@@ -2775,33 +3223,83 @@ if i_showDOL and i_showPacMan and barstate.islast
                 color pbColor = pullbackColor
 
                 // ─────────────────────────────────────────────────────────────
-                // PRIORITY 1: Check for unfilled FVG in the pullback zone
-                // Price loves to retrace to fill imbalances
+                // PRIORITY 0: SUSPENSION BLOCK (ICT's MOST POWERFUL PD Array)
+                // Single candle with Volume Imbalance at BOTH ends
+                // "Being suspended between two volume imbalances" - ICT
                 // ─────────────────────────────────────────────────────────────
                 if dolDirection == DIR_BULL
-                    // Bullish move - look for bearish FVG (SIBI) below target to fill
-                    if array.size(bearFVGs) > 0
-                        for j = 0 to math.min(array.size(bearFVGs) - 1, 8)
-                            fvg = array.get(bearFVGs, j)
-                            // FVG is in our pullback zone (between prevY and targetY)
-                            if not fvg.mitigated and fvg.top < targetY and fvg.bottom > moveLow
-                                pullbackY := fvg.top  // Retrace to top of bearish FVG
-                                pbReason := "FVG"
-                                pbColor := fvgPbColor
+                    if array.size(bullSuspBlocks) > 0
+                        for j = 0 to math.min(array.size(bullSuspBlocks) - 1, 3)
+                            sb = array.get(bullSuspBlocks, j)
+                            // Unmitigated Suspension Block in our pullback zone
+                            if not sb.mitigated and sb.top < targetY and sb.bottom > moveLow
+                                pullbackY := sb.top  // Retrace to top of Suspension Block
+                                pbReason := "SUSP"
+                                pbColor := suspPbColor
                                 break
                 else if dolDirection == DIR_BEAR
-                    // Bearish move - look for bullish FVG (BISI) above target to fill
-                    if array.size(bullFVGs) > 0
-                        for j = 0 to math.min(array.size(bullFVGs) - 1, 8)
-                            fvg = array.get(bullFVGs, j)
-                            if not fvg.mitigated and fvg.bottom > targetY and fvg.top < moveHigh
-                                pullbackY := fvg.bottom  // Retrace to bottom of bullish FVG
-                                pbReason := "FVG"
-                                pbColor := fvgPbColor
+                    if array.size(bearSuspBlocks) > 0
+                        for j = 0 to math.min(array.size(bearSuspBlocks) - 1, 3)
+                            sb = array.get(bearSuspBlocks, j)
+                            if not sb.mitigated and sb.bottom > targetY and sb.top < moveHigh
+                                pullbackY := sb.bottom  // Retrace to bottom of Suspension Block
+                                pbReason := "SUSP"
+                                pbColor := suspPbColor
                                 break
 
                 // ─────────────────────────────────────────────────────────────
-                // PRIORITY 2: Check for Order Block to retest
+                // PRIORITY 1: Check for unfilled FVG in the pullback zone
+                // Price loves to retrace to fill imbalances
+                // ─────────────────────────────────────────────────────────────
+                if na(pullbackY)
+                    if dolDirection == DIR_BULL
+                        // Bullish move - look for bearish FVG (SIBI) below target to fill
+                        if array.size(bearFVGs) > 0
+                            for j = 0 to math.min(array.size(bearFVGs) - 1, 8)
+                                fvg = array.get(bearFVGs, j)
+                                // FVG is in our pullback zone (between prevY and targetY)
+                                if not fvg.mitigated and fvg.top < targetY and fvg.bottom > moveLow
+                                    pullbackY := fvg.top  // Retrace to top of bearish FVG
+                                    pbReason := "FVG"
+                                    pbColor := fvgPbColor
+                                    break
+                    else if dolDirection == DIR_BEAR
+                        // Bearish move - look for bullish FVG (BISI) above target to fill
+                        if array.size(bullFVGs) > 0
+                            for j = 0 to math.min(array.size(bullFVGs) - 1, 8)
+                                fvg = array.get(bullFVGs, j)
+                                if not fvg.mitigated and fvg.bottom > targetY and fvg.top < moveHigh
+                                    pullbackY := fvg.bottom  // Retrace to bottom of bullish FVG
+                                    pbReason := "FVG"
+                                    pbColor := fvgPbColor
+                                    break
+
+                // ─────────────────────────────────────────────────────────────
+                // PRIORITY 2: Volume Imbalance (Gap between consecutive bodies)
+                // Strong institutional price action - gap must be filled
+                // ─────────────────────────────────────────────────────────────
+                if na(pullbackY)
+                    if dolDirection == DIR_BULL
+                        if array.size(bearVIs) > 0
+                            for j = 0 to math.min(array.size(bearVIs) - 1, 5)
+                                vi = array.get(bearVIs, j)
+                                if not vi.filled and vi.top < targetY and vi.bottom > moveLow
+                                    pullbackY := vi.top  // Retrace to top of Volume Imbalance
+                                    pbReason := "VI"
+                                    pbColor := viPbColor
+                                    break
+                    else if dolDirection == DIR_BEAR
+                        if array.size(bullVIs) > 0
+                            for j = 0 to math.min(array.size(bullVIs) - 1, 5)
+                                vi = array.get(bullVIs, j)
+                                if not vi.filled and vi.bottom > targetY and vi.top < moveHigh
+                                    pullbackY := vi.bottom  // Retrace to bottom of Volume Imbalance
+                                    pbReason := "VI"
+                                    pbColor := viPbColor
+                                    break
+
+                // ─────────────────────────────────────────────────────────────
+                // PRIORITY 3: Check for Order Block to retest
                 // Institutions defend their entry points
                 // ─────────────────────────────────────────────────────────────
                 if na(pullbackY)
@@ -2828,7 +3326,31 @@ if i_showDOL and i_showPacMan and barstate.islast
                                     break
 
                 // ─────────────────────────────────────────────────────────────
-                // PRIORITY 3: Check for nearby liquidity to sweep
+                // PRIORITY 4: Liquidity Void (Large displacement gap)
+                // Price must fill this inefficiency before continuing
+                // ─────────────────────────────────────────────────────────────
+                if na(pullbackY)
+                    if dolDirection == DIR_BULL
+                        if array.size(bearLiqVoids) > 0
+                            for j = 0 to math.min(array.size(bearLiqVoids) - 1, 3)
+                                lv = array.get(bearLiqVoids, j)
+                                if not lv.filled and lv.top < targetY and lv.bottom > moveLow
+                                    pullbackY := lv.top  // Retrace to top of Liquidity Void
+                                    pbReason := "LV"
+                                    pbColor := lvPbColor
+                                    break
+                    else if dolDirection == DIR_BEAR
+                        if array.size(bullLiqVoids) > 0
+                            for j = 0 to math.min(array.size(bullLiqVoids) - 1, 3)
+                                lv = array.get(bullLiqVoids, j)
+                                if not lv.filled and lv.bottom > targetY and lv.top < moveHigh
+                                    pullbackY := lv.bottom  // Retrace to bottom of Liquidity Void
+                                    pbReason := "LV"
+                                    pbColor := lvPbColor
+                                    break
+
+                // ─────────────────────────────────────────────────────────────
+                // PRIORITY 5: Check for nearby liquidity to sweep
                 // Price hunts stops before continuing
                 // ─────────────────────────────────────────────────────────────
                 if na(pullbackY)
@@ -2855,7 +3377,7 @@ if i_showDOL and i_showPacMan and barstate.islast
                             pbColor := liqPbColor
 
                 // ─────────────────────────────────────────────────────────────
-                // PRIORITY 4: Equilibrium (50%) - Fair value of the move
+                // PRIORITY 6: Equilibrium (50%) - Fair value of the move
                 // ─────────────────────────────────────────────────────────────
                 if na(pullbackY)
                     // Check if we're in a strong trend (use shallower pullback)
@@ -2868,7 +3390,7 @@ if i_showDOL and i_showPacMan and barstate.islast
                         pbReason := "EQ"
 
                 // ─────────────────────────────────────────────────────────────
-                // PRIORITY 5: OTE Zone (0.618-0.786) - Fallback
+                // PRIORITY 7: OTE Zone (0.618-0.786) - Fallback
                 // ─────────────────────────────────────────────────────────────
                 if na(pullbackY)
                     // Dynamic OTE based on volatility
@@ -2891,7 +3413,8 @@ if i_showDOL and i_showPacMan and barstate.islast
                 array.push(dolPathLines, pullbackLine)
 
                 // Pullback marker with reason
-                pbMarkerText = pbReason == "FVG" ? "◈" : pbReason == "OB" ? "◆" : pbReason == "LIQ" ? "◇" : pbReason == "EQ" ? "◦" : "○"
+                // Marker symbols: SUSP=★ VI=◆ LV=▼ FVG=◈ OB=■ LIQ=◇ EQ=◦ OTE=○
+                pbMarkerText = pbReason == "SUSP" ? "★" : pbReason == "VI" ? "◆" : pbReason == "LV" ? "▼" : pbReason == "FVG" ? "◈" : pbReason == "OB" ? "■" : pbReason == "LIQ" ? "◇" : pbReason == "EQ" ? "◦" : "○"
                 pbMarker = label.new(pullbackX, pullbackY, pbMarkerText,
                      style=label.style_none, textcolor=pbColor, size=size.tiny)
                 array.push(dolPathLabels, pbMarker)
@@ -3245,7 +3768,7 @@ var color accentLine = color.new(#0F3460, 0)
 var color textDim = color.new(#8892B0, 0)
 var color textBright = color.new(#E6F1FF, 0)
 
-var table infoTable = table.new(position.middle_right, 2, 17, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
+var table infoTable = table.new(position.middle_right, 2, 19, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
 
 if i_showDOLTable and barstate.islast
     // ═══ HEADER - Merged and centered ═══
@@ -3405,13 +3928,45 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 15, "Day", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
     table.cell(infoTable, 1, 15, dayType, text_color=dayTypeColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
+    // ═══ PD ARRAY STATUS (Suspension Block, VI, Liquidity Void, NDOG, ORG) ═══
+    // Build PD Array status display
+    pdArrayStatus = ""
+    pdArrayCount2 = 0
+    if hasSuspensionBlock
+        pdArrayStatus := pdArrayStatus + "★SB "
+        pdArrayCount2 += 1
+    if hasVolumeImbalance
+        pdArrayStatus := pdArrayStatus + "◆VI "
+        pdArrayCount2 += 1
+    if hasLiquidityVoid
+        pdArrayStatus := pdArrayStatus + "▼LV "
+        pdArrayCount2 += 1
+    if not na(ndogHigh) and not ndogFilled
+        pdArrayStatus := pdArrayStatus + "⬚NDOG "
+        pdArrayCount2 += 1
+    if not na(orgHigh) and close > orgLow and close < orgHigh
+        pdArrayStatus := pdArrayStatus + "⬛ORG "
+        pdArrayCount2 += 1
+
+    pdArrayDisplay = pdArrayCount2 > 0 ? pdArrayStatus : "—"
+    pdArrayColor = pdArrayCount2 >= 3 ? #00E676 : pdArrayCount2 >= 2 ? #69F0AE : pdArrayCount2 >= 1 ? #FFD740 : textDim
+    pdArrayBg = hasSuspensionBlock ? color.new(#00E676, 85) : tableBg
+    table.cell(infoTable, 0, 16, "PD Arrays", text_color=textDim, text_size=size.tiny, bgcolor=pdArrayBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 16, pdArrayDisplay, text_color=pdArrayColor, text_size=size.tiny, bgcolor=pdArrayBg, text_halign=text.align_right)
+
+    // ═══ R:R DISPLAY (if Stop Loss calculated) ═══
+    rrDisplayText = not na(stopLoss) ? "SL:" + str.tostring(stopLoss, format.mintick) + " R:R " + str.tostring(riskReward, "#.#") : "—"
+    rrDisplayColor = riskReward >= 3 ? #00E676 : riskReward >= 2 ? #69F0AE : riskReward >= 1 ? #FFD740 : textDim
+    table.cell(infoTable, 0, 17, "Risk", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 17, rrDisplayText, text_color=rrDisplayColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+
     // ═══ TAKE THE TRADE SIGNAL ═══
     takeItActive = takeTradeSignalBull or takeTradeSignalBear
     takeItText = takeItActive ? "🚀 TAKE THE TRADE!" : "—"
     takeItColor = takeItActive ? #00FF00 : textDim
     takeItBg = takeItActive ? color.new(#00FF00, 80) : headerBg
-    table.cell(infoTable, 0, 16, takeItText, text_color=takeItColor, text_size=size.small, bgcolor=takeItBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 16, 1, 16)
+    table.cell(infoTable, 0, 18, takeItText, text_color=takeItColor, text_size=size.small, bgcolor=takeItBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 18, 1, 18)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // "TAKE THE TRADE" VISUAL SIGNAL
@@ -3467,6 +4022,43 @@ alertcondition(mmxmBearConfirm, title="📊 MMXM Short", message="📊 MMXM SELL
 alertcondition(amdFractalBull, title="🔄 AMD Fractal Long", message="🔄 AMD FRACTAL LONG on {{ticker}} - Nested AMD alignment!")
 alertcondition(amdFractalBear, title="🔄 AMD Fractal Short", message="🔄 AMD FRACTAL SHORT on {{ticker}} - Nested AMD alignment!")
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PD ARRAY ALERTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Suspension Block alerts (ICT's most powerful PD Array)
+suspBlockBullAlert = hasSuspensionBlock and msDirection == DIR_BULL and inDiscount
+suspBlockBearAlert = hasSuspensionBlock and msDirection == DIR_BEAR and inPremium
+alertcondition(suspBlockBullAlert, title="★ Suspension Block Long", message="★ SUSPENSION BLOCK LONG on {{ticker}} - ICT's most powerful PD Array in discount zone!")
+alertcondition(suspBlockBearAlert, title="★ Suspension Block Short", message="★ SUSPENSION BLOCK SHORT on {{ticker}} - ICT's most powerful PD Array in premium zone!")
+
+// Volume Imbalance alerts
+viLongAlert = hasVolumeImbalance and msDirection == DIR_BULL and inOTE
+viShortAlert = hasVolumeImbalance and msDirection == DIR_BEAR and inOTE
+alertcondition(viLongAlert, title="◆ Volume Imbalance Long", message="◆ VOLUME IMBALANCE LONG on {{ticker}} - Gap between candle bodies in OTE zone!")
+alertcondition(viShortAlert, title="◆ Volume Imbalance Short", message="◆ VOLUME IMBALANCE SHORT on {{ticker}} - Gap between candle bodies in OTE zone!")
+
+// Liquidity Void alerts
+lvLongAlert = hasLiquidityVoid and msDirection == DIR_BULL
+lvShortAlert = hasLiquidityVoid and msDirection == DIR_BEAR
+alertcondition(lvLongAlert, title="▼ Liquidity Void Long", message="▼ LIQUIDITY VOID LONG on {{ticker}} - Large inefficiency to be filled!")
+alertcondition(lvShortAlert, title="▼ Liquidity Void Short", message="▼ LIQUIDITY VOID SHORT on {{ticker}} - Large inefficiency to be filled!")
+
+// NDOG (New Day Opening Gap) alerts
+ndogActive = not na(ndogHigh) and not ndogFilled
+ndogLongAlert = ndogActive and close > ndogCE and msDirection == DIR_BULL
+ndogShortAlert = ndogActive and close < ndogCE and msDirection == DIR_BEAR
+alertcondition(ndogLongAlert, title="⬚ NDOG Long", message="⬚ NDOG LONG on {{ticker}} - Price above New Day Opening Gap CE!")
+alertcondition(ndogShortAlert, title="⬚ NDOG Short", message="⬚ NDOG SHORT on {{ticker}} - Price below New Day Opening Gap CE!")
+
+// Combined PD Array Stack alert (multiple PD arrays aligned)
+pdStackAlert = (hasSuspensionBlock ? 1 : 0) + (hasVolumeImbalance ? 1 : 0) + (hasLiquidityVoid ? 1 : 0) >= 2 and (msDirection == DIR_BULL or msDirection == DIR_BEAR)
+alertcondition(pdStackAlert, title="🔥 PD Array Stack", message="🔥 MULTIPLE PD ARRAYS STACKED on {{ticker}} - High probability zone!")
+
+// Suspension Block + OTE Combo (highest conviction)
+suspOTECombo = hasSuspensionBlock and inOTE
+alertcondition(suspOTECombo, title="💎 Suspension Block + OTE", message="💎 SUSPENSION BLOCK IN OTE on {{ticker}} - ICT's highest probability entry!")
+
 // Plot probability for external use
 plot(dolProbability, title="DOL Probability", display=display.none)
 plot(dolDirection, title="DOL Direction", display=display.none)
@@ -3484,7 +4076,7 @@ plot(compositeTier, title="Composite Tier", display=display.none)
 // 5. Fair Value Gaps (FVG/IFVG) - 4,567 mentions
 // 6. OTE Zone (62-79%) - 4,123 mentions
 // 7. Killzones - 3,892 mentions
-// 8. Silver Bullet Windows - 3,456 mentions
+// 8. Silver Bullet Windows (FULL HOUR + Phase) - 3,456 mentions
 // 9. Power of Three (AMD) - 3,234 mentions
 // 10. 2022 Model - 2,891 mentions
 // 11. Turtle Soup - 2,567 mentions
@@ -3497,6 +4089,24 @@ plot(compositeTier, title="Composite Tier", display=display.none)
 // 18. HTF Bias Alignment - Custom weight
 // 19. Composite Scoring (Tier 1/2/3) - Custom system
 //
+// NEW PD ARRAYS (v5.0):
+// 20. Suspension Block - ICT's MOST POWERFUL PD Array (VI at BOTH ends)
+// 21. Volume Imbalance (VI) - Gap between consecutive candle bodies
+// 22. Liquidity Void - Large displacement gap with no overlapping wicks
+// 23. NDOG (New Day Opening Gap) - Gap from midnight
+// 24. ORG (Opening Range Gap) - First session gap
+// 25. Rejection Block - Long wick rejection zones
+//
+// DOL PATH PULLBACK PRIORITIES:
+// 0. Suspension Block (★) - Bright Green
+// 1. Fair Value Gap (◈) - Purple
+// 2. Volume Imbalance (◆) - Magenta
+// 3. Order Block (■) - Blue
+// 4. Liquidity Void (▼) - Red
+// 5. Liquidity Sweep (◇) - Orange
+// 6. Equilibrium (◦) - Default
+// 7. OTE Zone (○) - Default
+//
 // PAC-MAN THEME ELEMENTS:
 // 🟡 PAC-MAN = Current price position
 // 👻 GHOSTS = Institutional liquidity targets (BSL/SSL)
@@ -3505,6 +4115,7 @@ plot(compositeTier, title="Composite Tier", display=display.none)
 // 🎯 MAZE PATH = DOL direction arrow
 // 🎁 BONUS = NWOG zones
 // 🏆 TIER MEDALS = Composite confluence signals
+// ★ SUSPENSION BLOCK = Highest priority pullback target
 //
 // ═══════════════════════════════════════════════════════════════════════════════
 
