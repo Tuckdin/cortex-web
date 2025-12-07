@@ -2118,11 +2118,12 @@ else if isFriday
 // when multiple PD arrays are present... that's discount sensitivity"
 
 // Count confluences present at current price
+// Note: Full discount sensitivity calculation is done later after all PD arrays are calculated
 sensitivityCount := 0
 sensitivityLevel := na
 discountSensitivity := false
 
-// Check gradient level proximity
+// Check gradient level proximity (wick gradients are available at this point)
 if array.size(discountWicks) > 0
     for i = 0 to math.min(array.size(discountWicks) - 1, 2)
         wg = array.get(discountWicks, i)
@@ -2135,24 +2136,8 @@ if array.size(discountWicks) > 0
             else if math.abs(close - wg.wick25) < tolerance or math.abs(close - wg.wick75) < tolerance
                 sensitivityCount += 1
 
-// Check FVG proximity
-if hasFVGPresent
-    sensitivityCount += 1
-
-// Check Order Block proximity
-if hasFreshOB
-    sensitivityCount += 1
-
-// Check OTE zone
-if inOTE
-    sensitivityCount += 1
-
-// Check Suspension Block
-if hasSuspensionBlock
-    sensitivityCount += 2  // Double weight for suspension block
-
-// Discount Sensitivity = 3+ confluences honoring a level
-discountSensitivity := sensitivityCount >= 3 and inDiscount
+// Note: Additional sensitivity checks (FVG, OB, OTE, Suspension Block, inDiscount)
+// are calculated later in the SCORING section after those variables are defined
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║              IMMEDIATE REBALANCE PATTERN DETECTION                             ║
