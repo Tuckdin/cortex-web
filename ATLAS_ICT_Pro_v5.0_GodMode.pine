@@ -4337,9 +4337,9 @@ if i_showDOL and i_showPacMan and barstate.islast
                 // ─────────────────────────────────────────────────────────────
                 pullbackX = targetX + xSpacingPullback
 
-                // Draw pullback line
+                // Draw pullback line - thicker for visibility, keep dotted
                 pullbackLine = line.new(targetX, targetY, pullbackX, pullbackY,
-                     color=pbColor, width=1, style=line.style_dotted)
+                     color=pbColor, width=2, style=line.style_dotted)
                 array.push(dolPathLines, pullbackLine)
 
                 // Pullback marker with reason
