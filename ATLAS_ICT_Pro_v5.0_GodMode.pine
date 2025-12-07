@@ -2014,10 +2014,13 @@ for i = 0 to lookbackBars - 1
 currentMove = math.abs(close - close[lookbackBars])
 expectedMove = ta.atr(lookbackBars) * lookbackBars * 0.3  // Expected directional move
 
+// Pre-calculate ATR for consolidation check (can't call ta.atr inside loop)
+atrForConsolidation = ta.atr(14) * 0.7
+
 // Calculate time in consolidation (bars where range < ATR)
 consolidationBars := 0
 for i = 0 to lookbackBars - 1
-    if (high[i] - low[i]) < ta.atr(14) * 0.7
+    if (high[i] - low[i]) < atrForConsolidation
         consolidationBars += 1
 
 // Liquidity Run Score (0-100, higher = more resistance)
@@ -4701,8 +4704,8 @@ if i_showDOL and i_showPacMan and barstate.islast
                 if na(pullbackY)
                     // Dynamic OTE based on volatility
                     // Calm market = deeper retrace (0.79), volatile = shallower (0.62)
-                    atrValue = ta.atr(14)
-                    volatilityRatio = atrValue / close
+                    // Using global atrVal instead of ta.atr(14) inside conditional
+                    volatilityRatio = atrVal / close
                     oteLevel = volatilityRatio > 0.02 ? 0.618 : volatilityRatio > 0.01 ? 0.705 : 0.786
 
                     pullbackY := targetY - (moveSize * oteLevel)
@@ -5608,7 +5611,12 @@ webhookPayload = '{"ticker":"' + syminfo.ticker + '",' +
                  '"confluence":' + str.tostring(confluenceCount) + ',' +
                  '"session":"' + (inSilverBullet ? "SILVER_BULLET" : nyAMKZ ? "NY_AM_KZ" : londonKZ ? "LONDON_KZ" : "NONE") + '"}'
 
-alertcondition(newSetupGenerated and i_enableWebhook, title="📡 Webhook: New Setup", message=webhookPayload)
+// Webhook alert - use alert() for dynamic messages
+if newSetupGenerated and i_enableWebhook
+    alert(webhookPayload, alert.freq_once_per_bar)
+
+// Static alertcondition for TradingView alerts
+alertcondition(newSetupGenerated, title="📡 New Setup Generated", message="ATLAS ICT Pro: New trading setup detected")
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // END OF ATLAS ICT PRO v5.0 - GOD MODE [PAC-MAN EDITION]
