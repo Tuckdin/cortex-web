@@ -4982,8 +4982,8 @@ var color tableBg = color.new(#0D0D0D, 5)
 var color textDim = color.new(#8892B0, 0)
 var color textBright = color.new(#E6F1FF, 0)
 
-// Compact table (13 rows - essential ICT info)
-var table infoTable = table.new(position.middle_right, 2, 13, bgcolor=tableBg, border_width=0, frame_width=2, frame_color=color.new(#2121DE, 30))
+// Compact table (17 rows - essential ICT info)
+var table infoTable = table.new(position.middle_right, 2, 17, bgcolor=tableBg, border_width=0, frame_width=2, frame_color=color.new(#2121DE, 30))
 
 if i_showDOLTable and barstate.islast
     // Row 0: Direction
@@ -5062,10 +5062,45 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 11, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 11, 1, 11)
 
-    // Row 12: Take Trade Signal
+    // Row 12: Day Type
+    dayTypeText = isSeekDestroyDay ? "⚔ SEEK&DESTROY" : isExpansionDay ? "📈 EXPANSION" : isAccumulationDay ? "📦 ACCUMULATION" : "—"
+    dayTypeCol = isSeekDestroyDay ? #FF9800 : isExpansionDay ? #4CAF50 : isAccumulationDay ? #2196F3 : textDim
+    table.cell(infoTable, 0, 12, "Day", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 12, dayTypeText, text_color=dayTypeCol, text_size=size.small, bgcolor=tableBg)
+
+    // Row 13: PD Arrays Active
+    pdActive = ""
+    if hasSuspensionBlock
+        pdActive := "SB "
+    if hasFVGPresent
+        pdActive := pdActive + "FVG "
+    if hasVolumeImbalance
+        pdActive := pdActive + "VI "
+    if hasLiquidityVoid
+        pdActive := pdActive + "LV "
+    if hasNDOGAlignment
+        pdActive := pdActive + "NDOG "
+    if hasFreshOB
+        pdActive := pdActive + "OB"
+    pdActive := pdActive == "" ? "—" : pdActive
+    table.cell(infoTable, 0, 13, "PD Arrays", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 13, pdActive, text_color=hasSuspensionBlock ? #00E5FF : textBright, text_size=size.tiny, bgcolor=tableBg)
+
+    // Row 14: Time Risk
+    trCol = timeRiskMultiplier >= 1.2 ? #00E676 : timeRiskMultiplier >= 1.0 ? textBright : timeRiskMultiplier >= 0.7 ? #FFD740 : #FF5252
+    table.cell(infoTable, 0, 14, "Time Risk", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 14, timeRiskReason + " ×" + str.tostring(timeRiskMultiplier, "#.#"), text_color=trCol, text_size=size.small, bgcolor=tableBg)
+
+    // Row 15: Discount Sensitivity
+    sensText = discountSensitivity ? "◉ ACTIVE " + str.tostring(sensitivityCount) + "/6" : "—"
+    sensCol = discountSensitivity ? #00E5FF : textDim
+    table.cell(infoTable, 0, 15, "Sensitivity", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 15, sensText, text_color=sensCol, text_size=size.small, bgcolor=discountSensitivity ? color.new(#00E5FF, 90) : tableBg)
+
+    // Row 16: Take Trade Signal
     takeIt = (takeTradeSignalBull or takeTradeSignalBear) ? "🚀 TAKE IT!" : "—"
-    table.cell(infoTable, 0, 12, takeIt, text_color=(takeTradeSignalBull or takeTradeSignalBear) ? #00FF00 : textDim, text_size=size.small, bgcolor=(takeTradeSignalBull or takeTradeSignalBear) ? color.new(#00FF00, 80) : tableBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 12, 1, 12)
+    table.cell(infoTable, 0, 16, takeIt, text_color=(takeTradeSignalBull or takeTradeSignalBear) ? #00FF00 : textDim, text_size=size.small, bgcolor=(takeTradeSignalBull or takeTradeSignalBear) ? color.new(#00FF00, 80) : tableBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 16, 1, 16)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // "TAKE THE TRADE" VISUAL SIGNAL LABELS
