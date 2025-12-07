@@ -1499,69 +1499,76 @@ if isMidnight
     midnightOpen := open
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
-// ║                     🎮 PAC-MAN DOL ENGINE (THE MAZE)                           ║
+// ║              🎯 COMPREHENSIVE ICT SCORING ENGINE (Cortex-Derived)              ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-// Initialize scoring (Cortex-derived weights based on ICT concept frequency)
-bullScore = 0.0
-bearScore = 0.0
-
 // ═══════════════════════════════════════════════════════════════════════════════
-// CORTEX ICT CONCEPT WEIGHTS (Based on transcript analysis)
+// LAYER 1: FOUNDATION SCORE (0-30 points) - MUST HAVE for valid setup
+// Based on ICT's core hierarchy: Market Structure → Liquidity → HTF Alignment
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// 1. MARKET STRUCTURE (Weight: 20) - 8,016 mentions
-if msDirection == DIR_BULL
-    bullScore += 20
-else if msDirection == DIR_BEAR
-    bearScore += 20
+foundationScore = 0.0
+var bool hasFoundationComplete = false
 
-// CHoCH bonus (significant reversal signal)
-if bullishCHoCH
-    bullScore += 15
-if bearishCHoCH
-    bearScore += 15
+// 1A. MARKET STRUCTURE (0-10 points) - 8,016 Cortex mentions
+hasMSClear = msDirection == DIR_BULL or msDirection == DIR_BEAR
+hasCHoCH = bullishCHoCH or bearishCHoCH
+hasBOS = bullishBOS or bearishBOS
 
-// BOS confirmation
-if bullishBOS
-    bullScore += 8
-if bearishBOS
-    bearScore += 8
+if hasMSClear
+    foundationScore += 5
+    if hasCHoCH
+        foundationScore += 3  // CHoCH is stronger signal
+    else if hasBOS
+        foundationScore += 2  // BOS confirms structure
 
-// 2. HTF BIAS ALIGNMENT (Weight: 18) - Critical for confluence
-if htfBias == DIR_BULL and msDirection == DIR_BULL
-    bullScore += 18
-else if htfBias == DIR_BEAR and msDirection == DIR_BEAR
-    bearScore += 18
-
-// 3. LIQUIDITY (Weight: 15) - 7,892 mentions
-// Check proximity to liquidity pools
+// 1B. LIQUIDITY TARGET IDENTIFIED (0-10 points) - 7,892 Cortex mentions
 nearestBSL = array.size(bslLevels) > 0 ? array.get(bslLevels, array.size(bslLevels) - 1).level : na
 nearestSSL = array.size(sslLevels) > 0 ? array.get(sslLevels, array.size(sslLevels) - 1).level : na
+hasLiquidityTarget = (msDirection == DIR_BULL and not na(nearestBSL)) or (msDirection == DIR_BEAR and not na(nearestSSL))
 
 distToBSL = not na(nearestBSL) ? math.abs(close - nearestBSL) : 9999
 distToSSL = not na(nearestSSL) ? math.abs(close - nearestSSL) : 9999
+isNearLiquidity = (msDirection == DIR_BULL and distToBSL < distToSSL * 0.7) or (msDirection == DIR_BEAR and distToSSL < distToBSL * 0.7)
 
-// Price seeks liquidity
-if distToBSL < distToSSL * 0.5 and msDirection == DIR_BULL
-    bullScore += 15
-if distToSSL < distToBSL * 0.5 and msDirection == DIR_BEAR
-    bearScore += 15
+if hasLiquidityTarget
+    foundationScore += 6
+    if isNearLiquidity
+        foundationScore += 4  // Bonus for being close to target
 
-// 4. PREMIUM/DISCOUNT (Weight: 15) - 6,234 mentions
-if inDiscount and msDirection == DIR_BULL
-    bullScore += 15
-if inPremium and msDirection == DIR_BEAR
-    bearScore += 15
+// 1C. HTF ALIGNMENT (0-10 points) - Critical for confluence
+hasHTFAlignment = (htfBias == DIR_BULL and msDirection == DIR_BULL) or (htfBias == DIR_BEAR and msDirection == DIR_BEAR)
+hasMTFAlignment = (mtfBiasW == 1 and mtfBiasD == 1 and mtfBias1H == 1) or (mtfBiasW == -1 and mtfBiasD == -1 and mtfBias1H == -1)
 
-// Penalty for wrong zone
-if inPremium and msDirection == DIR_BULL
-    bullScore -= 5
-if inDiscount and msDirection == DIR_BEAR
-    bearScore -= 5
+if hasHTFAlignment
+    foundationScore += 6
+    if hasMTFAlignment
+        foundationScore += 4  // Full MTF alignment bonus
 
-// 5. ORDER BLOCKS (Weight: 12) - 5,891 mentions
-// Check if price is at a valid OB
+hasFoundationComplete := foundationScore >= 20  // Need 20/30 for valid foundation
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYER 2: ENTRY ZONE SCORE (0-25 points) - WHERE to enter
+// Based on ICT's entry zones: Premium/Discount → OTE → Order Block
+// ═══════════════════════════════════════════════════════════════════════════════
+
+zoneScore = 0.0
+var bool hasZoneAlignment = false
+
+// 2A. PREMIUM/DISCOUNT ALIGNMENT (0-10 points) - 6,234 Cortex mentions
+isCorrectZone = (inDiscount and msDirection == DIR_BULL) or (inPremium and msDirection == DIR_BEAR)
+isWrongZone = (inPremium and msDirection == DIR_BULL) or (inDiscount and msDirection == DIR_BEAR)
+
+if isCorrectZone
+    zoneScore += 10
+else if isWrongZone
+    zoneScore -= 5  // Penalty for wrong zone
+
+// 2B. OTE ZONE (0-10 points) - 4,216 Cortex mentions - Primary entry zone
+if inOTE
+    zoneScore += 10
+
+// 2C. ORDER BLOCK ENTRY (0-5 points) - 5,891 Cortex mentions
 atBullOB = false
 atBearOB = false
 
@@ -1579,13 +1586,20 @@ if array.size(bearOBs) > 0
             atBearOB := true
             break
 
-if atBullOB
-    bullScore += 12
-if atBearOB
-    bearScore += 12
+hasFreshOB = (atBullOB and msDirection == DIR_BULL) or (atBearOB and msDirection == DIR_BEAR)
+if hasFreshOB
+    zoneScore += 5
 
-// 6. FVG (Weight: 10) - 4,567 mentions
-// Check for unfilled FVGs as targets
+hasZoneAlignment := zoneScore >= 15  // Need 15/25 for good zone
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYER 3: CONFIRMATION SCORE (0-20 points) - Validates entry
+// Based on ICT confirmations: FVG → Displacement → Killzone → Silver Bullet
+// ═══════════════════════════════════════════════════════════════════════════════
+
+confirmationScore = 0.0
+
+// 3A. FVG PRESENT (0-5 points) - 4,567 Cortex mentions
 bullFVGAbove = false
 bearFVGBelow = false
 
@@ -1603,286 +1617,283 @@ if array.size(bearFVGs) > 0
             bearFVGBelow := true
             break
 
-if bullFVGAbove
-    bullScore += 10
-if bearFVGBelow
-    bearScore += 10
+hasFVGTarget = (bullFVGAbove and msDirection == DIR_BULL) or (bearFVGBelow and msDirection == DIR_BEAR)
+hasFVGPresent = array.size(bullFVGs) > 0 or array.size(bearFVGs) > 0
 
-// 7. OTE ZONE (Weight: 15) - 4,123 mentions
-if inOTE and msDirection == DIR_BULL
-    bullScore += 15
-if inOTE and msDirection == DIR_BEAR
-    bearScore += 15
+if hasFVGTarget
+    confirmationScore += 5
+else if hasFVGPresent
+    confirmationScore += 2
 
-// 8. KILLZONE TIMING (Weight: 10) - 3,892 mentions
-if nyAMKZ or nyPMKZ
-    if msDirection == DIR_BULL
-        bullScore += 10
-    else if msDirection == DIR_BEAR
-        bearScore += 10
+// 3B. DISPLACEMENT (0-5 points) - 2,123 Cortex mentions
+hasDisplacement = (displacementUp and msDirection == DIR_BULL) or (displacementDown and msDirection == DIR_BEAR)
+if hasDisplacement
+    confirmationScore += 5
 
-// 9. SILVER BULLET (Weight: 12) - 3,456 mentions
-if inSilverBullet
-    if msDirection == DIR_BULL
-        bullScore += 12
-    else if msDirection == DIR_BEAR
-        bearScore += 12
+// 3C. KILLZONE TIMING (0-5 points) - 3,892 Cortex mentions
+hasKillzone = londonKZ or nyAMKZ or nyPMKZ
+if hasKillzone
+    confirmationScore += 5
 
-// 10. POWER OF THREE (Weight: 8) - 3,234 mentions
-if po3Phase == "DISTRIBUTION"
-    if msDirection == DIR_BULL
-        bullScore += 8
-    else if msDirection == DIR_BEAR
-        bearScore += 8
-
-// 11. 2022 MODEL (Weight: 18) - 2,891 mentions (high conviction)
-if model2022Bull
-    bullScore += 18
-if model2022Bear
-    bearScore += 18
-
-// 12. TURTLE SOUP (Weight: 15) - 2,567 mentions
-if bullishTS
-    bullScore += 15
-if bearishTS
-    bearScore += 15
-
-// 13. JUDAS SWING (Weight: 12) - 2,345 mentions
-if bullishJudas
-    bullScore += 12
-if bearishJudas
-    bearScore += 12
-
-// 14. DISPLACEMENT (Weight: 10) - 2,123 mentions
-if displacementUp
-    bullScore += 10
-if displacementDown
-    bearScore += 10
-
-// 15. IPDA HISTORICAL LEVELS (Weight: 8) - 1,892 mentions
-distToIPDAHigh = math.abs(close - high60IPDA)
-distToIPDALow = math.abs(close - low60IPDA)
-
-if distToIPDAHigh < distToIPDALow * 0.3 and msDirection == DIR_BULL
-    bullScore += 8
-if distToIPDALow < distToIPDAHigh * 0.3 and msDirection == DIR_BEAR
-    bearScore += 8
-
-// 16. MIDNIGHT OPEN (Weight: 5) - 1,678 mentions
-if not na(midnightOpen)
-    if close > midnightOpen and msDirection == DIR_BULL
-        bullScore += 5
-    else if close < midnightOpen and msDirection == DIR_BEAR
-        bearScore += 5
-
-// 17. CBDR SD (Weight: 8) - CBDR as institutional framework
-if not na(cbdrSD1High) and not na(cbdrSD1Low)
-    if close > cbdrHigh and close < cbdrSD1High
-        bullScore += 8
-    else if close < cbdrLow and close > cbdrSD1Low
-        bearScore += 8
-
-// 18. NWOG (Weight: 6) - New Week Opening Gap
-if not na(nwogCE)
-    if close > nwogCE and msDirection == DIR_BULL
-        bullScore += 6
-    else if close < nwogCE and msDirection == DIR_BEAR
-        bearScore += 6
-
-// 19. MACRO TIME (Weight: 3) - Increased volatility
-if isMacroTime
-    bullScore += 3
-    bearScore += 3
-
-// 20. UNICORN MODEL (Weight: 20) - High conviction breaker + FVG overlap
-if unicornBull
-    bullScore += 20
-if unicornBear
-    bearScore += 20
-
-// 21. AMD FRACTAL (Weight: 15) - Nested AMD alignment
-if amdFractalBull
-    bullScore += 15
-if amdFractalBear
-    bearScore += 15
-
-// 22. MMXM (Weight: 18) - Market Maker Model confirmation
-if mmxmBullConfirm
-    bullScore += 18
-if mmxmBearConfirm
-    bearScore += 18
-
-// 23. SEASONAL TENDENCY (Weight: 5) - Historical seasonal bias
-if seasonalBullish and msDirection == DIR_BULL
-    bullScore += 5
-if seasonalBearish and msDirection == DIR_BEAR
-    bearScore += 5
+// 3D. SILVER BULLET WINDOW (0-5 points) - 3,456 Cortex mentions
+hasSilverBullet = inSilverBullet
+if hasSilverBullet
+    confirmationScore += 5
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CALCULATE FINAL DOL DIRECTION
+// LAYER 4: COMBINATION BONUSES (0-25 points) - ICT's preferred confluences
+// Based on Cortex co-mention analysis of high-probability combinations
 // ═══════════════════════════════════════════════════════════════════════════════
 
-totalScore = bullScore + bearScore
-dolProbability := totalScore > 0 ? math.max(bullScore, bearScore) / totalScore * 100 : 50
+comboScore = 0.0
 
-if bullScore > bearScore
+// Combo 1: Liquidity + OTE (179 co-mentions) - ICT's #1 entry setup
+if hasLiquidityTarget and inOTE
+    comboScore += 8
+
+// Combo 2: FVG + Zone Alignment (104 co-mentions)
+if hasFVGPresent and isCorrectZone
+    comboScore += 5
+
+// Combo 3: OTE + Order Block (93 co-mentions)
+if inOTE and hasFreshOB
+    comboScore += 5
+
+// Combo 4: Displacement + FVG (creates IFVG potential)
+if hasDisplacement and hasFVGPresent
+    comboScore += 4
+
+// Combo 5: Full MTF + Killzone (time + direction alignment)
+if hasMTFAlignment and hasKillzone
+    comboScore += 3
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYER 5: TRIGGER DETECTION - What fires the signal
+// High-conviction setups that represent complete ICT models
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var string activeTrigger = "NONE"
+var float triggerMultiplier = 1.0
+activeTrigger := "NONE"
+triggerMultiplier := 0.7  // Default: no trigger = 70% of score (capped at MODERATE)
+
+// Detect which trigger is active (priority order)
+hasModel2022 = model2022Bull or model2022Bear
+hasTurtleSoup = bullishTS or bearishTS
+hasJudas = bullishJudas or bearishJudas
+hasUnicorn = unicornBull or unicornBear
+hasMMXM = mmxmBullConfirm or mmxmBearConfirm
+hasAMDFractal = amdFractalBull or amdFractalBear
+
+// High-conviction triggers (1.2x multiplier)
+if hasUnicorn
+    activeTrigger := "UNICORN"
+    triggerMultiplier := 1.25
+else if hasMMXM
+    activeTrigger := "MMXM"
+    triggerMultiplier := 1.2
+else if hasModel2022
+    activeTrigger := "2022 MODEL"
+    triggerMultiplier := 1.2
+else if hasTurtleSoup
+    activeTrigger := "TURTLE SOUP"
+    triggerMultiplier := 1.15
+else if hasAMDFractal
+    activeTrigger := "AMD FRACTAL"
+    triggerMultiplier := 1.1
+else if hasJudas
+    activeTrigger := "JUDAS SWING"
+    triggerMultiplier := 1.1
+// Standard triggers (1.0x multiplier)
+else if hasCHoCH
+    activeTrigger := "CHoCH"
+    triggerMultiplier := 1.0
+else if hasBOS
+    activeTrigger := "BOS"
+    triggerMultiplier := 0.9
+else if hasSilverBullet and hasKillzone
+    activeTrigger := "SILVER BULLET"
+    triggerMultiplier := 1.0
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CALCULATE FINAL COMPOSITE SCORE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Raw score out of 100
+rawScore = foundationScore + zoneScore + confirmationScore + comboScore
+
+// Apply trigger multiplier (capped at 100)
+compositeScore := math.min(rawScore * triggerMultiplier, 100)
+
+// Store individual layer scores for display
+var float displayFoundation = 0.0
+var float displayZone = 0.0
+var float displayConfirmation = 0.0
+var float displayCombo = 0.0
+displayFoundation := foundationScore
+displayZone := zoneScore
+displayConfirmation := confirmationScore
+displayCombo := comboScore
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DETERMINE DIRECTION (separate from quality score)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Direction based on market structure (not score comparison)
+if msDirection == DIR_BULL
     dolDirection := DIR_BULL
     dolTarget := not na(nearestBSL) ? nearestBSL : high20IPDA
-else if bearScore > bullScore
+else if msDirection == DIR_BEAR
     dolDirection := DIR_BEAR
     dolTarget := not na(nearestSSL) ? nearestSSL : low20IPDA
 else
     dolDirection := DIR_NEUTRAL
     dolTarget := equilibrium
 
-// Build reason string with readable labels
+// Legacy probability for compatibility (now based on composite score)
+dolProbability := compositeScore
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BUILD REASON STRING WITH LAYER BREAKDOWN
+// ═══════════════════════════════════════════════════════════════════════════════
+
 if dolDirection == DIR_BULL
-    dolReason := "BULLISH STRUCTURE"
-    dolReason += htfBias == DIR_BULL ? " • HTF ALIGNED" : ""
-    dolReason += inDiscount ? " • IN DISCOUNT" : ""
-    dolReason += inOTE ? " • OTE ZONE" : ""
-    dolReason += bullishTS ? " • TURTLE SOUP" : ""
-    dolReason += model2022Bull ? " • 2022 MODEL" : ""
-    dolReason += unicornBull ? " • UNICORN" : ""
-    dolReason += mmxmBullConfirm ? " • MMXM" : ""
-    dolReason += amdFractalBull ? " • AMD FRACTAL" : ""
-    dolReason += seasonalBullish ? " • SEASONAL" : ""
+    dolReason := "BULLISH"
+    dolReason += hasHTFAlignment ? " • HTF" : ""
+    dolReason += isCorrectZone ? " • DISCOUNT" : ""
+    dolReason += inOTE ? " • OTE" : ""
+    dolReason += hasFreshOB ? " • OB" : ""
+    dolReason += hasDisplacement ? " • DISP" : ""
+    dolReason += hasKillzone ? " • KZ" : ""
+    dolReason += activeTrigger != "NONE" ? " • " + activeTrigger : ""
 else if dolDirection == DIR_BEAR
-    dolReason := "BEARISH STRUCTURE"
-    dolReason += htfBias == DIR_BEAR ? " • HTF ALIGNED" : ""
-    dolReason += inPremium ? " • IN PREMIUM" : ""
-    dolReason += inOTE ? " • OTE ZONE" : ""
-    dolReason += bearishTS ? " • TURTLE SOUP" : ""
-    dolReason += model2022Bear ? " • 2022 MODEL" : ""
-    dolReason += unicornBear ? " • UNICORN" : ""
-    dolReason += mmxmBearConfirm ? " • MMXM" : ""
-    dolReason += amdFractalBear ? " • AMD FRACTAL" : ""
-    dolReason += seasonalBearish ? " • SEASONAL" : ""
+    dolReason := "BEARISH"
+    dolReason += hasHTFAlignment ? " • HTF" : ""
+    dolReason += isCorrectZone ? " • PREMIUM" : ""
+    dolReason += inOTE ? " • OTE" : ""
+    dolReason += hasFreshOB ? " • OB" : ""
+    dolReason += hasDisplacement ? " • DISP" : ""
+    dolReason += hasKillzone ? " • KZ" : ""
+    dolReason += activeTrigger != "NONE" ? " • " + activeTrigger : ""
 else
-    dolReason := "NEUTRAL - NO CLEAR BIAS"
+    dolReason := "NEUTRAL - AWAITING STRUCTURE"
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
-// ║                        COMPOSITE PATTERN SCORING                               ║
+// ║                        COMPOSITE TIER ASSIGNMENT                               ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-// Tier calculation based on confluence
-compositeScore := dolProbability
+// Tier requirements (absolute, not relative)
+// ELITE: 85+ with high-conviction trigger and complete foundation
+// PREMIUM: 70-84 with any trigger and good foundation
+// STRONG: 55-69 with foundation
+// MODERATE: 40-54
+// WEAK: <40
 
-// Count active confluence factors for pattern naming (16 factors total)
+isHighConvictionTrigger = hasUnicorn or hasMMXM or hasModel2022 or hasTurtleSoup
+isAnyTrigger = activeTrigger != "NONE"
+
+// Count total confluences for display
 confluenceCount = 0
-hasHTFAlignment = htfBias == DIR_BULL and msDirection == DIR_BULL or htfBias == DIR_BEAR and msDirection == DIR_BEAR
-hasZoneAlignment = (inDiscount and msDirection == DIR_BULL) or (inPremium and msDirection == DIR_BEAR)
-hasOTEEntry = inOTE
-hasModel2022 = model2022Bull or model2022Bear
-hasTurtleSoup = bullishTS or bearishTS
-hasJudas = bullishJudas or bearishJudas
-hasDisplacement = displacementUp or displacementDown
-hasSilverBullet = inSilverBullet
-hasFreshOB = atBullOB or atBearOB
-// Expanded factors
-hasKillzone = londonKZ or nyAMKZ or nyPMKZ
-hasFVGPresent = array.size(bullFVGs) > 0 or array.size(bearFVGs) > 0
-hasMTFAlignment = (mtfBiasW == 1 and mtfBiasD == 1 and mtfBias1H == 1 and mtfBias15m == 1) or (mtfBiasW == -1 and mtfBiasD == -1 and mtfBias1H == -1 and mtfBias15m == -1)
-// New ICT models
-hasUnicorn = unicornBull or unicornBear
-hasMMXM = mmxmBullConfirm or mmxmBearConfirm
-hasAMDFractal = amdFractalBull or amdFractalBear
-hasSeasonal = (seasonalBullish and msDirection == DIR_BULL) or (seasonalBearish and msDirection == DIR_BEAR)
-
+if hasMSClear
+    confluenceCount += 1
 if hasHTFAlignment
-    confluenceCount += 1
-if hasZoneAlignment
-    confluenceCount += 1
-if hasOTEEntry
-    confluenceCount += 1
-if hasModel2022
-    confluenceCount += 1
-if hasTurtleSoup
-    confluenceCount += 1
-if hasJudas
-    confluenceCount += 1
-if hasDisplacement
-    confluenceCount += 1
-if hasSilverBullet
-    confluenceCount += 1
-if hasFreshOB
-    confluenceCount += 1
-if hasKillzone
-    confluenceCount += 1
-if hasFVGPresent
     confluenceCount += 1
 if hasMTFAlignment
     confluenceCount += 1
-if hasUnicorn
-    confluenceCount += 2  // Unicorn is worth 2 points (high conviction)
-if hasMMXM
-    confluenceCount += 2  // MMXM is worth 2 points (complete sequence)
-if hasAMDFractal
+if hasLiquidityTarget
     confluenceCount += 1
-if hasSeasonal
+if isCorrectZone
     confluenceCount += 1
+if inOTE
+    confluenceCount += 1
+if hasFreshOB
+    confluenceCount += 1
+if hasFVGPresent
+    confluenceCount += 1
+if hasDisplacement
+    confluenceCount += 1
+if hasKillzone
+    confluenceCount += 1
+if hasSilverBullet
+    confluenceCount += 1
+if isHighConvictionTrigger
+    confluenceCount += 2  // High-conviction triggers count as 2
+
+// Assign tier with requirements
+if compositeScore >= 85 and isHighConvictionTrigger and hasFoundationComplete
+    compositeTier := TIER_1  // ELITE
+else if compositeScore >= 70 and isAnyTrigger and hasFoundationComplete
+    compositeTier := TIER_2  // PREMIUM
+else if compositeScore >= 55 and hasFoundationComplete
+    compositeTier := TIER_3  // STRONG
+else if compositeScore >= 40
+    compositeTier := TIER_4  // MODERATE
+else
+    compositeTier := TIER_5  // WEAK
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PATTERN NAMES (5-Tier System Based on confluence combination)
+// PATTERN NAMES (Based on active trigger and tier)
 // ═══════════════════════════════════════════════════════════════════════════════
 patternName := ""
 
-// TIER 1 ELITE (90%+) - Highest probability setups
-if compositeScore >= i_tier1Threshold
-    if hasUnicorn and hasOTEEntry and hasHTFAlignment
-        patternName := "🦄 UNICORN SETUP"  // Legendary breaker + FVG confluence
-    else if hasMMXM and hasOTEEntry
-        patternName := "📊 MMXM CONFIRMED"  // Full market maker sequence
-    else if hasModel2022 and hasOTEEntry and hasHTFAlignment and hasMTFAlignment
-        patternName := "💎 DIAMOND SETUP"  // Perfect alignment
-    else if hasModel2022 and hasOTEEntry and hasHTFAlignment
-        patternName := "🏆 THE APEX"  // Perfect 2022 model setup
-    else if hasTurtleSoup and hasOTEEntry and hasZoneAlignment and hasSilverBullet
-        patternName := "🏆 PERFECT STORM"  // All key elements
-    else if confluenceCount >= 8
-        patternName := "🏆 MEGA CONFLUENCE"  // 8+ confluences
+// TIER 1 ELITE - Highest probability setups
+if compositeTier == TIER_1
+    if activeTrigger == "UNICORN"
+        patternName := "🦄 UNICORN SETUP"
+    else if activeTrigger == "MMXM"
+        patternName := "📊 MMXM CONFIRMED"
+    else if activeTrigger == "2022 MODEL" and hasMTFAlignment
+        patternName := "💎 DIAMOND SETUP"
+    else if activeTrigger == "2022 MODEL"
+        patternName := "🏆 THE APEX"
+    else if activeTrigger == "TURTLE SOUP" and hasSilverBullet
+        patternName := "🏆 PERFECT STORM"
+    else if confluenceCount >= 10
+        patternName := "🏆 MEGA CONFLUENCE"
     else
         patternName := "🏆 ELITE SETUP"
 
-// TIER 2 PREMIUM (80-89%) - Very strong setups
-else if compositeScore >= i_tier2Threshold
-    if hasUnicorn
-        patternName := "🦄 UNICORN ZONE"  // Breaker + FVG overlap
-    else if hasMMXM
-        patternName := "📊 MMXM SETUP"  // Market maker sequence forming
-    else if hasAMDFractal
-        patternName := "🔄 AMD FRACTAL"  // Nested AMD alignment
-    else if hasTurtleSoup and hasOTEEntry and hasZoneAlignment
-        patternName := "⭐ SWEET SPOT"  // TS + OTE + Zone
-    else if hasJudas and hasHTFAlignment and hasSilverBullet
-        patternName := "⭐ JUDAS TRAP"  // London false move in SB window
-    else if hasDisplacement and hasFreshOB and hasZoneAlignment
-        patternName := "⭐ EXECUTION"  // Clean displacement entry
-    else if confluenceCount >= 5
-        patternName := "⭐ PREMIUM SETUP"  // 5+ confluences
+// TIER 2 PREMIUM - Very strong setups
+else if compositeTier == TIER_2
+    if activeTrigger == "UNICORN"
+        patternName := "🦄 UNICORN ZONE"
+    else if activeTrigger == "MMXM"
+        patternName := "📊 MMXM SETUP"
+    else if activeTrigger == "AMD FRACTAL"
+        patternName := "🔄 AMD FRACTAL"
+    else if activeTrigger == "TURTLE SOUP"
+        patternName := "⭐ SWEET SPOT"
+    else if activeTrigger == "JUDAS SWING"
+        patternName := "⭐ JUDAS TRAP"
+    else if activeTrigger == "2022 MODEL"
+        patternName := "⭐ 2022 ENTRY"
+    else if activeTrigger == "SILVER BULLET"
+        patternName := "⭐ BULLET TIME"
+    else if confluenceCount >= 7
+        patternName := "⭐ PREMIUM SETUP"
     else
         patternName := "⭐ STRONG BIAS"
 
-// TIER 3 STRONG (65-79%) - Good setups
-else if compositeScore >= i_tier3Threshold
-    if hasOTEEntry and hasZoneAlignment
-        patternName := "🥈 OTE ZONE"  // OTE + P/D alignment
-    else if hasTurtleSoup and hasHTFAlignment
-        patternName := "🥈 SOUP ALIGNED"  // TS with HTF
+// TIER 3 STRONG - Good setups
+else if compositeTier == TIER_3
+    if inOTE and isCorrectZone
+        patternName := "🥈 OTE ZONE"
+    else if activeTrigger == "TURTLE SOUP"
+        patternName := "🥈 SOUP ALIGNED"
     else if hasDisplacement and hasFreshOB
-        patternName := "🥈 OB PLAY"  // Displacement to OB
-    else if hasSilverBullet and hasZoneAlignment
-        patternName := "🥈 BULLET TIME"  // SB in correct zone
-    else if hasJudas
-        patternName := "🥈 JUDAS MOVE"  // Judas swing detected
-    else if hasSeasonal
-        patternName := "🥈 SEASONAL PLAY"  // Seasonal tendency aligned
+        patternName := "🥈 OB PLAY"
+    else if activeTrigger == "CHoCH"
+        patternName := "🥈 CHoCH ENTRY"
+    else if activeTrigger == "BOS"
+        patternName := "🥈 BOS PLAY"
+    else if hasSilverBullet
+        patternName := "🥈 BULLET WINDOW"
     else
         patternName := "🥈 GOOD SETUP"
 
-// TIER 4 MODERATE (50-64%) - Developing setups
-else if compositeScore >= i_tier4Threshold
-    if hasZoneAlignment
+// TIER 4 MODERATE - Developing setups
+else if compositeTier == TIER_4
+    if isCorrectZone
         patternName := "🥉 ZONE PLAY"
     else if hasDisplacement
         patternName := "🥉 MOMENTUM"
@@ -1893,7 +1904,7 @@ else if compositeScore >= i_tier4Threshold
     else
         patternName := "🥉 DEVELOPING"
 
-// TIER 5 WEAK (Below 50%) - Low probability
+// TIER 5 WEAK - Low probability
 else
     if hasFVGPresent
         patternName := "⚠️ FVG ONLY"
@@ -1901,18 +1912,6 @@ else
         patternName := "⚠️ WAITING"
     else
         patternName := "⚠️ NO SETUP"
-
-if i_showComposite
-    if compositeScore >= i_tier1Threshold
-        compositeTier := TIER_1
-    else if compositeScore >= i_tier2Threshold
-        compositeTier := TIER_2
-    else if compositeScore >= i_tier3Threshold
-        compositeTier := TIER_3
-    else if compositeScore >= i_tier4Threshold
-        compositeTier := TIER_4
-    else
-        compositeTier := TIER_5
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        🎨 VISUAL RENDERING                                     ║
@@ -2243,7 +2242,7 @@ var color accentLine = color.new(#0F3460, 0)
 var color textDim = color.new(#8892B0, 0)
 var color textBright = color.new(#E6F1FF, 0)
 
-var table infoTable = table.new(position.middle_right, 2, 14, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
+var table infoTable = table.new(position.middle_right, 2, 18, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
 
 if i_showDOLTable and barstate.islast
     // ═══ HEADER - Merged and centered ═══
@@ -2322,58 +2321,72 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 7, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
     table.cell(infoTable, 1, 7, sessDisplay, text_color=kzActive ? kzColor : textDim, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
-    // ═══ CONFLUENCE COUNT (16 factors) ═══
-    // Build dots string dynamically (capped at 16 for display)
-    confDots = ""
-    displayCount = math.min(confluenceCount, 16)
-    for i = 0 to 15
-        confDots := confDots + (i < displayCount ? "●" : "○")
-    confLabel = confluenceCount >= 12 ? "STRONG" : confluenceCount >= 8 ? "GOOD" : confluenceCount >= 5 ? "MODERATE" : "WEAK"
-    confColor = confluenceCount >= 12 ? color.new(#00E676, 0) : confluenceCount >= 8 ? i_bullColor : confluenceCount >= 5 ? i_pacmanColor : textDim
-    confDisplay = "(" + str.tostring(confluenceCount) + "/16)"
-    table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 8, confDots + " " + confDisplay, text_color=confColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+    // ═══ SCORING BREAKDOWN HEADER ═══
+    table.cell(infoTable, 0, 8, "─── SCORE BREAKDOWN ───", text_color=textDim, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 8, 1, 8)
 
-    // ═══ WEEKLY PROFILE & S&D (ICT Day of Week Theory) ═══
-    // Mon-Wed = High/Low forming, Thu-Fri = Trade in bias
-    isFormingDays = isMonday or isTuesday or isWednesday
-    isTradeDays = isThursday or isFriday
-
-    // Check for Seek & Destroy (whipsaw - don't trade)
-    isSeekDestroy = sdPhase == "SEEK" or sdPhase == "WATCH" or sdPhase == "DESTROY_BEARS" or sdPhase == "DESTROY_BULLS"
-
-    // Build display based on priority: S&D > Day phase
-    weeklyDisplay = isSeekDestroy ? "⚠ SEEK & DESTROY" : isFormingDays ? "MON-WED ◉ FORMING" : isTradeDays ? "THU-FRI ◉ TRADE" : "—"
-    weeklyColor = isSeekDestroy ? i_bearColor : isFormingDays ? i_pacmanColor : isTradeDays ? i_bullColor : textDim
-
-    table.cell(infoTable, 0, 9, "Weekly", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 9, weeklyDisplay, text_color=weeklyColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
-
-    // ═══ GAP (Opening Range Gap) - Gradient Fill Bar ═══
-    string gapArrow = hasORG ? (gapIsAbove ? "↑" : "↓") : "—"
-    int gapFillBlocks = math.round(gapFillPct / 10)  // 0-10 blocks
-    string gapBar = ""
+    // ═══ FOUNDATION SCORE (0-30) ═══
+    foundationBar = ""
+    foundationPct = math.round(displayFoundation / 30 * 10)
     for i = 0 to 9
-        gapBar := gapBar + (i < gapFillBlocks ? "▓" : "░")
-    string gapDisplay = hasORG ? gapArrow + " " + gapBar + " " + str.tostring(math.round(gapFillPct)) + "%" : "— ░░░░░░░░░░ 0%"
-    gapColor = hasORG ? (gapFillPct >= 100 ? i_bullColor : color.new(#FF9800, 0)) : textDim
-    table.cell(infoTable, 0, 10, "GAP", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 10, gapDisplay, text_color=gapColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
+        foundationBar := foundationBar + (i < foundationPct ? "█" : "░")
+    foundationColor = displayFoundation >= 20 ? #00E676 : displayFoundation >= 15 ? #FFD740 : #FF5252
+    table.cell(infoTable, 0, 9, "Foundation", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 9, foundationBar + " " + str.tostring(displayFoundation, "#") + "/30", text_color=foundationColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+
+    // ═══ ZONE SCORE (0-25) ═══
+    zoneBar = ""
+    zonePct = math.round(math.max(displayZone, 0) / 25 * 10)
+    for i = 0 to 9
+        zoneBar := zoneBar + (i < zonePct ? "█" : "░")
+    zoneScoreColor = displayZone >= 15 ? #00E676 : displayZone >= 10 ? #FFD740 : displayZone > 0 ? #FF9800 : #FF5252
+    table.cell(infoTable, 0, 10, "Entry Zone", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 10, zoneBar + " " + str.tostring(math.max(displayZone, 0), "#") + "/25", text_color=zoneScoreColor, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_right)
+
+    // ═══ CONFIRMATION SCORE (0-20) ═══
+    confBar = ""
+    confPct = math.round(displayConfirmation / 20 * 10)
+    for i = 0 to 9
+        confBar := confBar + (i < confPct ? "█" : "░")
+    confScoreColor = displayConfirmation >= 15 ? #00E676 : displayConfirmation >= 10 ? #FFD740 : displayConfirmation > 0 ? #FF9800 : #FF5252
+    table.cell(infoTable, 0, 11, "Confirmation", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 11, confBar + " " + str.tostring(displayConfirmation, "#") + "/20", text_color=confScoreColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+
+    // ═══ COMBO BONUS (0-25) ═══
+    comboBar = ""
+    comboPct = math.round(displayCombo / 25 * 10)
+    for i = 0 to 9
+        comboBar := comboBar + (i < comboPct ? "█" : "░")
+    comboColor = displayCombo >= 15 ? #00E676 : displayCombo >= 8 ? #FFD740 : displayCombo > 0 ? #FF9800 : textDim
+    table.cell(infoTable, 0, 12, "Combo Bonus", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 12, comboBar + " " + str.tostring(displayCombo, "#") + "/25", text_color=comboColor, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_right)
+
+    // ═══ TRIGGER & MULTIPLIER ═══
+    triggerDisplay = activeTrigger != "NONE" ? activeTrigger + " ×" + str.tostring(triggerMultiplier, "#.##") : "NO TRIGGER ×0.7"
+    triggerColor = triggerMultiplier >= 1.2 ? #00E676 : triggerMultiplier >= 1.0 ? #FFD740 : #FF9800
+    table.cell(infoTable, 0, 13, "Trigger", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 13, triggerDisplay, text_color=triggerColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+
+    // ═══ TOTAL SCORE ═══
+    totalDisplay = str.tostring(compositeScore, "#") + "/100"
+    totalColor = compositeScore >= 85 ? #00E676 : compositeScore >= 70 ? #69F0AE : compositeScore >= 55 ? #FFD740 : compositeScore >= 40 ? #FF9800 : #FF5252
+    table.cell(infoTable, 0, 14, "TOTAL SCORE", text_color=textBright, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 14, totalDisplay, text_color=totalColor, text_size=size.small, bgcolor=headerBg, text_halign=text.align_right)
 
     // ═══ KEY FACTORS - Compact ═══
-    table.cell(infoTable, 0, 11, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 11, 1, 11)
+    table.cell(infoTable, 0, 15, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 15, 1, 15)
 
     // ═══ TARGET ═══
-    table.cell(infoTable, 0, 12, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 12, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
+    table.cell(infoTable, 0, 16, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 16, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
     // ═══ TIER INDICATOR BAR (5-Tier System) ═══
     tierLabel = compositeTier == TIER_1 ? "ELITE" : compositeTier == TIER_2 ? "PREMIUM" : compositeTier == TIER_3 ? "STRONG" : compositeTier == TIER_4 ? "MODERATE" : "WEAK"
     tierBar = compositeTier == TIER_1 ? "████████████ " + tierLabel : compositeTier == TIER_2 ? "██████████░░ " + tierLabel : compositeTier == TIER_3 ? "████████░░░░ " + tierLabel : compositeTier == TIER_4 ? "██████░░░░░░ " + tierLabel : "████░░░░░░░░ " + tierLabel
     tierColor = compositeTier == TIER_1 ? #00E676 : compositeTier == TIER_2 ? #69F0AE : compositeTier == TIER_3 ? #FFD740 : compositeTier == TIER_4 ? #FF9800 : #FF5252
-    table.cell(infoTable, 0, 13, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 13, 1, 13)
+    table.cell(infoTable, 0, 17, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 17, 1, 17)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALERTS (Reduced to stay under 64 plot limit)
