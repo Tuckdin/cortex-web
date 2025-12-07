@@ -472,6 +472,68 @@ var int lastGhostPoints = 0              // Points from last ghost eaten
 // Level System (based on composite tier)
 var int currentLevel = 1
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📊 SETUP TRACKING SYSTEM - Performance Analytics
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Trade tracking type
+type TradeRecord
+    int barIndex           // When setup was generated
+    string setupType       // Pattern name
+    int tier              // 1-5 tier
+    int direction         // 1=long, -1=short
+    float entryPrice      // Entry level
+    float stopLoss        // Stop loss level
+    float target          // Target level
+    float rr              // Risk:Reward
+    string outcome        // "PENDING", "WIN", "LOSS", "BREAKEVEN"
+    float pnlPercent      // Actual P&L %
+    int confluenceCount   // Number of confluences
+    bool inKillzone       // Was in killzone
+    bool inOTE            // Was in OTE
+
+// Session tracking arrays (max 100 trades per session)
+var array<TradeRecord> sessionTrades = array.new<TradeRecord>()
+
+// Session statistics
+var int sessionWins = 0
+var int sessionLosses = 0
+var int sessionPending = 0
+var float sessionTotalRR = 0.0
+var float sessionBestRR = 0.0
+var float sessionWorstRR = 0.0
+var int totalSetupsGenerated = 0
+
+// Tier-specific tracking
+var int tier1Wins = 0
+var int tier1Losses = 0
+var int tier2Wins = 0
+var int tier2Losses = 0
+var int tier3Wins = 0
+var int tier3Losses = 0
+
+// Pattern-specific tracking (top 5 patterns)
+var int unicornWins = 0
+var int unicornLosses = 0
+var int mmxmWins = 0
+var int mmxmLosses = 0
+var int model2022Wins = 0
+var int model2022Losses = 0
+var int turtleSoupWins = 0
+var int turtleSoupLosses = 0
+var int judasWins = 0
+var int judasLosses = 0
+
+// Current active trade tracking
+var bool hasActiveTrade = false
+var float activeEntry = na
+var float activeStop = na
+var float activeTarget = na
+var int activeDirection = 0
+var int activeBar = 0
+var string activePattern = ""
+var int activeTier = 0
+
 // Market Structure
 var int msDirection = 0
 var float lastSwingHigh = na
@@ -3570,6 +3632,231 @@ else
     currentFruit := ""
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                   📊 SETUP TRACKING & OUTCOME DETECTION 📊                     ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DETECT NEW SETUP (Tier 1-3 with valid entry conditions)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// A valid setup is generated when:
+// - Tier 1, 2, or 3
+// - Has a trigger pattern
+// - Has valid stop loss and target
+// - Not already tracking an active trade
+
+newSetupGenerated = (compositeTier <= TIER_3) and isAnyTrigger and not na(stopLoss) and not na(dolTarget) and not hasActiveTrade and barstate.isconfirmed
+
+if newSetupGenerated
+    // Record the new setup
+    hasActiveTrade := true
+    activeEntry := close
+    activeStop := stopLoss
+    activeTarget := dolTarget
+    activeDirection := dolDirection
+    activeBar := bar_index
+    activePattern := activeTrigger
+    activeTier := compositeTier
+    totalSetupsGenerated := totalSetupsGenerated + 1
+
+    // Create trade record
+    newTrade = TradeRecord.new()
+    newTrade.barIndex := bar_index
+    newTrade.setupType := activeTrigger
+    newTrade.tier := compositeTier
+    newTrade.direction := dolDirection
+    newTrade.entryPrice := close
+    newTrade.stopLoss := stopLoss
+    newTrade.target := dolTarget
+    newTrade.rr := riskReward
+    newTrade.outcome := "PENDING"
+    newTrade.pnlPercent := 0.0
+    newTrade.confluenceCount := confluenceCount
+    newTrade.inKillzone := hasKillzone
+    newTrade.inOTE := inOTE
+
+    // Add to session trades (limit to 100)
+    if array.size(sessionTrades) >= 100
+        array.shift(sessionTrades)
+    array.push(sessionTrades, newTrade)
+    sessionPending := sessionPending + 1
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TRACK TRADE OUTCOME (Target Hit vs Stop Hit)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if hasActiveTrade
+    // Check for LONG trade outcome
+    if activeDirection == DIR_BULL
+        // Target hit (WIN)
+        if high >= activeTarget
+            hasActiveTrade := false
+            sessionWins := sessionWins + 1
+            sessionPending := sessionPending - 1
+            actualRR = (activeTarget - activeEntry) / (activeEntry - activeStop)
+            sessionTotalRR := sessionTotalRR + actualRR
+            if actualRR > sessionBestRR
+                sessionBestRR := actualRR
+
+            // Update tier stats
+            if activeTier == TIER_1
+                tier1Wins := tier1Wins + 1
+            else if activeTier == TIER_2
+                tier2Wins := tier2Wins + 1
+            else if activeTier == TIER_3
+                tier3Wins := tier3Wins + 1
+
+            // Update pattern stats
+            if activePattern == "UNICORN"
+                unicornWins := unicornWins + 1
+            else if activePattern == "MMXM"
+                mmxmWins := mmxmWins + 1
+            else if activePattern == "2022 MODEL"
+                model2022Wins := model2022Wins + 1
+            else if activePattern == "TURTLE SOUP"
+                turtleSoupWins := turtleSoupWins + 1
+            else if activePattern == "JUDAS SWING"
+                judasWins := judasWins + 1
+
+            // Update last trade record
+            if array.size(sessionTrades) > 0
+                lastTrade = array.get(sessionTrades, array.size(sessionTrades) - 1)
+                lastTrade.outcome := "WIN"
+                lastTrade.pnlPercent := actualRR
+
+        // Stop hit (LOSS)
+        else if low <= activeStop
+            hasActiveTrade := false
+            sessionLosses := sessionLosses + 1
+            sessionPending := sessionPending - 1
+            actualRR = -1.0  // Lost 1R
+            sessionTotalRR := sessionTotalRR + actualRR
+            if actualRR < sessionWorstRR or sessionWorstRR == 0
+                sessionWorstRR := actualRR
+
+            // Update tier stats
+            if activeTier == TIER_1
+                tier1Losses := tier1Losses + 1
+            else if activeTier == TIER_2
+                tier2Losses := tier2Losses + 1
+            else if activeTier == TIER_3
+                tier3Losses := tier3Losses + 1
+
+            // Update pattern stats
+            if activePattern == "UNICORN"
+                unicornLosses := unicornLosses + 1
+            else if activePattern == "MMXM"
+                mmxmLosses := mmxmLosses + 1
+            else if activePattern == "2022 MODEL"
+                model2022Losses := model2022Losses + 1
+            else if activePattern == "TURTLE SOUP"
+                turtleSoupLosses := turtleSoupLosses + 1
+            else if activePattern == "JUDAS SWING"
+                judasLosses := judasLosses + 1
+
+            // Update last trade record
+            if array.size(sessionTrades) > 0
+                lastTrade = array.get(sessionTrades, array.size(sessionTrades) - 1)
+                lastTrade.outcome := "LOSS"
+                lastTrade.pnlPercent := actualRR
+
+    // Check for SHORT trade outcome
+    else if activeDirection == DIR_BEAR
+        // Target hit (WIN)
+        if low <= activeTarget
+            hasActiveTrade := false
+            sessionWins := sessionWins + 1
+            sessionPending := sessionPending - 1
+            actualRR = (activeEntry - activeTarget) / (activeStop - activeEntry)
+            sessionTotalRR := sessionTotalRR + actualRR
+            if actualRR > sessionBestRR
+                sessionBestRR := actualRR
+
+            // Update tier stats
+            if activeTier == TIER_1
+                tier1Wins := tier1Wins + 1
+            else if activeTier == TIER_2
+                tier2Wins := tier2Wins + 1
+            else if activeTier == TIER_3
+                tier3Wins := tier3Wins + 1
+
+            // Update pattern stats
+            if activePattern == "UNICORN"
+                unicornWins := unicornWins + 1
+            else if activePattern == "MMXM"
+                mmxmWins := mmxmWins + 1
+            else if activePattern == "2022 MODEL"
+                model2022Wins := model2022Wins + 1
+            else if activePattern == "TURTLE SOUP"
+                turtleSoupWins := turtleSoupWins + 1
+            else if activePattern == "JUDAS SWING"
+                judasWins := judasWins + 1
+
+            // Update last trade record
+            if array.size(sessionTrades) > 0
+                lastTrade = array.get(sessionTrades, array.size(sessionTrades) - 1)
+                lastTrade.outcome := "WIN"
+                lastTrade.pnlPercent := actualRR
+
+        // Stop hit (LOSS)
+        else if high >= activeStop
+            hasActiveTrade := false
+            sessionLosses := sessionLosses + 1
+            sessionPending := sessionPending - 1
+            actualRR = -1.0
+            sessionTotalRR := sessionTotalRR + actualRR
+            if actualRR < sessionWorstRR or sessionWorstRR == 0
+                sessionWorstRR := actualRR
+
+            // Update tier stats
+            if activeTier == TIER_1
+                tier1Losses := tier1Losses + 1
+            else if activeTier == TIER_2
+                tier2Losses := tier2Losses + 1
+            else if activeTier == TIER_3
+                tier3Losses := tier3Losses + 1
+
+            // Update pattern stats
+            if activePattern == "UNICORN"
+                unicornLosses := unicornLosses + 1
+            else if activePattern == "MMXM"
+                mmxmLosses := mmxmLosses + 1
+            else if activePattern == "2022 MODEL"
+                model2022Losses := model2022Losses + 1
+            else if activePattern == "TURTLE SOUP"
+                turtleSoupLosses := turtleSoupLosses + 1
+            else if activePattern == "JUDAS SWING"
+                judasLosses := judasLosses + 1
+
+            // Update last trade record
+            if array.size(sessionTrades) > 0
+                lastTrade = array.get(sessionTrades, array.size(sessionTrades) - 1)
+                lastTrade.outcome := "LOSS"
+                lastTrade.pnlPercent := actualRR
+
+    // Timeout after 50 bars (invalidate stale setups)
+    if bar_index - activeBar > 50
+        hasActiveTrade := false
+        sessionPending := sessionPending - 1
+        if array.size(sessionTrades) > 0
+            lastTrade = array.get(sessionTrades, array.size(sessionTrades) - 1)
+            lastTrade.outcome := "TIMEOUT"
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CALCULATE SESSION STATISTICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+totalCompleted = sessionWins + sessionLosses
+winRate = totalCompleted > 0 ? (sessionWins / totalCompleted) * 100 : 0.0
+avgRR = totalCompleted > 0 ? sessionTotalRR / totalCompleted : 0.0
+expectancy = totalCompleted > 0 ? (winRate/100 * avgRR) - ((100-winRate)/100 * 1.0) : 0.0
+
+// Tier win rates
+tier1WinRate = (tier1Wins + tier1Losses) > 0 ? (tier1Wins / (tier1Wins + tier1Losses)) * 100 : 0.0
+tier2WinRate = (tier2Wins + tier2Losses) > 0 ? (tier2Wins / (tier2Wins + tier2Losses)) * 100 : 0.0
+tier3WinRate = (tier3Wins + tier3Losses) > 0 ? (tier3Wins / (tier3Wins + tier3Losses)) * 100 : 0.0
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        🎨 VISUAL RENDERING                                     ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
@@ -4753,6 +5040,23 @@ if i_showComposite and barstate.islast and (compositeTier == TIER_1 or composite
          style=label.style_none, textcolor=color.new(rrColor, 0), size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// "TAKE THE TRADE" SIGNAL CALCULATION (must be before table uses it)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Create the TAKE THE TRADE conditions (must be calculated outside barstate.islast block)
+var bool takeTradeSignalBull = false
+var bool takeTradeSignalBear = false
+
+// Update on every bar for proper alerting
+takeTradeCondition = (compositeTier == TIER_1 or compositeTier == TIER_2) and
+                     (sbPrime or isMacroTime) and
+                     isAnyTrigger and
+                     inOTE
+
+takeTradeSignalBull := takeTradeCondition and dolDirection == DIR_BULL
+takeTradeSignalBear := takeTradeCondition and dolDirection == DIR_BEAR
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // DOL PROBABILITY DASHBOARD (GOD MODE INFO TABLE) - SLEEK ARCADE DESIGN
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -5030,23 +5334,8 @@ if i_showDOLTable and barstate.islast
     table.merge_cells(infoTable, 0, 24, 1, 24)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// "TAKE THE TRADE" VISUAL SIGNAL
+// "TAKE THE TRADE" VISUAL SIGNAL LABELS
 // ═══════════════════════════════════════════════════════════════════════════════
-
-// Create the TAKE THE TRADE conditions (must be calculated outside barstate.islast block)
-var bool takeTradeSignalBull = false
-var bool takeTradeSignalBear = false
-
-// Update on every bar for proper alerting
-takeTradeCondition = (compositeTier == TIER_1 or compositeTier == TIER_2) and
-                     (sbPrime or isMacroTime) and
-                     isAnyTrigger and
-                     inOTE
-
-takeTradeSignalBull := takeTradeCondition and dolDirection == DIR_BULL
-takeTradeSignalBear := takeTradeCondition and dolDirection == DIR_BEAR
-
-// Plot TAKE THE TRADE signals (big, can't-miss-it labels)
 plotshape(takeTradeSignalBull and barstate.isconfirmed, title="🚀 TAKE THE TRADE Long",
      style=shape.labelup, location=location.belowbar,
      color=color.new(#00FF00, 0), text="🚀 TAKE IT", textcolor=color.white, size=size.normal)
@@ -5054,6 +5343,73 @@ plotshape(takeTradeSignalBull and barstate.isconfirmed, title="🚀 TAKE THE TRA
 plotshape(takeTradeSignalBear and barstate.isconfirmed, title="🚀 TAKE THE TRADE Short",
      style=shape.labeldown, location=location.abovebar,
      color=color.new(#FF0000, 0), text="🚀 TAKE IT", textcolor=color.white, size=size.normal)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📊 PERFORMANCE TRACKING TABLE (Top-Left)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var table statsTable = table.new(position.top_left, 2, 12, bgcolor=color.new(#0D0D0D, 10), border_width=0, frame_width=2, frame_color=color.new(#FFD700, 50))
+
+if barstate.islast and totalSetupsGenerated > 0
+    // Header
+    table.cell(statsTable, 0, 0, "📊 SESSION STATS", text_color=color.new(#FFD700, 0), text_size=size.small, bgcolor=color.new(#000033, 0), text_halign=text.align_center)
+    table.merge_cells(statsTable, 0, 0, 1, 0)
+
+    // Win Rate
+    winRateColor = winRate >= 60 ? #00E676 : winRate >= 50 ? #FFD740 : #FF5252
+    table.cell(statsTable, 0, 1, "Win Rate", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(statsTable, 1, 1, str.tostring(winRate, "#.#") + "% (" + str.tostring(sessionWins) + "W/" + str.tostring(sessionLosses) + "L)", text_color=winRateColor, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_right)
+
+    // Total Setups
+    table.cell(statsTable, 0, 2, "Setups", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(statsTable, 1, 2, str.tostring(totalSetupsGenerated) + " (" + str.tostring(sessionPending) + " pending)", text_color=textBright, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+
+    // Avg R:R
+    avgRRColor = avgRR >= 2 ? #00E676 : avgRR >= 1 ? #FFD740 : avgRR >= 0 ? #FF9800 : #FF5252
+    table.cell(statsTable, 0, 3, "Avg R:R", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(statsTable, 1, 3, str.tostring(avgRR, "#.##") + "R", text_color=avgRRColor, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_right)
+
+    // Expectancy
+    expectColor = expectancy >= 0.5 ? #00E676 : expectancy >= 0 ? #FFD740 : #FF5252
+    table.cell(statsTable, 0, 4, "Expectancy", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(statsTable, 1, 4, str.tostring(expectancy, "#.##") + "R/trade", text_color=expectColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+
+    // Best/Worst
+    table.cell(statsTable, 0, 5, "Best/Worst", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(statsTable, 1, 5, "+" + str.tostring(sessionBestRR, "#.#") + "R / " + str.tostring(sessionWorstRR, "#.#") + "R", text_color=textBright, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_right)
+
+    // Tier Performance Header
+    table.cell(statsTable, 0, 6, "── TIER STATS ──", text_color=color.new(#00BCD4, 0), text_size=size.tiny, bgcolor=color.new(#000033, 0), text_halign=text.align_center)
+    table.merge_cells(statsTable, 0, 6, 1, 6)
+
+    // Tier 1
+    t1Color = tier1WinRate >= 70 ? #00E676 : tier1WinRate >= 50 ? #FFD740 : #FF5252
+    t1Text = (tier1Wins + tier1Losses) > 0 ? str.tostring(tier1WinRate, "#") + "% (" + str.tostring(tier1Wins) + "/" + str.tostring(tier1Wins + tier1Losses) + ")" : "—"
+    table.cell(statsTable, 0, 7, "🏆 Tier 1", text_color=#00E676, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(statsTable, 1, 7, t1Text, text_color=t1Color, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+
+    // Tier 2
+    t2Color = tier2WinRate >= 60 ? #00E676 : tier2WinRate >= 50 ? #FFD740 : #FF5252
+    t2Text = (tier2Wins + tier2Losses) > 0 ? str.tostring(tier2WinRate, "#") + "% (" + str.tostring(tier2Wins) + "/" + str.tostring(tier2Wins + tier2Losses) + ")" : "—"
+    table.cell(statsTable, 0, 8, "⭐ Tier 2", text_color=#69F0AE, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(statsTable, 1, 8, t2Text, text_color=t2Color, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_right)
+
+    // Tier 3
+    t3Color = tier3WinRate >= 55 ? #00E676 : tier3WinRate >= 45 ? #FFD740 : #FF5252
+    t3Text = (tier3Wins + tier3Losses) > 0 ? str.tostring(tier3WinRate, "#") + "% (" + str.tostring(tier3Wins) + "/" + str.tostring(tier3Wins + tier3Losses) + ")" : "—"
+    table.cell(statsTable, 0, 9, "🥈 Tier 3", text_color=#FFD740, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(statsTable, 1, 9, t3Text, text_color=t3Color, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
+
+    // Active Trade Status
+    activeText = hasActiveTrade ? (activeDirection == DIR_BULL ? "🟢 LONG ACTIVE" : "🔴 SHORT ACTIVE") : "No Active Trade"
+    activeColor = hasActiveTrade ? (activeDirection == DIR_BULL ? #00E676 : #FF5252) : textDim
+    table.cell(statsTable, 0, 10, activeText, text_color=activeColor, text_size=size.tiny, bgcolor=color.new(#000033, 0), text_halign=text.align_center)
+    table.merge_cells(statsTable, 0, 10, 1, 10)
+
+    // Total R
+    totalRColor = sessionTotalRR >= 0 ? #00E676 : #FF5252
+    table.cell(statsTable, 0, 11, "Total: " + str.tostring(sessionTotalRR, "#.#") + "R", text_color=totalRColor, text_size=size.small, bgcolor=color.new(#000033, 0), text_halign=text.align_center)
+    table.merge_cells(statsTable, 0, 11, 1, 11)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALERTS (Enhanced with TAKE THE TRADE)
