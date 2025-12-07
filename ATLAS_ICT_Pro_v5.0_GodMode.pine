@@ -2477,97 +2477,208 @@ plot(i_ipda60 and i_showIPDA ? low60IPDA : na, "IPDA 60 Low", color=color.new(co
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PAC-MAN DOL PATH - Dynamic "Most Likely Path" Visualization
+// PAC-MAN DOL PATH - Dynamic Multi-Waypoint "Most Likely Path"
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var line dolLine = na
-var label dolTargetLabel = na
-var label[] pacmanDots = array.new_label(0)
-var line pacmanPath = na
+var line[] dolPathLines = array.new_line(0)
+var label[] dolPathLabels = array.new_label(0)
 
 // Pac-Man themed colors
 pacmanYellow = #FFEB3B  // Classic Pac-Man yellow
 pacmanGold = #FFC107    // Golden pellets
+pacmanCyan = #00BCD4    // Path color
 
 if i_showDOL and i_showPacMan and barstate.islast
     // Clean up old visuals
-    if not na(dolLine)
-        line.delete(dolLine)
-    if not na(dolTargetLabel)
-        label.delete(dolTargetLabel)
-    if not na(pacmanPath)
-        line.delete(pacmanPath)
+    while array.size(dolPathLines) > 0
+        line.delete(array.pop(dolPathLines))
+    while array.size(dolPathLabels) > 0
+        label.delete(array.pop(dolPathLabels))
 
-    // Clean up old dots
-    while array.size(pacmanDots) > 0
-        label.delete(array.pop(pacmanDots))
-
-    // Determine if this is a "trade ready" setup (show yellow dots)
+    // Determine visual style based on setup quality
     tradeReady = (compositeTier == TIER_1 or compositeTier == TIER_2) and
                  (manipulationComplete or amdPhase == 3) and
                  dolDirection != DIR_NEUTRAL
-
-    // High confluence but not quite trade ready (show gold path)
     highConf = compositeTier <= TIER_3 and dolDirection != DIR_NEUTRAL
 
-    if not na(dolTarget) and dolDirection != DIR_NEUTRAL
-        priceRange = math.abs(dolTarget - close)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BUILD WAYPOINT ARRAY - Collect all liquidity targets sorted by distance
+    // ═══════════════════════════════════════════════════════════════════════════
 
+    // Arrays to hold waypoint data (parallel arrays for level, name, strength)
+    var float[] wpLevels = array.new_float(0)
+    var string[] wpNames = array.new_string(0)
+    var int[] wpStrength = array.new_int(0)  // Higher = stronger draw
+
+    // Clear previous waypoints
+    array.clear(wpLevels)
+    array.clear(wpNames)
+    array.clear(wpStrength)
+
+    if dolDirection == DIR_BULL
+        // Collect all UNSWEPT targets ABOVE current price
+        // BSL (60 IPDA) - Strongest draw
+        if not na(high60IPDA) and high60IPDA > close
+            array.push(wpLevels, high60IPDA)
+            array.push(wpNames, "BSL")
+            array.push(wpStrength, 100)
+
+        // PWH - Strong weekly level
+        if not pwhSwept and not na(pwh) and pwh > close
+            array.push(wpLevels, pwh)
+            array.push(wpNames, "PWH")
+            array.push(wpStrength, 80)
+
+        // PDH - Daily level
+        if not pdhSwept and not na(pdh) and pdh > close
+            array.push(wpLevels, pdh)
+            array.push(wpNames, "PDH")
+            array.push(wpStrength, 60)
+
+        // London High - Session level
+        if not londonHighSwept and not na(londonHigh) and londonHigh > close and not londonSession
+            array.push(wpLevels, londonHigh)
+            array.push(wpNames, "LDN")
+            array.push(wpStrength, 40)
+
+        // NY High - Session level
+        if not nyHighSwept and not na(nyHigh) and nyHigh > close and not (nyAMSession or nyPMSession)
+            array.push(wpLevels, nyHigh)
+            array.push(wpNames, "NY")
+            array.push(wpStrength, 30)
+
+    else if dolDirection == DIR_BEAR
+        // Collect all UNSWEPT targets BELOW current price
+        // SSL (60 IPDA) - Strongest draw
+        if not na(low60IPDA) and low60IPDA < close
+            array.push(wpLevels, low60IPDA)
+            array.push(wpNames, "SSL")
+            array.push(wpStrength, 100)
+
+        // PWL - Strong weekly level
+        if not pwlSwept and not na(pwl) and pwl < close
+            array.push(wpLevels, pwl)
+            array.push(wpNames, "PWL")
+            array.push(wpStrength, 80)
+
+        // PDL - Daily level
+        if not pdlSwept and not na(pdl) and pdl < close
+            array.push(wpLevels, pdl)
+            array.push(wpNames, "PDL")
+            array.push(wpStrength, 60)
+
+        // London Low - Session level
+        if not londonLowSwept and not na(londonLow) and londonLow < close and not londonSession
+            array.push(wpLevels, londonLow)
+            array.push(wpNames, "LDN")
+            array.push(wpStrength, 40)
+
+        // NY Low - Session level
+        if not nyLowSwept and not na(nyLow) and nyLow < close and not (nyAMSession or nyPMSession)
+            array.push(wpLevels, nyLow)
+            array.push(wpNames, "NY")
+            array.push(wpStrength, 30)
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SORT WAYPOINTS BY DISTANCE (nearest first for the path)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    numWaypoints = array.size(wpLevels)
+
+    // Simple bubble sort by distance from close
+    if numWaypoints > 1
+        for i = 0 to numWaypoints - 2
+            for j = 0 to numWaypoints - i - 2
+                dist1 = math.abs(array.get(wpLevels, j) - close)
+                dist2 = math.abs(array.get(wpLevels, j + 1) - close)
+                if dist1 > dist2
+                    // Swap all parallel arrays
+                    tempLevel = array.get(wpLevels, j)
+                    tempName = array.get(wpNames, j)
+                    tempStr = array.get(wpStrength, j)
+                    array.set(wpLevels, j, array.get(wpLevels, j + 1))
+                    array.set(wpNames, j, array.get(wpNames, j + 1))
+                    array.set(wpStrength, j, array.get(wpStrength, j + 1))
+                    array.set(wpLevels, j + 1, tempLevel)
+                    array.set(wpNames, j + 1, tempName)
+                    array.set(wpStrength, j + 1, tempStr)
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DRAW MULTI-WAYPOINT PATH
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Limit to max 5 waypoints for clean visualization
+    maxWaypoints = math.min(numWaypoints, 5)
+
+    if maxWaypoints > 0
+        // Starting point
+        prevX = bar_index + 2
+        prevY = close
+        xSpacing = 12  // bars between waypoints
+
+        // Choose colors based on setup quality
+        pathColor = tradeReady ? pacmanYellow : highConf ? pacmanGold : color.new(pacmanCyan, 40)
+        pathWidth = tradeReady ? 2 : highConf ? 2 : 1
+        pathStyle = tradeReady ? line.style_solid : line.style_dashed
+
+        // Draw Pac-Man at start if trade ready
         if tradeReady
-            // ═══ TRADE READY: Yellow Pac-Man Dots ═══
-            // Draw large yellow dots leading to target (Pac-Man eating pellets)
-            numDots = 5
-            for i = 0 to numDots - 1
-                dotProgress = (i + 1) / (numDots + 1)
-                dotX = bar_index + 2 + math.round(dotProgress * 15)
-                dotY = close + (dolTarget - close) * dotProgress
-
-                // Dots get bigger closer to target
-                dotSize = i < 2 ? size.small : i < 4 ? size.normal : size.large
-                dotChar = "●"
-
-                // Alternate between bright yellow and gold for animation effect
-                dotColor = i % 2 == 0 ? pacmanYellow : pacmanGold
-
-                newDot = label.new(dotX, dotY, dotChar,
-                     style=label.style_none, textcolor=dotColor, size=dotSize)
-                array.push(pacmanDots, newDot)
-
-            // Add Pac-Man at the start
-            pacmanIcon = dolDirection == DIR_BULL ? "ᗧ" : "ᗤ"  // Pac-Man facing direction
+            pacmanIcon = dolDirection == DIR_BULL ? "ᗧ" : "ᗤ"
             pacmanLabel = label.new(bar_index + 1, close, pacmanIcon,
                  style=label.style_none, textcolor=pacmanYellow, size=size.large)
-            array.push(pacmanDots, pacmanLabel)
+            array.push(dolPathLabels, pacmanLabel)
 
-            // Add target indicator (cherry/ghost)
-            targetIcon = "🎯"
-            targetLabel = label.new(bar_index + 18, dolTarget, targetIcon,
+        // Draw path through each waypoint
+        for i = 0 to maxWaypoints - 1
+            wpLevel = array.get(wpLevels, i)
+            wpName = array.get(wpNames, i)
+            wpStr = array.get(wpStrength, i)
+
+            // Calculate position for this waypoint
+            wpX = prevX + xSpacing
+            wpY = wpLevel
+
+            // Draw line segment from previous point to this waypoint
+            newLine = line.new(prevX, prevY, wpX, wpY,
+                 color=pathColor, width=pathWidth, style=pathStyle)
+            array.push(dolPathLines, newLine)
+
+            // Draw waypoint marker
+            if tradeReady
+                // Large yellow dots for trade ready
+                dotSize = wpStr >= 80 ? size.large : wpStr >= 50 ? size.normal : size.small
+                dotLabel = label.new(wpX, wpY, "●",
+                     style=label.style_none, textcolor=pacmanYellow, size=dotSize)
+                array.push(dolPathLabels, dotLabel)
+            else
+                // Smaller dots for other states
+                dotLabel = label.new(wpX, wpY, "•",
+                     style=label.style_none, textcolor=pathColor, size=size.small)
+                array.push(dolPathLabels, dotLabel)
+
+            // Add waypoint name label (below for bull, above for bear)
+            labelY = dolDirection == DIR_BULL ? wpY * 0.9998 : wpY * 1.0002
+            nameLabel = label.new(wpX, labelY, wpName,
+                 style=label.style_none, textcolor=color.new(pathColor, 20), size=size.tiny, textalign=text.align_center)
+            array.push(dolPathLabels, nameLabel)
+
+            // Update previous point for next segment
+            prevX := wpX
+            prevY := wpY
+
+        // Add final target marker
+        if tradeReady
+            finalLabel = label.new(prevX + 3, prevY, "🎯",
                  style=label.style_none, textcolor=pacmanYellow, size=size.normal)
-            array.push(pacmanDots, targetLabel)
+            array.push(dolPathLabels, finalLabel)
 
-        else if highConf
-            // ═══ HIGH CONFLUENCE: Gold dashed path with dots ═══
-            pathColor = dolDirection == DIR_BULL ? color.new(pacmanGold, 30) : color.new(pacmanGold, 30)
-
-            pacmanPath := line.new(bar_index + 2, close, bar_index + 15, dolTarget,
-                 color=pathColor, width=2, style=line.style_dashed)
-
-            // Add smaller dots along path
-            numDots = 3
-            for i = 0 to numDots - 1
-                dotProgress = (i + 1) / (numDots + 1)
-                dotX = bar_index + 2 + math.round(dotProgress * 13)
-                dotY = close + (dolTarget - close) * dotProgress
-
-                newDot = label.new(dotX, dotY, "•",
-                     style=label.style_none, textcolor=color.new(pacmanGold, 40), size=size.small)
-                array.push(pacmanDots, newDot)
-
-        else
-            // ═══ NORMAL: Subtle directional arrow ═══
+    else
+        // No waypoints found - draw simple arrow to dolTarget if available
+        if not na(dolTarget) and dolDirection != DIR_NEUTRAL
             arrowColor = dolDirection == DIR_BULL ? color.new(i_bullColor, 50) : color.new(i_bearColor, 50)
-            dolLine := line.new(bar_index + 2, close, bar_index + 12, dolTarget,
+            simpleLine = line.new(bar_index + 2, close, bar_index + 14, dolTarget,
                  color=arrowColor, width=1, style=line.style_arrow_right)
+            array.push(dolPathLines, simpleLine)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LIQUIDITY TARGETS (Institutional Levels) - Clean minimal
