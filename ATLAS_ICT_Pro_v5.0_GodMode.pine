@@ -3598,6 +3598,53 @@ if i_showOTE and barstate.islast
          style=label.style_none, textcolor=color.new(oteLineColor, 60), size=size.tiny, textalign=text.align_right)
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// LONGEST WICK CE - ICT's Special Level (Hidden Gem)
+// "Consequent encroachment of the longest wick... that's the one that matters"
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var line longestWickCELine = na
+var label longestWickCELabel = na
+
+// Color based on wick direction
+lwceColor = longestWickDirection == 1 ? #FF5252 : longestWickDirection == -1 ? #00E676 : #78909C
+
+if barstate.islast and not na(longestWickCE)
+    // Clean up old
+    if not na(longestWickCELine)
+        line.delete(longestWickCELine)
+    if not na(longestWickCELabel)
+        label.delete(longestWickCELabel)
+
+    // Draw the Longest Wick CE line - distinctive teal with circle markers
+    longestWickCELine := line.new(bar_index - 30, longestWickCE, bar_index + 15, longestWickCE,
+         color=color.new(#00BFA5, 40), width=2, style=line.style_dotted)
+
+    // Label with direction indicator
+    lwceText = longestWickDirection == 1 ? "⊕ LW-CE ▼" : longestWickDirection == -1 ? "⊕ LW-CE ▲" : "⊕ LW-CE"
+    longestWickCELabel := label.new(bar_index + 15, longestWickCE, lwceText,
+         style=label.style_none, textcolor=color.new(#00BFA5, 20), size=size.tiny, textalign=text.align_left)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MARKET MAKER MODEL STATE - 9/18 EMA Visual (Hidden Gem)
+// "Market makers will generally price markets lower to buy [BUY MODEL]"
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var label mmModelLabel = na
+
+if barstate.islast
+    // Clean up old
+    if not na(mmModelLabel)
+        label.delete(mmModelLabel)
+
+    // Position in top-left area of chart (below price)
+    mmLabelY = low - (high - low) * 0.15
+    mmLabelColor = mmModelBullish ? #00E676 : mmModelBearish ? #FF5252 : #78909C
+    mmLabelText = mmModelBullish ? "🟢 MM BUY MODEL" : mmModelBearish ? "🔴 MM SELL MODEL" : "⚪ MM NEUTRAL"
+
+    mmModelLabel := label.new(bar_index + 2, mmLabelY, mmLabelText,
+         style=label.style_none, textcolor=mmLabelColor, size=size.small, textalign=text.align_left)
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // PREMIUM/DISCOUNT ZONES - Subtle reference lines
 // ═══════════════════════════════════════════════════════════════════════════════
 
