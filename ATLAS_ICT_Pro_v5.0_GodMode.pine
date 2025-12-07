@@ -1814,7 +1814,9 @@ if barstate.islast
             float h = array.get(nwogHighs, i)
             float l = array.get(nwogLows, i)
             float ce = array.get(nwogCEs, i)
-            int startBar = array.get(nwogBars, i)
+            int storedBar = array.get(nwogBars, i)
+            // Clamp startBar to prevent "too far from current bar" error
+            int startBar = math.max(storedBar, bar_index - 500)
 
             // Progressive fading: newer = more visible, older = more faded
             int fadeLevel = 50 + (i * 8)  // 50, 58, 66, 74, 82 for 5 weeks
