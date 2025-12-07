@@ -299,7 +299,6 @@ var bool inCBDR = false
 var float[] nwogHighs = array.new_float(0)
 var float[] nwogLows = array.new_float(0)
 var float[] nwogCEs = array.new_float(0)
-var int[] nwogBars = array.new_int(0)  // Store bar_index when NWOG was created
 var bool newWeekStart = false
 // Keep single variables for backward compatibility with confluence
 var float nwogHigh = na
@@ -1231,14 +1230,12 @@ if isNewWeek and i_showNWOG
     array.unshift(nwogHighs, newNwogHigh)
     array.unshift(nwogLows, newNwogLow)
     array.unshift(nwogCEs, newNwogCE)
-    array.unshift(nwogBars, bar_index)
 
     // Trim arrays to max weeks
     while array.size(nwogHighs) > i_nwogWeeks
         array.pop(nwogHighs)
         array.pop(nwogLows)
         array.pop(nwogCEs)
-        array.pop(nwogBars)
 
     // Update single variables for backward compatibility
     nwogHigh := newNwogHigh
@@ -1814,9 +1811,6 @@ if barstate.islast
             float h = array.get(nwogHighs, i)
             float l = array.get(nwogLows, i)
             float ce = array.get(nwogCEs, i)
-            int storedBar = array.get(nwogBars, i)
-            // Clamp startBar to prevent "too far from current bar" error
-            int startBar = math.max(storedBar, bar_index - 500)
 
             // Progressive fading: newer = more visible, older = more faded
             int fadeLevel = 50 + (i * 8)  // 50, 58, 66, 74, 82 for 5 weeks
@@ -1827,8 +1821,9 @@ if barstate.islast
             // Label: NWOG-1 (current) through NWOG-5 (oldest)
             string nwogLabel = "NWOG-" + str.tostring(i + 1)
 
-            // Draw box from its creation point to current bar + projection
-            box newBox = box.new(startBar, h, bar_index + 10, l,
+            // Draw box relative to current bar (safe approach)
+            int boxLeft = bar_index - 50
+            box newBox = box.new(boxLeft, h, bar_index + 10, l,
                  border_color=color.new(#E040FB, fadeLevel), bgcolor=color.new(#E040FB, bgFade),
                  border_width=1, border_style=line.style_dotted,
                  text=nwogLabel, text_color=color.new(#E040FB, fadeLevel), text_size=size.tiny, text_halign=text.align_right)
@@ -1838,7 +1833,7 @@ if barstate.islast
             if i_showNWOGCE
                 int ceFade = 30 + (i * 12)  // 30, 42, 54, 66, 78 for 5 weeks
                 ceFade := math.min(ceFade, 85)
-                line ceLine = line.new(startBar, ce, bar_index + 10, ce,
+                line ceLine = line.new(boxLeft, ce, bar_index + 10, ce,
                      color=color.new(#E040FB, ceFade), width=i == 0 ? 2 : 1, style=line.style_dashed)
                 array.push(nwogCELines, ceLine)
 
