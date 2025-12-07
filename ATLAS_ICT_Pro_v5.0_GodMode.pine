@@ -2230,6 +2230,68 @@ plotshape(tier1Bull and barstate.isconfirmed, title="ELITE Bull", style=shape.la
 plotshape(tier1Bear and barstate.isconfirmed, title="ELITE Bear", style=shape.labeldown,
      location=location.abovebar, color=color.new(#FF1744, 0), text="ELITE ▼", textcolor=color.white, size=size.small)
 
+// Tier 2 PREMIUM signals
+plotshape(tier2Bull and barstate.isconfirmed and not tier1Bull, title="PREMIUM Bull", style=shape.labelup,
+     location=location.belowbar, color=color.new(#69F0AE, 0), text="PREMIUM ▲", textcolor=color.white, size=size.tiny)
+plotshape(tier2Bear and barstate.isconfirmed and not tier1Bear, title="PREMIUM Bear", style=shape.labeldown,
+     location=location.abovebar, color=color.new(#69F0AE, 0), text="PREMIUM ▼", textcolor=color.white, size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ENTRY ZONE BOX & TARGET ARROW (For ELITE/PREMIUM setups)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var box entryZoneBox = na
+var line targetArrow = na
+var label targetLabel = na
+var label entryLabel = na
+
+// Only show entry zone for high-tier setups on last bar
+if i_showComposite and barstate.islast and (compositeTier == TIER_1 or compositeTier == TIER_2)
+    // Clean up previous drawings
+    if not na(entryZoneBox)
+        box.delete(entryZoneBox)
+    if not na(targetArrow)
+        line.delete(targetArrow)
+    if not na(targetLabel)
+        label.delete(targetLabel)
+    if not na(entryLabel)
+        label.delete(entryLabel)
+
+    // Determine entry zone boundaries (OTE zone)
+    swingRange = swingHigh - swingLow
+    ote62 = dolDirection == DIR_BULL ? swingLow + swingRange * 0.62 : swingHigh - swingRange * 0.62
+    ote79 = dolDirection == DIR_BULL ? swingLow + swingRange * 0.79 : swingHigh - swingRange * 0.79
+
+    // Entry zone box color based on tier
+    entryBoxColor = compositeTier == TIER_1 ? color.new(#00E676, 85) : color.new(#69F0AE, 88)
+    entryBorderColor = compositeTier == TIER_1 ? color.new(#00E676, 30) : color.new(#69F0AE, 40)
+
+    // Draw entry zone box (OTE area)
+    if dolDirection == DIR_BULL
+        entryZoneBox := box.new(bar_index - 15, ote79, bar_index + 3, ote62,
+             bgcolor=entryBoxColor, border_color=entryBorderColor, border_width=2)
+        entryLabel := label.new(bar_index + 4, (ote62 + ote79) / 2, "◀ ENTRY ZONE",
+             style=label.style_none, textcolor=entryBorderColor, size=size.tiny)
+    else if dolDirection == DIR_BEAR
+        entryZoneBox := box.new(bar_index - 15, ote62, bar_index + 3, ote79,
+             bgcolor=entryBoxColor, border_color=entryBorderColor, border_width=2)
+        entryLabel := label.new(bar_index + 4, (ote62 + ote79) / 2, "◀ ENTRY ZONE",
+             style=label.style_none, textcolor=entryBorderColor, size=size.tiny)
+
+    // Draw target arrow to liquidity
+    targetArrowColor = dolDirection == DIR_BULL ? color.new(#00E676, 20) : color.new(#FF1744, 20)
+
+    if dolDirection == DIR_BULL and not na(dolTarget)
+        targetArrow := line.new(bar_index, close, bar_index + 8, dolTarget,
+             color=targetArrowColor, width=2, style=line.style_arrow_right)
+        targetLabel := label.new(bar_index + 9, dolTarget, "TARGET\n" + str.tostring(dolTarget, format.mintick),
+             style=label.style_none, textcolor=targetArrowColor, size=size.tiny)
+    else if dolDirection == DIR_BEAR and not na(dolTarget)
+        targetArrow := line.new(bar_index, close, bar_index + 8, dolTarget,
+             color=targetArrowColor, width=2, style=line.style_arrow_right)
+        targetLabel := label.new(bar_index + 9, dolTarget, "TARGET\n" + str.tostring(dolTarget, format.mintick),
+             style=label.style_none, textcolor=targetArrowColor, size=size.tiny)
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // DOL PROBABILITY DASHBOARD (GOD MODE INFO TABLE) - SLEEK ARCADE DESIGN
 // ═══════════════════════════════════════════════════════════════════════════════
