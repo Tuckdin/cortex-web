@@ -2672,9 +2672,9 @@ if i_showDOL and i_showPacMan and barstate.islast
 
             // ═══ STEP 2: SMART PULLBACK - Find best retracement level ═══
             if i < maxWaypoints - 1
-                pullbackY = na
-                pbReason = ""
-                pbColor = pullbackColor
+                float pullbackY = na
+                string pbReason = ""
+                color pbColor = pullbackColor
 
                 // ─────────────────────────────────────────────────────────────
                 // PRIORITY 1: Check for unfilled FVG in the pullback zone
