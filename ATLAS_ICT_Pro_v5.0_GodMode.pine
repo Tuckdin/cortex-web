@@ -4982,8 +4982,8 @@ var color tableBg = color.new(#0D0D0D, 5)
 var color textDim = color.new(#8892B0, 0)
 var color textBright = color.new(#E6F1FF, 0)
 
-// Compact table (10 rows)
-var table infoTable = table.new(position.middle_right, 2, 10, bgcolor=tableBg, border_width=0, frame_width=2, frame_color=color.new(#2121DE, 30))
+// Compact table (13 rows - essential ICT info)
+var table infoTable = table.new(position.middle_right, 2, 13, bgcolor=tableBg, border_width=0, frame_width=2, frame_color=color.new(#2121DE, 30))
 
 if i_showDOLTable and barstate.islast
     // Row 0: Direction
@@ -4992,48 +4992,80 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 0, dirText, text_color=dirColor, text_size=size.normal, bgcolor=color.new(dirColor, 85), text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 0, 1, 0)
 
-    // Row 1: Tier
+    // Row 1: Tier + Pattern
     tierLabel = compositeTier == TIER_1 ? "ELITE" : compositeTier == TIER_2 ? "PREMIUM" : compositeTier == TIER_3 ? "STRONG" : compositeTier == TIER_4 ? "MODERATE" : "WEAK"
     tierColor = compositeTier == TIER_1 ? #00E676 : compositeTier == TIER_2 ? #69F0AE : compositeTier == TIER_3 ? #FFD740 : compositeTier == TIER_4 ? #FF9800 : #FF5252
-    table.cell(infoTable, 0, 1, "Tier", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 1, tierLabel, text_color=tierColor, text_size=size.small, bgcolor=tableBg)
+    table.cell(infoTable, 0, 1, tierLabel + " | " + patternName, text_color=tierColor, text_size=size.small, bgcolor=color.new(tierColor, 90), text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 1, 1, 1)
 
-    // Row 2: Pattern
-    table.cell(infoTable, 0, 2, patternName, text_color=tierColor, text_size=size.small, bgcolor=color.new(tierColor, 90), text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 2, 1, 2)
+    // Row 2: MTF Bias (compact)
+    wA = mtfBiasW == 1 ? "↑" : mtfBiasW == -1 ? "↓" : "—"
+    dA = mtfBiasD == 1 ? "↑" : mtfBiasD == -1 ? "↓" : "—"
+    hA = mtfBias1H == 1 ? "↑" : mtfBias1H == -1 ? "↓" : "—"
+    bullCnt = (mtfBiasW == 1 ? 1 : 0) + (mtfBiasD == 1 ? 1 : 0) + (mtfBias1H == 1 ? 1 : 0)
+    bearCnt = (mtfBiasW == -1 ? 1 : 0) + (mtfBiasD == -1 ? 1 : 0) + (mtfBias1H == -1 ? 1 : 0)
+    mtfCol = bullCnt >= 2 ? i_bullColor : bearCnt >= 2 ? i_bearColor : textDim
+    table.cell(infoTable, 0, 2, "MTF", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 2, "W" + wA + " D" + dA + " 1H" + hA, text_color=mtfCol, text_size=size.small, bgcolor=tableBg)
 
     // Row 3: Zone
-    zoneText = inPremium ? "PREMIUM" : inDiscount ? "DISCOUNT" : inOTE ? "OTE" : "EQ"
+    zoneText = inPremium ? "PREMIUM" : inDiscount ? "DISCOUNT" : inOTE ? "◉ OTE" : "EQ"
     zoneColor = inOTE ? #00BCD4 : inDiscount ? i_bullColor : inPremium ? i_bearColor : textDim
-    table.cell(infoTable, 0, 3, "Zone", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 3, zoneText, text_color=zoneColor, text_size=size.small, bgcolor=tableBg)
+    table.cell(infoTable, 0, 3, "Zone", text_color=textDim, text_size=size.tiny, bgcolor=inOTE ? color.new(#00BCD4, 90) : tableBg)
+    table.cell(infoTable, 1, 3, zoneText, text_color=zoneColor, text_size=size.small, bgcolor=inOTE ? color.new(#00BCD4, 90) : tableBg)
 
     // Row 4: Session
-    sessName = inSilverBullet ? "SB" : londonKZ or nyAMKZ or nyPMKZ ? "KZ" : asianSession ? "ASIA" : londonSession ? "LDN" : nyAMSession ? "NY-AM" : "OFF"
+    sessName = inSilverBullet ? "◉ SILVER BULLET" : londonKZ or nyAMKZ or nyPMKZ ? "◉ KILLZONE" : asianSession ? "ASIA" : londonSession ? "LONDON" : nyAMSession ? "NY-AM" : "OFF"
     table.cell(infoTable, 0, 4, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 4, sessName, text_color=inSilverBullet ? #00E5FF : textBright, text_size=size.small, bgcolor=tableBg)
 
-    // Row 5: Confluence
-    table.cell(infoTable, 0, 5, "Conf", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 5, str.tostring(confluenceCount) + "/16", text_color=confluenceCount >= 8 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
+    // Row 5: Turtle Soup Stage
+    tsText = tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? "◎ STALK" : tsStage == "TRAP" ? "◉ TRAP" : tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? "✓ CONFIRM" : "—"
+    tsColor = tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? #00E676 : tsStage == "TRAP" ? #FFD740 : textDim
+    table.cell(infoTable, 0, 5, "Turtle Soup", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 5, tsText, text_color=tsColor, text_size=size.small, bgcolor=tableBg)
 
-    // Row 6: Target
-    table.cell(infoTable, 0, 6, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 6, not na(dolTarget) ? str.tostring(dolTarget, format.mintick) : "—", text_color=dirColor, text_size=size.small, bgcolor=tableBg)
+    // Row 6: AMD Phase
+    amdText = amdPhase == 1 ? "ACCUM" : amdPhase == 2 ? (asianHighSwept ? "JUDAS ▲" : asianLowSwept ? "JUDAS ▼" : "MANIP") : amdPhase == 3 ? "DIST" : "—"
+    table.cell(infoTable, 0, 6, "AMD", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 6, amdText, text_color=manipulationComplete ? dirColor : textDim, text_size=size.small, bgcolor=tableBg)
 
-    // Row 7: R:R
-    table.cell(infoTable, 0, 7, "R:R", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 7, str.tostring(riskReward, "#.#") + ":1", text_color=riskReward >= 2 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
+    // Row 7: Liquidity Sequence (key targets)
+    liqSeq = ""
+    if dolDirection == DIR_BULL
+        if not pdhSwept and not na(pdh) and pdh > close
+            liqSeq := "PDH→"
+        if not pwhSwept and not na(pwh) and pwh > close
+            liqSeq := liqSeq + "PWH"
+    else if dolDirection == DIR_BEAR
+        if not pdlSwept and not na(pdl) and pdl < close
+            liqSeq := "PDL→"
+        if not pwlSwept and not na(pwl) and pwl < close
+            liqSeq := liqSeq + "PWL"
+    liqSeq := liqSeq == "" ? "—" : liqSeq
+    table.cell(infoTable, 0, 7, "Liq Path", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 7, liqSeq, text_color=dirColor, text_size=size.small, bgcolor=tableBg)
 
-    // Row 8: AMD Phase
-    amdText = amdPhase == 1 ? "ACCUM" : amdPhase == 2 ? "MANIP" : amdPhase == 3 ? "DIST" : "—"
-    table.cell(infoTable, 0, 8, "AMD", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 8, amdText, text_color=manipulationComplete ? dirColor : textDim, text_size=size.small, bgcolor=tableBg)
+    // Row 8: Confluence
+    table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 8, str.tostring(confluenceCount) + "/16", text_color=confluenceCount >= 8 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
 
-    // Row 9: Take Trade Signal
+    // Row 9: Target
+    table.cell(infoTable, 0, 9, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 9, not na(dolTarget) ? str.tostring(dolTarget, format.mintick) : "—", text_color=dirColor, text_size=size.small, bgcolor=tableBg)
+
+    // Row 10: R:R
+    table.cell(infoTable, 0, 10, "R:R", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 10, str.tostring(riskReward, "#.#") + ":1", text_color=riskReward >= 2 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
+
+    // Row 11: Key Factors
+    table.cell(infoTable, 0, 11, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 11, 1, 11)
+
+    // Row 12: Take Trade Signal
     takeIt = (takeTradeSignalBull or takeTradeSignalBear) ? "🚀 TAKE IT!" : "—"
-    table.cell(infoTable, 0, 9, takeIt, text_color=(takeTradeSignalBull or takeTradeSignalBear) ? #00FF00 : textDim, text_size=size.small, bgcolor=(takeTradeSignalBull or takeTradeSignalBear) ? color.new(#00FF00, 80) : tableBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 9, 1, 9)
+    table.cell(infoTable, 0, 12, takeIt, text_color=(takeTradeSignalBull or takeTradeSignalBear) ? #00FF00 : textDim, text_size=size.small, bgcolor=(takeTradeSignalBull or takeTradeSignalBear) ? color.new(#00FF00, 80) : tableBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 12, 1, 12)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // "TAKE THE TRADE" VISUAL SIGNAL LABELS
