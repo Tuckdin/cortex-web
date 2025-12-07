@@ -339,6 +339,20 @@ var float nyHigh = na
 var float nyLow = na
 var float midnightOpen = na
 
+// AMD (Power of 3) Engine - TRUE price-based detection
+var int amdPhase = 0           // 0=None, 1=Accumulation, 2=Manipulation, 3=Distribution
+var string amdStatus = ""       // Detailed status message
+var bool asianHighSwept = false // Has Asian high been swept?
+var bool asianLowSwept = false  // Has Asian low been swept?
+var bool manipulationComplete = false  // Has Judas/manipulation finished?
+var int manipDirection = 0      // Direction of manipulation: 1=swept high (fake bull), -1=swept low (fake bear)
+var int expectedDirection = 0   // Expected true direction after manipulation: 1=bull, -1=bear
+var float manipulationSwingHigh = na  // High of the manipulation move
+var float manipulationSwingLow = na   // Low of the manipulation move
+var bool distributionStarted = false  // Has true move begun?
+var float amdEntryZoneTop = na  // Optimal entry zone after manipulation
+var float amdEntryZoneBottom = na
+
 // Composite Score
 var float compositeScore = 0.0
 var int compositeTier = 0
@@ -1337,22 +1351,121 @@ if bearishRejection
     array.push(rejBlocks, newRB)
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
-// ║                        POWER OF THREE (AMD)                                    ║
+// ║                   POWER OF THREE (AMD) - PRICE-BASED ENGINE                    ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-// Asian = Accumulation, London = Manipulation, NY = Distribution
+// ICT's Power of 3: ACCUMULATION → MANIPULATION → DISTRIBUTION
+// This is NOT just time-based - it's based on PRICE ACTION within those times
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE 1: ACCUMULATION (Asian Session) - Build the range
+// ═══════════════════════════════════════════════════════════════════════════════
 if asianSession
     po3Phase := "ACCUMULATION"
+    amdPhase := 1
+
+    // Reset at start of Asian session (new day cycle)
     if nyHour == 20 or na(accumulationHigh)
         accumulationHigh := high
         accumulationLow := low
+        // Reset manipulation tracking for new day
+        asianHighSwept := false
+        asianLowSwept := false
+        manipulationComplete := false
+        manipDirection := 0
+        expectedDirection := 0
+        distributionStarted := false
+        manipulationSwingHigh := na
+        manipulationSwingLow := na
     else
         accumulationHigh := math.max(accumulationHigh, high)
         accumulationLow := math.min(accumulationLow, low)
-else if londonSession
+
+    amdStatus := "ACCUMULATION - Range building [" + str.tostring(accumulationHigh, format.mintick) + " / " + str.tostring(accumulationLow, format.mintick) + "]"
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE 2: MANIPULATION (London/Early NY) - Judas sweep detection
+// ═══════════════════════════════════════════════════════════════════════════════
+else if (londonSession or nyAMSession) and not manipulationComplete
     po3Phase := "MANIPULATION"
-else if nyAMSession or nyPMSession
+    amdPhase := 2
+
+    // Check for Asian High sweep (fake bullish move → expect bearish)
+    if not asianHighSwept and not na(accumulationHigh) and high > accumulationHigh
+        asianHighSwept := true
+        manipDirection := 1  // Swept high = fake bull
+        expectedDirection := -1  // Expect bear after
+        manipulationSwingHigh := high
+        amdStatus := "MANIPULATION - Asian HIGH SWEPT! Expect reversal DOWN"
+
+    // Check for Asian Low sweep (fake bearish move → expect bullish)
+    if not asianLowSwept and not na(accumulationLow) and low < accumulationLow
+        asianLowSwept := true
+        manipDirection := -1  // Swept low = fake bear
+        expectedDirection := 1  // Expect bull after
+        manipulationSwingLow := low
+        amdStatus := "MANIPULATION - Asian LOW SWEPT! Expect reversal UP"
+
+    // Track manipulation swing extremes
+    if manipDirection == 1 and not na(manipulationSwingHigh)
+        manipulationSwingHigh := math.max(manipulationSwingHigh, high)
+    if manipDirection == -1 and not na(manipulationSwingLow)
+        manipulationSwingLow := math.min(manipulationSwingLow, low)
+
+    // Detect manipulation completion (reversal confirmation)
+    // After sweeping high, look for bearish CHoCH/displacement
+    if manipDirection == 1 and asianHighSwept
+        if bearishCHoCH or (displacementDown and close < accumulationHigh)
+            manipulationComplete := true
+            amdEntryZoneTop := manipulationSwingHigh
+            amdEntryZoneBottom := accumulationHigh
+            amdStatus := "JUDAS COMPLETE - Reversal DOWN confirmed, seeking SSL"
+
+    // After sweeping low, look for bullish CHoCH/displacement
+    if manipDirection == -1 and asianLowSwept
+        if bullishCHoCH or (displacementUp and close > accumulationLow)
+            manipulationComplete := true
+            amdEntryZoneTop := accumulationLow
+            amdEntryZoneBottom := manipulationSwingLow
+            amdStatus := "JUDAS COMPLETE - Reversal UP confirmed, seeking BSL"
+
+    // No sweep yet
+    if not asianHighSwept and not asianLowSwept
+        amdStatus := "MANIPULATION - Watching for Asian range sweep..."
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE 3: DISTRIBUTION (Post-Manipulation) - True move to DOL
+// ═══════════════════════════════════════════════════════════════════════════════
+else if manipulationComplete or nyPMSession
     po3Phase := "DISTRIBUTION"
+    amdPhase := 3
+
+    if manipulationComplete
+        distributionStarted := true
+        if expectedDirection == 1
+            amdStatus := "DISTRIBUTION - True move UP to BSL"
+        else if expectedDirection == -1
+            amdStatus := "DISTRIBUTION - True move DOWN to SSL"
+        else
+            amdStatus := "DISTRIBUTION - True move in progress"
+    else
+        amdStatus := "DISTRIBUTION - NY PM session (late distribution)"
+
+// Default: No clear phase
+else
+    po3Phase := "NONE"
+    amdPhase := 0
+    amdStatus := "No active AMD phase"
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AMD CONFLUENCE - Boost score when aligned with manipulation
+// ═══════════════════════════════════════════════════════════════════════════════
+amdAligned = (manipulationComplete and expectedDirection == 1 and msDirection == DIR_BULL) or
+             (manipulationComplete and expectedDirection == -1 and msDirection == DIR_BEAR)
+
+// AMD provides strong directional bias after Judas completes
+amdBiasBull = manipulationComplete and expectedDirection == 1
+amdBiasBear = manipulationComplete and expectedDirection == -1
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        2022 MODEL DETECTION                                    ║
@@ -1677,6 +1790,14 @@ if hasDisplacement and hasFVGPresent
 // Combo 5: Full MTF + Killzone (time + direction alignment)
 if hasMTFAlignment and hasKillzone
     comboScore += 3
+
+// Combo 6: AMD ALIGNMENT - Judas completed + direction confirmed (HUGE edge)
+if amdAligned
+    comboScore += 10  // Major bonus - this is ICT's bread and butter
+
+// Combo 7: Post-Judas + OTE (optimal entry after manipulation)
+if manipulationComplete and inOTE
+    comboScore += 5
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LAYER 5: TRIGGER DETECTION - What fires the signal
@@ -2424,12 +2545,19 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 5, "Turtle Soup", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
     table.cell(infoTable, 1, 5, tsText, text_color=tsColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
-    // ═══ PO3 PHASE (Progressive Fill) ═══
-    po3Icons = po3Phase == "ACCUMULATION" ? "● ○ ○" : po3Phase == "MANIPULATION" ? "● ● ○" : "● ● ●"
-    po3Text = po3Phase == "ACCUMULATION" ? "ACCUMULATE" : po3Phase == "MANIPULATION" ? "MANIPULATE" : "DISTRIBUTE"
-    po3Color = i_pacmanColor
-    table.cell(infoTable, 0, 6, "Phase", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 6, po3Icons + " " + po3Text, text_color=po3Color, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
+    // ═══ AMD PHASE (Judas-Aware) ═══
+    amdIcon = amdPhase == 1 ? "◐" : amdPhase == 2 ? "◉" : amdPhase == 3 ? "●" : "○"
+    amdShortStatus = amdPhase == 1 ? "ACCUM" :
+                     amdPhase == 2 and asianHighSwept ? "JUDAS ▲" :
+                     amdPhase == 2 and asianLowSwept ? "JUDAS ▼" :
+                     amdPhase == 2 ? "WATCH" :
+                     amdPhase == 3 and manipulationComplete ? (expectedDirection == 1 ? "DIST ▲" : "DIST ▼") :
+                     amdPhase == 3 ? "DIST" : "—"
+    amdDisplayColor = manipulationComplete ? (expectedDirection == 1 ? i_bullColor : i_bearColor) :
+                      asianHighSwept ? i_bearColor : asianLowSwept ? i_bullColor : i_pacmanColor
+    amdBg = manipulationComplete ? color.new(amdDisplayColor, 88) : tableBgAlt
+    table.cell(infoTable, 0, 6, "AMD", text_color=textDim, text_size=size.tiny, bgcolor=amdBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 6, amdIcon + " " + amdShortStatus, text_color=amdDisplayColor, text_size=size.small, bgcolor=amdBg, text_halign=text.align_right)
 
     // ═══ SESSION / KILLZONE ═══
     sessName = asianSession ? "ASIA" : londonSession ? "LONDON" : nyAMSession ? "NY-AM" : nyPMSession ? "NY-PM" : "OFF"
