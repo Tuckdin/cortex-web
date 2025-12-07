@@ -2050,20 +2050,20 @@ if i_showOTE and barstate.islast
     float ote705 = rangeLow + rangeSize * 0.705
     float ote79 = rangeLow + rangeSize * 0.79
 
-    // Draw dashed lines for each OTE level - extended for visibility
-    oteLine62 := line.new(bar_index - 50, ote62, bar_index + 35, ote62,
+    // Draw dashed lines for each OTE level - all lines end at +20
+    oteLine62 := line.new(bar_index - 50, ote62, bar_index + 20, ote62,
          color=color.new(oteLineColor, 50), width=1, style=line.style_dotted)
-    oteLine705 := line.new(bar_index - 50, ote705, bar_index + 35, ote705,
+    oteLine705 := line.new(bar_index - 50, ote705, bar_index + 20, ote705,
          color=color.new(oteLineColor, 10), width=2, style=line.style_dashed)
-    oteLine79 := line.new(bar_index - 50, ote79, bar_index + 35, ote79,
+    oteLine79 := line.new(bar_index - 50, ote79, bar_index + 20, ote79,
          color=color.new(oteLineColor, 50), width=1, style=line.style_dotted)
 
-    // Labels for OTE levels - positioned well past line end for clarity
-    oteLabel62 := label.new(bar_index + 38, ote62, "62%",
+    // Labels for OTE levels - all labels at +22 (consistent column)
+    oteLabel62 := label.new(bar_index + 22, ote62, "62%",
          style=label.style_none, textcolor=color.new(oteLineColor, 30), size=size.tiny)
-    oteLabel705 := label.new(bar_index + 38, ote705, "OTE",
+    oteLabel705 := label.new(bar_index + 22, ote705, "OTE",
          style=label.style_none, textcolor=oteLineColor, size=size.small)
-    oteLabel79 := label.new(bar_index + 38, ote79, "79%",
+    oteLabel79 := label.new(bar_index + 22, ote79, "79%",
          style=label.style_none, textcolor=color.new(oteLineColor, 30), size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2205,17 +2205,17 @@ if i_showPacMan and barstate.islast
     if not na(sslLine)
         line.delete(sslLine)
 
-    // BSL - Cherries extended out past line (red for sell-side liquidity above)
-    bslLine := line.new(bar_index - 40, high60IPDA, bar_index + 25, high60IPDA,
+    // BSL - line ends at +20, label at +22 (consistent with OTE)
+    bslLine := line.new(bar_index - 40, high60IPDA, bar_index + 20, high60IPDA,
          color=color.new(#FF5252, 20), width=2, style=line.style_dashed)
-    cherryHighLabel := label.new(bar_index + 30, high60IPDA, "🍒 BSL",
-         style=label.style_none, textcolor=color.new(#FF5252, 0), size=size.normal)
+    cherryHighLabel := label.new(bar_index + 22, high60IPDA, "🍒 BSL",
+         style=label.style_none, textcolor=color.new(#FF5252, 0), size=size.small)
 
-    // SSL - Cherries extended out past line (green for buy-side liquidity below)
-    sslLine := line.new(bar_index - 40, low60IPDA, bar_index + 25, low60IPDA,
+    // SSL - line ends at +20, label at +22 (consistent with OTE)
+    sslLine := line.new(bar_index - 40, low60IPDA, bar_index + 20, low60IPDA,
          color=color.new(#69F0AE, 20), width=2, style=line.style_dashed)
-    cherryLowLabel := label.new(bar_index + 30, low60IPDA, "🍒 SSL",
-         style=label.style_none, textcolor=color.new(#69F0AE, 0), size=size.normal)
+    cherryLowLabel := label.new(bar_index + 22, low60IPDA, "🍒 SSL",
+         style=label.style_none, textcolor=color.new(#69F0AE, 0), size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPOSITE TIER SIGNALS (Only on TRUE high-confluence events)
