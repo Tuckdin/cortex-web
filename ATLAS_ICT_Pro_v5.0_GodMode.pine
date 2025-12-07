@@ -2409,9 +2409,7 @@ quarterName = isQ1 ? "Q1" : isQ2 ? "Q2" : isQ3 ? "Q3" : "Q4"
 
 var float prevDayClose = na
 var float currentDayOpen = na
-var float orgHigh = na
-var float orgLow = na
-var float orgCE = na
+// Note: orgHigh, orgLow, orgCE already defined in global variables section
 var bool hasORG = false
 var bool gapIsAbove = false  // true = gap above price, false = gap below price
 var float gapFillPct = 0.0   // 0-100% fill progress
@@ -3139,6 +3137,10 @@ if hasSilverBullet
 // Based on Cortex co-mention analysis of high-probability combinations
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Pre-calculate values needed for combo scoring
+hasModel2022 = model2022Bull or model2022Bear
+var int confluenceCount = 0  // Will be updated in CONFLUENCE section below
+
 comboScore = 0.0
 
 // Combo 1: Liquidity + OTE (179 co-mentions) - ICT's #1 entry setup
@@ -3352,7 +3354,7 @@ activeTrigger := "NONE"
 triggerMultiplier := 0.7  // Default: no trigger = 70% of score (capped at MODERATE)
 
 // Detect which trigger is active (priority order)
-hasModel2022 = model2022Bull or model2022Bear
+// Note: hasModel2022 already defined above in COMBO section
 hasTurtleSoup = bullishTS or bearishTS
 hasJudas = bullishJudas or bearishJudas
 hasUnicorn = unicornBull or unicornBear
@@ -3482,7 +3484,7 @@ isHighConvictionTrigger = hasUnicorn or hasMMXM or hasModel2022 or hasTurtleSoup
 isAnyTrigger = activeTrigger != "NONE"
 
 // Count total confluences for display
-confluenceCount = 0
+confluenceCount := 0  // Reset count (var initialized above)
 if hasMSClear
     confluenceCount += 1
 if hasHTFAlignment
