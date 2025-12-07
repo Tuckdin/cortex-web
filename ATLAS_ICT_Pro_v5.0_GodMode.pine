@@ -1379,19 +1379,26 @@ unicornBull := false
 unicornBear := false
 
 // Scan for breaker + FVG overlap (Unicorn conditions)
-if array.size(orderBlocks) > 0
-    for i = 0 to math.min(array.size(orderBlocks) - 1, 5)
-        ob = array.get(orderBlocks, i)
+// Check bullish breakers
+if array.size(bullOBs) > 0
+    for i = 0 to math.min(array.size(bullOBs) - 1, 5)
+        ob = array.get(bullOBs, i)
         if ob.isBreaker
             // Check if this breaker overlaps with any bullish FVG
-            if ob.direction == DIR_BULL and array.size(bullFVGs) > 0
+            if array.size(bullFVGs) > 0
                 for j = 0 to math.min(array.size(bullFVGs) - 1, 3)
                     fvg = array.get(bullFVGs, j)
                     if fvg.top >= ob.bottom and fvg.bottom <= ob.top
                         unicornBull := true
                         break
+
+// Check bearish breakers
+if array.size(bearOBs) > 0
+    for i = 0 to math.min(array.size(bearOBs) - 1, 5)
+        ob = array.get(bearOBs, i)
+        if ob.isBreaker
             // Check if this breaker overlaps with any bearish FVG
-            if ob.direction == DIR_BEAR and array.size(bearFVGs) > 0
+            if array.size(bearFVGs) > 0
                 for j = 0 to math.min(array.size(bearFVGs) - 1, 3)
                     fvg = array.get(bearFVGs, j)
                     if fvg.top >= ob.bottom and fvg.bottom <= ob.top
@@ -1413,10 +1420,14 @@ var bool amdFractalBear = false
 // HTF AMD based on session structure
 htfAMDPhase := asianSession ? "ACCUMULATION" : londonSession ? "MANIPULATION" : nyAMSession ? "DISTRIBUTION" : "NONE"
 
+// Pre-calculate ATR values (must be called on every bar)
+atr5 = ta.atr(5)
+atr20 = ta.atr(20)
+
 // LTF AMD based on intraday price action (within NY session)
 if nyAMSession or nyPMSession
     // Check for mini accumulation (consolidation after manipulation)
-    isLTFAccumulation = ta.atr(5) < ta.atr(20) * 0.7  // Low volatility = accumulation
+    isLTFAccumulation = atr5 < atr20 * 0.7  // Low volatility = accumulation
     isLTFManipulation = displacementUp or displacementDown  // Displacement = manipulation
     isLTFDistribution = bullishCHoCH or bearishCHoCH  // CHoCH = distribution starting
 
@@ -1467,7 +1478,7 @@ mmxmBearConfirm = mmxmBearSetup and inOTE and msDirection == DIR_BEAR
 // Q3 (Jul-Sep): Summer doldrums, low volatility
 // Q4 (Oct-Dec): Year-end rally, risk-on
 
-currentMonth = month(time)
+// Use currentMonth already defined earlier (line ~1105)
 currentQuarter = currentMonth <= 3 ? 1 : currentMonth <= 6 ? 2 : currentMonth <= 9 ? 3 : 4
 
 // Seasonal bias for US indices/risk assets
@@ -2257,10 +2268,10 @@ if i_showComposite and barstate.islast and (compositeTier == TIER_1 or composite
     if not na(entryLabel)
         label.delete(entryLabel)
 
-    // Determine entry zone boundaries (OTE zone)
-    swingRange = swingHigh - swingLow
-    ote62 = dolDirection == DIR_BULL ? swingLow + swingRange * 0.62 : swingHigh - swingRange * 0.62
-    ote79 = dolDirection == DIR_BULL ? swingLow + swingRange * 0.79 : swingHigh - swingRange * 0.79
+    // Determine entry zone boundaries (OTE zone) - using rangeHigh/rangeLow from P/D calculation
+    entryRange = rangeHigh - rangeLow
+    ote62 = dolDirection == DIR_BULL ? rangeLow + entryRange * 0.62 : rangeHigh - entryRange * 0.62
+    ote79 = dolDirection == DIR_BULL ? rangeLow + entryRange * 0.79 : rangeHigh - entryRange * 0.79
 
     // Entry zone box GLOW effect (bright, vibrant colors)
     entryBoxColor = compositeTier == TIER_1 ? color.new(#00FF88, 70) : color.new(#00E676, 75)
