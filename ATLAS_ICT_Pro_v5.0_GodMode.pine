@@ -2315,12 +2315,12 @@ var color accentLine = color.new(#0F3460, 0)
 var color textDim = color.new(#8892B0, 0)
 var color textBright = color.new(#E6F1FF, 0)
 
-var table infoTable = table.new(position.middle_right, 2, 18, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
+var table infoTable = table.new(position.middle_right, 2, 12, bgcolor=tableBg, border_width=0, border_color=color.new(#1A1A2E, 50), frame_width=2, frame_color=color.new(#0F3460, 30))
 
 if i_showDOLTable and barstate.islast
     // ═══ HEADER - Merged and centered ═══
-    probColor = dolProbability >= 70 ? i_bullColor : dolProbability >= 50 ? i_neutralColor : i_bearColor
-    headerText = "◉ PAC-MAN STATUS " + str.tostring(dolProbability, "#") + "%"
+    probColor = compositeScore >= 70 ? i_bullColor : compositeScore >= 50 ? i_neutralColor : i_bearColor
+    headerText = "◉ ATLAS PRO " + str.tostring(compositeScore, "#") + "%"
     table.cell(infoTable, 0, 0, headerText, text_color=i_pacmanColor, text_size=size.normal, bgcolor=headerBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 0, 1, 0)
 
@@ -2332,21 +2332,12 @@ if i_showDOLTable and barstate.islast
     table.merge_cells(infoTable, 0, 1, 1, 1)
 
     // ═══ MTF BIAS (ICT Multi-Timeframe) ═══
-    // Arrows: ↑ bullish, ↓ bearish, — neutral
     wArrow = mtfBiasW == 1 ? "↑" : mtfBiasW == -1 ? "↓" : "—"
     dArrow = mtfBiasD == 1 ? "↑" : mtfBiasD == -1 ? "↓" : "—"
     h1Arrow = mtfBias1H == 1 ? "↑" : mtfBias1H == -1 ? "↓" : "—"
     m15Arrow = mtfBias15m == 1 ? "↑" : mtfBias15m == -1 ? "↓" : "—"
     m5Arrow = mtfBias5m == 1 ? "↑" : mtfBias5m == -1 ? "↓" : "—"
 
-    // Colors for each arrow
-    wColor = mtfBiasW == 1 ? i_bullColor : mtfBiasW == -1 ? i_bearColor : textDim
-    dColor = mtfBiasD == 1 ? i_bullColor : mtfBiasD == -1 ? i_bearColor : textDim
-    h1Color = mtfBias1H == 1 ? i_bullColor : mtfBias1H == -1 ? i_bearColor : textDim
-    m15Color = mtfBias15m == 1 ? i_bullColor : mtfBias15m == -1 ? i_bearColor : textDim
-    m5Color = mtfBias5m == 1 ? i_bullColor : mtfBias5m == -1 ? i_bearColor : textDim
-
-    // Count alignment
     bullCount = (mtfBiasW == 1 ? 1 : 0) + (mtfBiasD == 1 ? 1 : 0) + (mtfBias1H == 1 ? 1 : 0) + (mtfBias15m == 1 ? 1 : 0) + (mtfBias5m == 1 ? 1 : 0)
     bearCount = (mtfBiasW == -1 ? 1 : 0) + (mtfBiasD == -1 ? 1 : 0) + (mtfBias1H == -1 ? 1 : 0) + (mtfBias15m == -1 ? 1 : 0) + (mtfBias5m == -1 ? 1 : 0)
     mtfAligned = bullCount >= 4 or bearCount >= 4
@@ -2377,89 +2368,41 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 1, 5, tsText, text_color=tsColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
     // ═══ PO3 PHASE (Progressive Fill) ═══
-    // ● = filled/passed (yellow), ○ = upcoming (dim)
     po3Icons = po3Phase == "ACCUMULATION" ? "● ○ ○" : po3Phase == "MANIPULATION" ? "● ● ○" : "● ● ●"
     po3Text = po3Phase == "ACCUMULATION" ? "ACCUMULATE" : po3Phase == "MANIPULATION" ? "MANIPULATE" : "DISTRIBUTE"
-    po3Color = i_pacmanColor  // Yellow for Pac-Man theme
+    po3Color = i_pacmanColor
     table.cell(infoTable, 0, 6, "Phase", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
     table.cell(infoTable, 1, 6, po3Icons + " " + po3Text, text_color=po3Color, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
-    // ═══ SESSION / KILLZONE (Dynamic) ═══
+    // ═══ SESSION / KILLZONE ═══
     sessName = asianSession ? "ASIA" : londonSession ? "LONDON" : nyAMSession ? "NY-AM" : nyPMSession ? "NY-PM" : "OFF"
     kzActive = inSilverBullet or nyAMKZ or nyPMKZ or londonKZ
     kzIndicator = inSilverBullet ? " ◉ SB" : kzActive ? " ◉ KZ" : ""
     sessDisplay = sessName + kzIndicator
-    sessColor = kzActive ? textBright : textDim
-    kzColor = inSilverBullet ? color.new(#00E5FF, 0) : i_pacmanColor  // Cyan for SB, Yellow for KZ
+    kzColor = inSilverBullet ? color.new(#00E5FF, 0) : i_pacmanColor
     table.cell(infoTable, 0, 7, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
     table.cell(infoTable, 1, 7, sessDisplay, text_color=kzActive ? kzColor : textDim, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
-    // ═══ SCORING BREAKDOWN HEADER ═══
-    table.cell(infoTable, 0, 8, "─── SCORE BREAKDOWN ───", text_color=textDim, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 8, 1, 8)
-
-    // ═══ FOUNDATION SCORE (0-30) ═══
-    foundationBar = ""
-    foundationPct = math.round(displayFoundation / 30 * 10)
-    for i = 0 to 9
-        foundationBar := foundationBar + (i < foundationPct ? "█" : "░")
-    foundationColor = displayFoundation >= 20 ? #00E676 : displayFoundation >= 15 ? #FFD740 : #FF5252
-    table.cell(infoTable, 0, 9, "Foundation", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 9, foundationBar + " " + str.tostring(displayFoundation, "#") + "/30", text_color=foundationColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
-
-    // ═══ ZONE SCORE (0-25) ═══
-    zoneBar = ""
-    zonePct = math.round(math.max(displayZone, 0) / 25 * 10)
-    for i = 0 to 9
-        zoneBar := zoneBar + (i < zonePct ? "█" : "░")
-    zoneScoreColor = displayZone >= 15 ? #00E676 : displayZone >= 10 ? #FFD740 : displayZone > 0 ? #FF9800 : #FF5252
-    table.cell(infoTable, 0, 10, "Entry Zone", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 10, zoneBar + " " + str.tostring(math.max(displayZone, 0), "#") + "/25", text_color=zoneScoreColor, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_right)
-
-    // ═══ CONFIRMATION SCORE (0-20) ═══
-    confBar = ""
-    confPct = math.round(displayConfirmation / 20 * 10)
-    for i = 0 to 9
-        confBar := confBar + (i < confPct ? "█" : "░")
-    confScoreColor = displayConfirmation >= 15 ? #00E676 : displayConfirmation >= 10 ? #FFD740 : displayConfirmation > 0 ? #FF9800 : #FF5252
-    table.cell(infoTable, 0, 11, "Confirmation", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 11, confBar + " " + str.tostring(displayConfirmation, "#") + "/20", text_color=confScoreColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
-
-    // ═══ COMBO BONUS (0-25) ═══
-    comboBar = ""
-    comboPct = math.round(displayCombo / 25 * 10)
-    for i = 0 to 9
-        comboBar := comboBar + (i < comboPct ? "█" : "░")
-    comboColor = displayCombo >= 15 ? #00E676 : displayCombo >= 8 ? #FFD740 : displayCombo > 0 ? #FF9800 : textDim
-    table.cell(infoTable, 0, 12, "Combo Bonus", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 12, comboBar + " " + str.tostring(displayCombo, "#") + "/25", text_color=comboColor, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_right)
-
-    // ═══ TRIGGER & MULTIPLIER ═══
-    triggerDisplay = activeTrigger != "NONE" ? activeTrigger + " ×" + str.tostring(triggerMultiplier, "#.##") : "NO TRIGGER ×0.7"
-    triggerColor = triggerMultiplier >= 1.2 ? #00E676 : triggerMultiplier >= 1.0 ? #FFD740 : #FF9800
-    table.cell(infoTable, 0, 13, "Trigger", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 13, triggerDisplay, text_color=triggerColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
-
-    // ═══ TOTAL SCORE ═══
-    totalDisplay = str.tostring(compositeScore, "#") + "/100"
-    totalColor = compositeScore >= 85 ? #00E676 : compositeScore >= 70 ? #69F0AE : compositeScore >= 55 ? #FFD740 : compositeScore >= 40 ? #FF9800 : #FF5252
-    table.cell(infoTable, 0, 14, "TOTAL SCORE", text_color=textBright, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 14, totalDisplay, text_color=totalColor, text_size=size.small, bgcolor=headerBg, text_halign=text.align_right)
-
-    // ═══ KEY FACTORS - Compact ═══
-    table.cell(infoTable, 0, 15, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 15, 1, 15)
+    // ═══ CONFLUENCE ═══
+    confDisplay = str.tostring(confluenceCount) + "/16"
+    confColor = confluenceCount >= 10 ? #00E676 : confluenceCount >= 7 ? #69F0AE : confluenceCount >= 5 ? #FFD740 : textDim
+    table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
+    table.cell(infoTable, 1, 8, confDisplay, text_color=confColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
     // ═══ TARGET ═══
-    table.cell(infoTable, 0, 16, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
-    table.cell(infoTable, 1, 16, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
+    table.cell(infoTable, 0, 9, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
+    table.cell(infoTable, 1, 9, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
+
+    // ═══ KEY FACTORS ═══
+    table.cell(infoTable, 0, 10, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 10, 1, 10)
 
     // ═══ TIER INDICATOR BAR (5-Tier System) ═══
     tierLabel = compositeTier == TIER_1 ? "ELITE" : compositeTier == TIER_2 ? "PREMIUM" : compositeTier == TIER_3 ? "STRONG" : compositeTier == TIER_4 ? "MODERATE" : "WEAK"
     tierBar = compositeTier == TIER_1 ? "████████████ " + tierLabel : compositeTier == TIER_2 ? "██████████░░ " + tierLabel : compositeTier == TIER_3 ? "████████░░░░ " + tierLabel : compositeTier == TIER_4 ? "██████░░░░░░ " + tierLabel : "████░░░░░░░░ " + tierLabel
     tierColor = compositeTier == TIER_1 ? #00E676 : compositeTier == TIER_2 ? #69F0AE : compositeTier == TIER_3 ? #FFD740 : compositeTier == TIER_4 ? #FF9800 : #FF5252
-    table.cell(infoTable, 0, 17, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
-    table.merge_cells(infoTable, 0, 17, 1, 17)
+    table.cell(infoTable, 0, 11, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
+    table.merge_cells(infoTable, 0, 11, 1, 11)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALERTS (Reduced to stay under 64 plot limit)
