@@ -1215,8 +1215,6 @@ isFriday = currentDOW == dayofweek.friday
 // - Classic: Mon/Tue consolidation, Wed reversal, Thu/Fri expansion
 // - Seek & Destroy: Wed/Thu reversals trap traders
 var string weeklyProfile = "DEVELOPING"
-var float weekHigh = na
-var float weekLow = na
 var float mondayHigh = na
 var float mondayLow = na
 
@@ -2887,9 +2885,9 @@ if i_showDOLTable and barstate.islast
     kzActive = inSilverBullet or nyAMKZ or nyPMKZ or londonKZ
     kzIndicator = inSilverBullet ? " ◉ SB" : kzActive ? " ◉ KZ" : ""
     sessDisplay = sessName + kzIndicator
-    kzColor = inSilverBullet ? color.new(#00E5FF, 0) : i_pacmanColor
+    sessKzColor = inSilverBullet ? color.new(#00E5FF, 0) : i_pacmanColor
     table.cell(infoTable, 0, 7, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
-    table.cell(infoTable, 1, 7, sessDisplay, text_color=kzActive ? kzColor : textDim, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
+    table.cell(infoTable, 1, 7, sessDisplay, text_color=kzActive ? sessKzColor : textDim, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
     // ═══ CONFLUENCE ═══
     confDisplay = str.tostring(confluenceCount) + "/16"
