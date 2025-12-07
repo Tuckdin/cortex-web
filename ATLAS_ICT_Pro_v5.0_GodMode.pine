@@ -2065,54 +2065,27 @@ isWednesday = currentDOW == dayofweek.wednesday
 isThursday = currentDOW == dayofweek.thursday
 isFriday = currentDOW == dayofweek.friday
 
-// Day of week assessment
-if isMonday
-    if nyHour >= 9 and nyHour < 11
-        timeRiskMultiplier := 1.2           // Monday 9-11am = 80% success = higher risk OK
-        timeRiskReason := "MON PRIME"
-        isHighProbTime := true
-    else if nyHour >= 11
-        timeRiskMultiplier := 0.8           // Monday afternoon = lower conviction
-        timeRiskReason := "MON PM"
-
-else if isTuesday
-    if nyHour >= 8 and nyHour < 11
-        timeRiskMultiplier := 1.3           // Tuesday 8:30-11am = 90% success = best day
-        timeRiskReason := "TUE PRIME"
-        isHighProbTime := true
-    else if nyHour >= 11 and nyHour < 14
-        timeRiskMultiplier := 1.0
-        timeRiskReason := "TUE MID"
-    else
-        timeRiskMultiplier := 0.7
-        timeRiskReason := "TUE PM"
-
-else if isWednesday
-    if nyHour >= 8 and nyHour < 11
-        timeRiskMultiplier := 0.9           // Wednesday AM = 60% success = more cautious
-        timeRiskReason := "WED AM"
-    else if nyHour >= 11
-        timeRiskMultiplier := 0.5           // Wednesday 11am+ = 20% success = avoid!
-        timeRiskReason := "WED CHOP"
-        isLowProbTime := true
-
-else if isThursday
-    if nyHour >= 8 and nyHour < 11
-        timeRiskMultiplier := 0.8           // Thursday AM = reversal day
-        timeRiskReason := "THU REV"
-    else
-        timeRiskMultiplier := 0.6
-        timeRiskReason := "THU PM"
-        isLowProbTime := true
-
-else if isFriday
-    if nyHour >= 8 and nyHour < 12
-        timeRiskMultiplier := 0.7           // Friday AM = expansion possible
-        timeRiskReason := "FRI AM"
-    else
-        timeRiskMultiplier := 0.4           // Friday PM = avoid (weekend positioning)
-        timeRiskReason := "FRI EXIT"
-        isLowProbTime := true
+// Day of week assessment (using ternary chains to reduce local scopes)
+// Monday
+timeRiskMultiplier := isMonday and nyHour >= 9 and nyHour < 11 ? 1.2 : isMonday and nyHour >= 11 ? 0.8 : timeRiskMultiplier
+timeRiskReason := isMonday and nyHour >= 9 and nyHour < 11 ? "MON PRIME" : isMonday and nyHour >= 11 ? "MON PM" : timeRiskReason
+isHighProbTime := isMonday and nyHour >= 9 and nyHour < 11 ? true : isHighProbTime
+// Tuesday
+timeRiskMultiplier := isTuesday and nyHour >= 8 and nyHour < 11 ? 1.3 : isTuesday and nyHour >= 11 and nyHour < 14 ? 1.0 : isTuesday and nyHour >= 14 ? 0.7 : timeRiskMultiplier
+timeRiskReason := isTuesday and nyHour >= 8 and nyHour < 11 ? "TUE PRIME" : isTuesday and nyHour >= 11 and nyHour < 14 ? "TUE MID" : isTuesday and nyHour >= 14 ? "TUE PM" : timeRiskReason
+isHighProbTime := isTuesday and nyHour >= 8 and nyHour < 11 ? true : isHighProbTime
+// Wednesday
+timeRiskMultiplier := isWednesday and nyHour >= 8 and nyHour < 11 ? 0.9 : isWednesday and nyHour >= 11 ? 0.5 : timeRiskMultiplier
+timeRiskReason := isWednesday and nyHour >= 8 and nyHour < 11 ? "WED AM" : isWednesday and nyHour >= 11 ? "WED CHOP" : timeRiskReason
+isLowProbTime := isWednesday and nyHour >= 11 ? true : isLowProbTime
+// Thursday
+timeRiskMultiplier := isThursday and nyHour >= 8 and nyHour < 11 ? 0.8 : isThursday and nyHour >= 11 ? 0.6 : timeRiskMultiplier
+timeRiskReason := isThursday and nyHour >= 8 and nyHour < 11 ? "THU REV" : isThursday and nyHour >= 11 ? "THU PM" : timeRiskReason
+isLowProbTime := isThursday and nyHour >= 11 ? true : isLowProbTime
+// Friday
+timeRiskMultiplier := isFriday and nyHour >= 8 and nyHour < 12 ? 0.7 : isFriday and nyHour >= 12 ? 0.4 : timeRiskMultiplier
+timeRiskReason := isFriday and nyHour >= 8 and nyHour < 12 ? "FRI AM" : isFriday and nyHour >= 12 ? "FRI EXIT" : timeRiskReason
+isLowProbTime := isFriday and nyHour >= 12 ? true : isLowProbTime
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                    DISCOUNT SENSITIVITY DETECTION                              ║
@@ -3137,93 +3110,31 @@ var float riskReward = 0.0   // Will be calculated later in visualization sectio
 
 comboScore = 0.0
 
-// Combo 1: Liquidity + OTE (179 co-mentions) - ICT's #1 entry setup
-if hasLiquidityTarget and inOTE
-    comboScore += 8
-
-// Combo 2: FVG + Zone Alignment (104 co-mentions)
-if hasFVGPresent and isCorrectZone
-    comboScore += 5
-
-// Combo 3: OTE + Order Block (93 co-mentions)
-if inOTE and hasFreshOB
-    comboScore += 5
-
-// Combo 4: Displacement + FVG (creates IFVG potential)
-if hasDisplacement and hasFVGPresent
-    comboScore += 4
-
-// Combo 5: Full MTF + Killzone (time + direction alignment)
-if hasMTFAlignment and hasKillzone
-    comboScore += 3
-
-// Combo 6: AMD ALIGNMENT - Judas completed + direction confirmed (HUGE edge)
-if amdAligned
-    comboScore += 10  // Major bonus - this is ICT's bread and butter
-
-// Combo 7: Post-Judas + OTE (optimal entry after manipulation)
-if manipulationComplete and inOTE
-    comboScore += 5
-
-// Combo 8: Silver Bullet Prime Window + FVG (ICT's favorite)
-if sbPrime and hasFVGPresent
-    comboScore += 6
-
-// Combo 9: Macro Time + Displacement (time-based reversal)
-if isMacroTime and hasDisplacement
-    comboScore += 4
-
-// Combo 10: Seek & Destroy Day + Counter-trend setup
-if isSeekDestroyDay and hasCHoCH
-    comboScore += 3
-
-// Combo 11: Rejection Block + Zone (strong rejection in correct zone)
+// Combos 1-12: Using ternary to reduce local scopes
+comboScore += hasLiquidityTarget and inOTE ? 8 : 0                    // Combo 1: Liquidity + OTE
+comboScore += hasFVGPresent and isCorrectZone ? 5 : 0                 // Combo 2: FVG + Zone
+comboScore += inOTE and hasFreshOB ? 5 : 0                            // Combo 3: OTE + OB
+comboScore += hasDisplacement and hasFVGPresent ? 4 : 0               // Combo 4: Displacement + FVG
+comboScore += hasMTFAlignment and hasKillzone ? 3 : 0                 // Combo 5: MTF + Killzone
+comboScore += amdAligned ? 10 : 0                                     // Combo 6: AMD Alignment
+comboScore += manipulationComplete and inOTE ? 5 : 0                  // Combo 7: Post-Judas + OTE
+comboScore += sbPrime and hasFVGPresent ? 6 : 0                       // Combo 8: SB Prime + FVG
+comboScore += isMacroTime and hasDisplacement ? 4 : 0                 // Combo 9: Macro + Displacement
+comboScore += isSeekDestroyDay and hasCHoCH ? 3 : 0                   // Combo 10: S&D + CHoCH
 hasRejBlock = (hasRecentBullRej and msDirection == DIR_BULL) or (hasRecentBearRej and msDirection == DIR_BEAR)
-if hasRejBlock and isCorrectZone
-    comboScore += 5
+comboScore += hasRejBlock and isCorrectZone ? 5 : 0                   // Combo 11: Rej Block + Zone
+comboScore += isPowerHour and confluenceCount >= 5 ? 3 : 0            // Combo 12: Power Hour
 
-// Combo 12: Power Hour + High Confluence (institutional activity)
-if isPowerHour and confluenceCount >= 5
-    comboScore += 3
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// LAYER 4B: PD ARRAY COMBO BONUSES - NEW ICT CONCEPTS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Combo 13: Suspension Block + OTE (ICT's most powerful entry)
-if hasSuspensionBlock and inOTE
-    comboScore += 8  // Major bonus - ICT says this is extremely powerful
-
-// Combo 14: Suspension Block + FVG stacked (double PD array)
-if hasSuspensionBlock and hasFVGPresent
-    comboScore += 5
-
-// Combo 15: Volume Imbalance + Order Block (VI confirms OB)
-if hasVolumeImbalance and hasFreshOB
-    comboScore += 4
-
-// Combo 16: Liquidity Void + Displacement (strong move into void)
-if hasLiquidityVoid and hasDisplacement
-    comboScore += 4
-
-// Combo 17: NDOG + Silver Bullet (gap fill during SB window)
-if hasNDOGAlignment and sbPrime
-    comboScore += 5
-
-// Combo 18: ORG + Macro Time (opening range play at macro)
-if hasORGAlignment and isMacroTime
-    comboScore += 4
-
-// Combo 19: Multiple PD Arrays stacked (confluence of PD arrays)
+// Combos 13-20: PD Array Combos (ternary to reduce scopes)
+comboScore += hasSuspensionBlock and inOTE ? 8 : 0                    // Combo 13: Susp Block + OTE
+comboScore += hasSuspensionBlock and hasFVGPresent ? 5 : 0            // Combo 14: Susp Block + FVG
+comboScore += hasVolumeImbalance and hasFreshOB ? 4 : 0               // Combo 15: VI + OB
+comboScore += hasLiquidityVoid and hasDisplacement ? 4 : 0            // Combo 16: LV + Displacement
+comboScore += hasNDOGAlignment and sbPrime ? 5 : 0                    // Combo 17: NDOG + SB
+comboScore += hasORGAlignment and isMacroTime ? 4 : 0                 // Combo 18: ORG + Macro
 pdArrayCount = (hasSuspensionBlock ? 1 : 0) + (hasVolumeImbalance ? 1 : 0) + (hasLiquidityVoid ? 1 : 0) + (hasFVGPresent ? 1 : 0) + (hasFreshOB ? 1 : 0)
-if pdArrayCount >= 3
-    comboScore += 6  // Stacked PD arrays = high probability
-else if pdArrayCount >= 2
-    comboScore += 3
-
-// Combo 20: Suspension Block + Killzone (time + price confluence)
-if hasSuspensionBlock and hasKillzone
-    comboScore += 4
+comboScore += pdArrayCount >= 3 ? 6 : pdArrayCount >= 2 ? 3 : 0       // Combo 19: Stacked PD Arrays
+comboScore += hasSuspensionBlock and hasKillzone ? 4 : 0              // Combo 20: Susp Block + KZ
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NEW HIDDEN GEM COMBOS (Combos 21-27)
@@ -3244,25 +3155,12 @@ if array.size(bearRejBlocks) > 0 and msDirection == DIR_BEAR
             hasRejectionBlock := true
             break
 
-// Combo 21: Rejection Block + OTE (ICT's bounce signal)
-if hasRejectionBlock and inOTE
-    comboScore += 5
-
-// Combo 22: Rejection Block + FVG stacked
-if hasRejectionBlock and hasFVGPresent
-    comboScore += 4
-
-// Combo 23: 3-Day ORG Confluence (ICT's lookback system)
-if orgConfluenceZone
-    comboScore += 6  // Major bonus - price respecting 3 days of ORGs
-
-// Combo 24: Discount Sensitivity (3+ confluences honoring gradient)
-if discountSensitivity
-    comboScore += 7  // ICT: "the market immediately launches"
-
-// Combo 25: Low Resistance Liquidity Run + Direction alignment
-if isSmoothMarket and (msDirection == DIR_BULL or msDirection == DIR_BEAR)
-    comboScore += 5  // Smooth market = easier targets
+// Combos 21-25 (ternary to reduce scopes)
+comboScore += hasRejectionBlock and inOTE ? 5 : 0                     // Combo 21: Rej Block + OTE
+comboScore += hasRejectionBlock and hasFVGPresent ? 4 : 0             // Combo 22: Rej Block + FVG
+comboScore += orgConfluenceZone ? 6 : 0                               // Combo 23: 3-Day ORG
+comboScore += discountSensitivity ? 7 : 0                             // Combo 24: Discount Sensitivity
+comboScore += isSmoothMarket and (msDirection == DIR_BULL or msDirection == DIR_BEAR) ? 5 : 0  // Combo 25
 
 // Combo 26: Wick Gradient CE test (price at consequent encroachment)
 hasWickGradientCE = false
@@ -3279,63 +3177,23 @@ if array.size(premiumWicks) > 0 and msDirection == DIR_BEAR
             hasWickGradientCE := true
             break
 
-if hasWickGradientCE
-    comboScore += 4  // ICT's notepad level being tested
-
-// Combo 27: High Probability Time + Strong Setup (Tuesday PRIME)
-if isHighProbTime and (hasSuspensionBlock or hasModel2022 or hasUnicorn)
-    comboScore += 6  // Best day + best setup = maximum conviction
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// NEW HIDDEN GEM COMBOS (28-35) - From Cortex Deep Dive
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Combo 28: Immediate Rebalance Pattern (high probability bounce)
-if immediateRebalanceBull and msDirection == DIR_BULL
-    comboScore += 8  // ICT: "very strong reaction"
-if immediateRebalanceBear and msDirection == DIR_BEAR
-    comboScore += 8
-
-// Combo 29: Market Maker Model Alignment
-// Buy Model + Bullish bias = institutions buying dips
-// Sell Model + Bearish bias = institutions selling rallies
-if mmModelBullish and msDirection == DIR_BULL and inDiscount
-    comboScore += 5  // Aligned with MM buying
-if mmModelBearish and msDirection == DIR_BEAR and inPremium
-    comboScore += 5  // Aligned with MM selling
-
-// Combo 30: Young Swing + Strong Setup (can take more displacement)
-if youngSwingHigh and msDirection == DIR_BEAR and (hasSuspensionBlock or hasFVGPresent)
-    comboScore += 4  // Young swing = more room to move
-if youngSwingLow and msDirection == DIR_BULL and (hasSuspensionBlock or hasFVGPresent)
-    comboScore += 4
-
-// Combo 31: Mature Swing Warning (penalty - likely to reverse)
-// ICT: "avoid the New York open setups if daily swings are maturing"
-if matureSwingHigh and msDirection == DIR_BEAR and nyHour >= 9 and nyHour <= 11
-    comboScore -= 3  // Penalty - mature swing may reverse
-if matureSwingLow and msDirection == DIR_BULL and nyHour >= 9 and nyHour <= 11
-    comboScore -= 3
-
-// Combo 32: Longest Wick CE Test (ICT's special level)
-if atLongestWickCE
-    comboScore += 5  // Price at THE longest wick's CE
-
-// Combo 33: Longest Wick CE + Direction alignment
-if atLongestWickCE and longestWickDirection == -1 and msDirection == DIR_BULL
-    comboScore += 3  // Discount wick CE + bullish = bounce point
-if atLongestWickCE and longestWickDirection == 1 and msDirection == DIR_BEAR
-    comboScore += 3  // Premium wick CE + bearish = rejection point
-
-// Combo 34: IOF Drill Entry (institutional order flow)
-if iofDrillLong
-    comboScore += 6  // ICT: "entry into a partial fair value gap"
-if iofDrillShort
-    comboScore += 6
-
-// Combo 35: IOF Drill + OTE + Killzone (maximum precision entry)
-if (iofDrillLong or iofDrillShort) and inOTE and hasKillzone
-    comboScore += 4  // Additional bonus for perfect timing
+// Combos 26-35 (ternary to reduce scopes)
+comboScore += hasWickGradientCE ? 4 : 0                               // Combo 26: Wick Gradient CE
+comboScore += isHighProbTime and (hasSuspensionBlock or hasModel2022 or hasUnicorn) ? 6 : 0  // Combo 27
+comboScore += immediateRebalanceBull and msDirection == DIR_BULL ? 8 : 0  // Combo 28a: Immediate Rebal
+comboScore += immediateRebalanceBear and msDirection == DIR_BEAR ? 8 : 0  // Combo 28b
+comboScore += mmModelBullish and msDirection == DIR_BULL and inDiscount ? 5 : 0  // Combo 29a: MM Model
+comboScore += mmModelBearish and msDirection == DIR_BEAR and inPremium ? 5 : 0   // Combo 29b
+comboScore += youngSwingHigh and msDirection == DIR_BEAR and (hasSuspensionBlock or hasFVGPresent) ? 4 : 0  // Combo 30a
+comboScore += youngSwingLow and msDirection == DIR_BULL and (hasSuspensionBlock or hasFVGPresent) ? 4 : 0   // Combo 30b
+comboScore -= matureSwingHigh and msDirection == DIR_BEAR and nyHour >= 9 and nyHour <= 11 ? 3 : 0  // Combo 31a penalty
+comboScore -= matureSwingLow and msDirection == DIR_BULL and nyHour >= 9 and nyHour <= 11 ? 3 : 0   // Combo 31b penalty
+comboScore += atLongestWickCE ? 5 : 0                                 // Combo 32: Longest Wick CE
+comboScore += atLongestWickCE and longestWickDirection == -1 and msDirection == DIR_BULL ? 3 : 0  // Combo 33a
+comboScore += atLongestWickCE and longestWickDirection == 1 and msDirection == DIR_BEAR ? 3 : 0   // Combo 33b
+comboScore += iofDrillLong ? 6 : 0                                    // Combo 34a: IOF Drill Long
+comboScore += iofDrillShort ? 6 : 0                                   // Combo 34b: IOF Drill Short
+comboScore += (iofDrillLong or iofDrillShort) and inOTE and hasKillzone ? 4 : 0  // Combo 35
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LAYER 5: TRIGGER DETECTION - What fires the signal
@@ -3398,13 +3256,8 @@ adjustedScore = rawScore * triggerMultiplier
 // Tuesday PRIME boosts, Wednesday 11am+ penalizes
 adjustedScore := adjustedScore * timeRiskMultiplier
 
-// Apply HIGH/LOW RESISTANCE LIQUIDITY RUN adjustment
-// High resistance = harder to reach targets = lower effective score
-// Low resistance = easier targets = slight boost
-if isJaggedMarket
-    adjustedScore := adjustedScore * 0.85  // 15% penalty for high resistance (choppy)
-else if isSmoothMarket
-    adjustedScore := adjustedScore * 1.05  // 5% boost for low resistance (smooth)
+// Apply HIGH/LOW RESISTANCE LIQUIDITY RUN adjustment (ternary to reduce scopes)
+adjustedScore := isJaggedMarket ? adjustedScore * 0.85 : isSmoothMarket ? adjustedScore * 1.05 : adjustedScore
 
 // Cap at 100
 compositeScore := math.min(adjustedScore, 100)
@@ -3423,16 +3276,9 @@ displayCombo := comboScore
 // DETERMINE DIRECTION (separate from quality score)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Direction based on market structure (not score comparison)
-if msDirection == DIR_BULL
-    dolDirection := DIR_BULL
-    dolTarget := not na(nearestBSL) ? nearestBSL : high20IPDA
-else if msDirection == DIR_BEAR
-    dolDirection := DIR_BEAR
-    dolTarget := not na(nearestSSL) ? nearestSSL : low20IPDA
-else
-    dolDirection := DIR_NEUTRAL
-    dolTarget := equilibrium
+// Direction based on market structure (ternary to reduce scopes)
+dolDirection := msDirection == DIR_BULL ? DIR_BULL : msDirection == DIR_BEAR ? DIR_BEAR : DIR_NEUTRAL
+dolTarget := msDirection == DIR_BULL ? (not na(nearestBSL) ? nearestBSL : high20IPDA) : msDirection == DIR_BEAR ? (not na(nearestSSL) ? nearestSSL : low20IPDA) : equilibrium
 
 // Legacy probability for compatibility (now based on composite score)
 dolProbability := compositeScore
@@ -3441,26 +3287,15 @@ dolProbability := compositeScore
 // BUILD REASON STRING WITH LAYER BREAKDOWN
 // ═══════════════════════════════════════════════════════════════════════════════
 
-if dolDirection == DIR_BULL
-    dolReason := "BULLISH"
-    dolReason += hasHTFAlignment ? " • HTF" : ""
-    dolReason += isCorrectZone ? " • DISCOUNT" : ""
-    dolReason += inOTE ? " • OTE" : ""
-    dolReason += hasFreshOB ? " • OB" : ""
-    dolReason += hasDisplacement ? " • DISP" : ""
-    dolReason += hasKillzone ? " • KZ" : ""
-    dolReason += activeTrigger != "NONE" ? " • " + activeTrigger : ""
-else if dolDirection == DIR_BEAR
-    dolReason := "BEARISH"
-    dolReason += hasHTFAlignment ? " • HTF" : ""
-    dolReason += isCorrectZone ? " • PREMIUM" : ""
-    dolReason += inOTE ? " • OTE" : ""
-    dolReason += hasFreshOB ? " • OB" : ""
-    dolReason += hasDisplacement ? " • DISP" : ""
-    dolReason += hasKillzone ? " • KZ" : ""
-    dolReason += activeTrigger != "NONE" ? " • " + activeTrigger : ""
-else
-    dolReason := "NEUTRAL - AWAITING STRUCTURE"
+// Build reason string (ternary to reduce scopes)
+dolReason := dolDirection == DIR_BULL ? "BULLISH" : dolDirection == DIR_BEAR ? "BEARISH" : "NEUTRAL - AWAITING STRUCTURE"
+dolReason += dolDirection != DIR_NEUTRAL and hasHTFAlignment ? " • HTF" : ""
+dolReason += dolDirection == DIR_BULL and isCorrectZone ? " • DISCOUNT" : dolDirection == DIR_BEAR and isCorrectZone ? " • PREMIUM" : ""
+dolReason += dolDirection != DIR_NEUTRAL and inOTE ? " • OTE" : ""
+dolReason += dolDirection != DIR_NEUTRAL and hasFreshOB ? " • OB" : ""
+dolReason += dolDirection != DIR_NEUTRAL and hasDisplacement ? " • DISP" : ""
+dolReason += dolDirection != DIR_NEUTRAL and hasKillzone ? " • KZ" : ""
+dolReason += dolDirection != DIR_NEUTRAL and activeTrigger != "NONE" ? " • " + activeTrigger : ""
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        COMPOSITE TIER ASSIGNMENT                               ║
@@ -3476,44 +3311,11 @@ else
 isHighConvictionTrigger = hasUnicorn or hasMMXM or hasModel2022 or hasTurtleSoup
 isAnyTrigger = activeTrigger != "NONE"
 
-// Count total confluences for display
-confluenceCount := 0  // Reset count (var initialized above)
-if hasMSClear
-    confluenceCount += 1
-if hasHTFAlignment
-    confluenceCount += 1
-if hasMTFAlignment
-    confluenceCount += 1
-if hasLiquidityTarget
-    confluenceCount += 1
-if isCorrectZone
-    confluenceCount += 1
-if inOTE
-    confluenceCount += 1
-if hasFreshOB
-    confluenceCount += 1
-if hasFVGPresent
-    confluenceCount += 1
-if hasDisplacement
-    confluenceCount += 1
-if hasKillzone
-    confluenceCount += 1
-if hasSilverBullet
-    confluenceCount += 1
-if isHighConvictionTrigger
-    confluenceCount += 2  // High-conviction triggers count as 2
+// Count total confluences for display (ternary to reduce scopes)
+confluenceCount := (hasMSClear ? 1 : 0) + (hasHTFAlignment ? 1 : 0) + (hasMTFAlignment ? 1 : 0) + (hasLiquidityTarget ? 1 : 0) + (isCorrectZone ? 1 : 0) + (inOTE ? 1 : 0) + (hasFreshOB ? 1 : 0) + (hasFVGPresent ? 1 : 0) + (hasDisplacement ? 1 : 0) + (hasKillzone ? 1 : 0) + (hasSilverBullet ? 1 : 0) + (isHighConvictionTrigger ? 2 : 0)
 
-// Assign tier with requirements
-if compositeScore >= 85 and isHighConvictionTrigger and hasFoundationComplete
-    compositeTier := TIER_1  // ELITE
-else if compositeScore >= 70 and isAnyTrigger and hasFoundationComplete
-    compositeTier := TIER_2  // PREMIUM
-else if compositeScore >= 55 and hasFoundationComplete
-    compositeTier := TIER_3  // STRONG
-else if compositeScore >= 40
-    compositeTier := TIER_4  // MODERATE
-else
-    compositeTier := TIER_5  // WEAK
+// Assign tier with requirements (ternary to reduce scopes)
+compositeTier := compositeScore >= 85 and isHighConvictionTrigger and hasFoundationComplete ? TIER_1 : compositeScore >= 70 and isAnyTrigger and hasFoundationComplete ? TIER_2 : compositeScore >= 55 and hasFoundationComplete ? TIER_3 : compositeScore >= 40 ? TIER_4 : TIER_5
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PATTERN NAMES (Based on active trigger and tier)
@@ -3521,81 +3323,8 @@ else
 patternName := ""
 
 // TIER 1 ELITE - Highest probability setups
-if compositeTier == TIER_1
-    if activeTrigger == "UNICORN"
-        patternName := "🦄 UNICORN SETUP"
-    else if activeTrigger == "MMXM"
-        patternName := "📊 MMXM CONFIRMED"
-    else if activeTrigger == "2022 MODEL" and hasMTFAlignment
-        patternName := "💎 DIAMOND SETUP"
-    else if activeTrigger == "2022 MODEL"
-        patternName := "🏆 THE APEX"
-    else if activeTrigger == "TURTLE SOUP" and hasSilverBullet
-        patternName := "🏆 PERFECT STORM"
-    else if confluenceCount >= 10
-        patternName := "🏆 MEGA CONFLUENCE"
-    else
-        patternName := "🏆 ELITE SETUP"
-
-// TIER 2 PREMIUM - Very strong setups
-else if compositeTier == TIER_2
-    if activeTrigger == "UNICORN"
-        patternName := "🦄 UNICORN ZONE"
-    else if activeTrigger == "MMXM"
-        patternName := "📊 MMXM SETUP"
-    else if activeTrigger == "AMD FRACTAL"
-        patternName := "🔄 AMD FRACTAL"
-    else if activeTrigger == "TURTLE SOUP"
-        patternName := "⭐ SWEET SPOT"
-    else if activeTrigger == "JUDAS SWING"
-        patternName := "⭐ JUDAS TRAP"
-    else if activeTrigger == "2022 MODEL"
-        patternName := "⭐ 2022 ENTRY"
-    else if activeTrigger == "SILVER BULLET"
-        patternName := "⭐ BULLET TIME"
-    else if confluenceCount >= 7
-        patternName := "⭐ PREMIUM SETUP"
-    else
-        patternName := "⭐ STRONG BIAS"
-
-// TIER 3 STRONG - Good setups
-else if compositeTier == TIER_3
-    if inOTE and isCorrectZone
-        patternName := "🥈 OTE ZONE"
-    else if activeTrigger == "TURTLE SOUP"
-        patternName := "🥈 SOUP ALIGNED"
-    else if hasDisplacement and hasFreshOB
-        patternName := "🥈 OB PLAY"
-    else if activeTrigger == "CHoCH"
-        patternName := "🥈 CHoCH ENTRY"
-    else if activeTrigger == "BOS"
-        patternName := "🥈 BOS PLAY"
-    else if hasSilverBullet
-        patternName := "🥈 BULLET WINDOW"
-    else
-        patternName := "🥈 GOOD SETUP"
-
-// TIER 4 MODERATE - Developing setups
-else if compositeTier == TIER_4
-    if isCorrectZone
-        patternName := "🥉 ZONE PLAY"
-    else if hasDisplacement
-        patternName := "🥉 MOMENTUM"
-    else if hasFreshOB
-        patternName := "🥉 OB WATCH"
-    else if hasKillzone
-        patternName := "🥉 KILLZONE"
-    else
-        patternName := "🥉 DEVELOPING"
-
-// TIER 5 WEAK - Low probability
-else
-    if hasFVGPresent
-        patternName := "⚠️ FVG ONLY"
-    else if hasKillzone
-        patternName := "⚠️ WAITING"
-    else
-        patternName := "⚠️ NO SETUP"
+// Pattern names using nested ternary to reduce scopes
+patternName := compositeTier == TIER_1 ? (activeTrigger == "UNICORN" ? "🦄 UNICORN SETUP" : activeTrigger == "MMXM" ? "📊 MMXM CONFIRMED" : activeTrigger == "2022 MODEL" and hasMTFAlignment ? "💎 DIAMOND SETUP" : activeTrigger == "2022 MODEL" ? "🏆 THE APEX" : activeTrigger == "TURTLE SOUP" and hasSilverBullet ? "🏆 PERFECT STORM" : confluenceCount >= 10 ? "🏆 MEGA CONFLUENCE" : "🏆 ELITE SETUP") : compositeTier == TIER_2 ? (activeTrigger == "UNICORN" ? "🦄 UNICORN ZONE" : activeTrigger == "MMXM" ? "📊 MMXM SETUP" : activeTrigger == "AMD FRACTAL" ? "🔄 AMD FRACTAL" : activeTrigger == "TURTLE SOUP" ? "⭐ SWEET SPOT" : activeTrigger == "JUDAS SWING" ? "⭐ JUDAS TRAP" : activeTrigger == "2022 MODEL" ? "⭐ 2022 ENTRY" : activeTrigger == "SILVER BULLET" ? "⭐ BULLET TIME" : confluenceCount >= 7 ? "⭐ PREMIUM SETUP" : "⭐ STRONG BIAS") : compositeTier == TIER_3 ? (inOTE and isCorrectZone ? "🥈 OTE ZONE" : activeTrigger == "TURTLE SOUP" ? "🥈 SOUP ALIGNED" : hasDisplacement and hasFreshOB ? "🥈 OB PLAY" : activeTrigger == "CHoCH" ? "🥈 CHoCH ENTRY" : activeTrigger == "BOS" ? "🥈 BOS PLAY" : hasSilverBullet ? "🥈 BULLET WINDOW" : "🥈 GOOD SETUP") : compositeTier == TIER_4 ? (isCorrectZone ? "🥉 ZONE PLAY" : hasDisplacement ? "🥉 MOMENTUM" : hasFreshOB ? "🥉 OB WATCH" : hasKillzone ? "🥉 KILLZONE" : "🥉 DEVELOPING") : (hasFVGPresent ? "⚠️ FVG ONLY" : hasKillzone ? "⚠️ WAITING" : "⚠️ NO SETUP")
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                   🕹️ PAC-MAN ARCADE GAME STATE LOGIC 🕹️                        ║
@@ -5068,23 +4797,10 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 12, "Day", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 12, dayTypeText, text_color=dayTypeCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 13: PD Arrays Active
-    pdActive = ""
-    if hasSuspensionBlock
-        pdActive := "SB "
-    if hasFVGPresent
-        pdActive := pdActive + "FVG "
-    if hasVolumeImbalance
-        pdActive := pdActive + "VI "
-    if hasLiquidityVoid
-        pdActive := pdActive + "LV "
-    if hasNDOGAlignment
-        pdActive := pdActive + "NDOG "
-    if hasFreshOB
-        pdActive := pdActive + "OB"
-    pdActive := pdActive == "" ? "—" : pdActive
+    // Row 13: PD Arrays Active (using ternary to avoid extra scopes)
+    pdActive = (hasSuspensionBlock ? "SB " : "") + (hasFVGPresent ? "FVG " : "") + (hasVolumeImbalance ? "VI " : "") + (hasLiquidityVoid ? "LV " : "") + (hasNDOGAlignment ? "NDOG " : "") + (hasFreshOB ? "OB" : "")
     table.cell(infoTable, 0, 13, "PD Arrays", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 13, pdActive, text_color=hasSuspensionBlock ? #00E5FF : textBright, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 13, pdActive == "" ? "—" : pdActive, text_color=hasSuspensionBlock ? #00E5FF : textBright, text_size=size.tiny, bgcolor=tableBg)
 
     // Row 14: Time Risk
     trCol = timeRiskMultiplier >= 1.2 ? #00E676 : timeRiskMultiplier >= 1.0 ? textBright : timeRiskMultiplier >= 0.7 ? #FFD740 : #FF5252
