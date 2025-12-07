@@ -1800,13 +1800,13 @@ if i_showOTE and barstate.islast
     oteLine79 := line.new(bar_index - 30, ote79, bar_index + 10, ote79,
          color=color.new(oteLineColor, 40), width=1, style=line.style_dashed)
 
-    // Labels for OTE levels
+    // Labels for OTE levels (70.5% brighter but same size)
     oteLabel62 := label.new(bar_index + 11, ote62, "62%",
-         style=label.style_none, textcolor=color.new(oteLineColor, 30), size=size.tiny)
-    oteLabel705 := label.new(bar_index + 11, ote705, "OTE 70.5%",
-         style=label.style_none, textcolor=color.new(oteLineColor, 0), size=size.small)
+         style=label.style_none, textcolor=color.new(oteLineColor, 50), size=size.tiny)
+    oteLabel705 := label.new(bar_index + 11, ote705, "━ OTE 70.5% ━",
+         style=label.style_none, textcolor=oteLineColor, size=size.tiny)
     oteLabel79 := label.new(bar_index + 11, ote79, "79%",
-         style=label.style_none, textcolor=color.new(oteLineColor, 30), size=size.tiny)
+         style=label.style_none, textcolor=color.new(oteLineColor, 50), size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PREMIUM/DISCOUNT ZONES - Subtle reference lines
