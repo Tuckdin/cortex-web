@@ -1241,15 +1241,15 @@ bullishOB = close[1] < open[1] and displacementUp and close > high[1]
 bearishOB = close[1] > open[1] and displacementDown and close < low[1]
 
 // ICT-style Order Block colors (blue for bullish, orange for bearish - per ICT videos)
-obBullColor = #90CAF9  // Pastel blue
-obBearColor = #FFAB91  // Pastel coral/orange
+obBullColor = #B3D9FF  // Soft pastel blue
+obBearColor = #FFD4C4  // Soft pastel peach
 
 // Create and manage Order Blocks - ICT style with labels
 if bullishOB and i_showOB
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BULL, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=obBullColor, bgcolor=color.new(obBullColor, 75),
+                 border_color=obBullColor, bgcolor=color.new(obBullColor, 60),
                  border_width=2, border_style=line.style_solid,
                  text="OB", text_color=obBullColor, text_size=size.tiny, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
@@ -1266,7 +1266,7 @@ if bearishOB and i_showOB
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BEAR, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=obBearColor, bgcolor=color.new(obBearColor, 75),
+                 border_color=obBearColor, bgcolor=color.new(obBearColor, 60),
                  border_width=2, border_style=line.style_solid,
                  text="OB", text_color=obBearColor, text_size=size.tiny, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
@@ -1410,8 +1410,8 @@ minFVGSize = i_fvgMinSize * f_tickSize()
 
 // ICT-style FVG colors (gold/amber for visibility)
 // ICT-style FVG colors (pink - per ICT videos)
-fvgBullColor = #FFE082  // Pastel gold/amber for bullish FVG
-fvgBearColor = #F48FB1  // Pastel magenta for bearish FVG
+fvgBullColor = #FFF3C4  // Soft pastel cream/gold for bullish FVG
+fvgBearColor = #FFCDD2  // Soft pastel pink for bearish FVG
 
 // Create FVGs - ICT style with labels
 if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
@@ -1420,7 +1420,7 @@ if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
     newFVG = FVG.new(
          bullishFVGTop, bullishFVGBottom, bar_index, DIR_BULL, false, mitLevel,
          box.new(bar_index - 2, bullishFVGTop, bar_index + 15, bullishFVGBottom,
-                 border_color=fvgBullColor, bgcolor=color.new(fvgBullColor, 75),
+                 border_color=fvgBullColor, bgcolor=color.new(fvgBullColor, 55),
                  border_width=2, border_style=line.style_solid,
                  text="FVG", text_color=fvgBullColor, text_size=size.tiny, text_halign=text.align_right))
     if array.size(bullFVGs) >= 15
@@ -1435,7 +1435,7 @@ if bearishFVG and i_showFVG and (bearishFVGTop - bearishFVGBottom) >= minFVGSize
     newFVG = FVG.new(
          bearishFVGTop, bearishFVGBottom, bar_index, DIR_BEAR, false, mitLevel,
          box.new(bar_index - 2, bearishFVGTop, bar_index + 15, bearishFVGBottom,
-                 border_color=fvgBearColor, bgcolor=color.new(fvgBearColor, 75),
+                 border_color=fvgBearColor, bgcolor=color.new(fvgBearColor, 55),
                  border_width=2, border_style=line.style_solid,
                  text="FVG", text_color=fvgBearColor, text_size=size.tiny, text_halign=text.align_right))
     if array.size(bearFVGs) >= 15
@@ -1587,7 +1587,7 @@ if hasEQL and i_showEQL
 // Bullish VI: Current candle body low > previous candle body high
 // Bearish VI: Current candle body high < previous candle body low
 
-viColor = #B388FF  // Pastel purple for VI
+viColor = #D4C4FF  // Soft pastel lavender for VI
 
 // Body calculations
 currBodyHigh = math.max(close, open)
@@ -1612,9 +1612,9 @@ viBottomBear = currBodyHigh
 if bullishVI and i_showFVG
     newVI = VolumeImbalance.new(viTopBull, viBottomBull, bar_index, DIR_BULL, false,
          box.new(bar_index - 1, viTopBull, bar_index + 10, viBottomBull,
-                 border_color=viColor, bgcolor=color.new(viColor, 85),
+                 border_color=viColor, bgcolor=color.new(viColor, 65),
                  border_width=1, border_style=line.style_dotted,
-                 text="VI", text_color=viColor, text_size=size.tiny, text_halign=text.align_right))
+                 text="VI", text_color=viColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bullVIs) >= 10
         oldVI = array.shift(bullVIs)
         if not na(oldVI.visual)
@@ -1624,9 +1624,9 @@ if bullishVI and i_showFVG
 if bearishVI and i_showFVG
     newVI = VolumeImbalance.new(viTopBear, viBottomBear, bar_index, DIR_BEAR, false,
          box.new(bar_index - 1, viTopBear, bar_index + 10, viBottomBear,
-                 border_color=viColor, bgcolor=color.new(viColor, 85),
+                 border_color=viColor, bgcolor=color.new(viColor, 65),
                  border_width=1, border_style=line.style_dotted,
-                 text="VI", text_color=viColor, text_size=size.tiny, text_halign=text.align_right))
+                 text="VI", text_color=viColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bearVIs) >= 10
         oldVI = array.shift(bearVIs)
         if not na(oldVI.visual)
@@ -1640,8 +1640,8 @@ if bearishVI and i_showFVG
 // "Being suspended between two volume imbalances" - ICT
 // Extremely powerful PD Array - acts like FVG but single candle
 
-suspBlockBullColor = #81D4FA  // Light blue for bullish
-suspBlockBearColor = #FFAB91  // Light coral for bearish
+suspBlockBullColor = #C5E8FF  // Soft pastel sky blue for bullish
+suspBlockBearColor = #FFE0D4  // Soft pastel coral for bearish
 
 // Check for VI at both ends of a single candle
 // VI HIGH: Gap between this candle's body high and next candle's body low
@@ -1677,7 +1677,7 @@ if bullishSuspBlock and i_showFVG
     newSB = SuspensionBlock.new(suspBlockTopBull, suspBlockBottomBull, prevCandleBodyHigh, prevCandleBodyLow,
          bar_index - 1, DIR_BULL, false, false,
          box.new(bar_index - 2, suspBlockTopBull, bar_index + 15, suspBlockBottomBull,
-                 border_color=suspBlockBullColor, bgcolor=color.new(suspBlockBullColor, 75),
+                 border_color=suspBlockBullColor, bgcolor=color.new(suspBlockBullColor, 55),
                  border_width=2, border_style=line.style_solid,
                  text="SUSP", text_color=suspBlockBullColor, text_size=size.tiny, text_halign=text.align_right),
          label.new(bar_index - 1, suspBlockTopBull, "⬡",
@@ -1694,7 +1694,7 @@ if bearishSuspBlock and i_showFVG
     newSB = SuspensionBlock.new(suspBlockTopBear, suspBlockBottomBear, prevCandleBodyHigh, prevCandleBodyLow,
          bar_index - 1, DIR_BEAR, false, false,
          box.new(bar_index - 2, suspBlockTopBear, bar_index + 15, suspBlockBottomBear,
-                 border_color=suspBlockBearColor, bgcolor=color.new(suspBlockBearColor, 75),
+                 border_color=suspBlockBearColor, bgcolor=color.new(suspBlockBearColor, 55),
                  border_width=2, border_style=line.style_solid,
                  text="SUSP", text_color=suspBlockBearColor, text_size=size.tiny, text_halign=text.align_right),
          label.new(bar_index - 1, suspBlockTopBear, "⬡",
@@ -1713,7 +1713,7 @@ if bearishSuspBlock and i_showFVG
 // Liquidity Void: Large displacement candle where price moved too fast
 // Creates an area price will likely return to fill
 
-liqVoidColor = #CE93D8  // Pastel purple
+liqVoidColor = #E8D4F0  // Soft pastel orchid
 
 // Large candle detection (> 2x ATR)
 largeCandle = totalRange > atrVal * 2
@@ -1737,9 +1737,9 @@ liqVoidBottomBear = high
 if bullishLiqVoid and i_showFVG
     newLV = LiquidityVoid.new(liqVoidTopBull, liqVoidBottomBull, bar_index, DIR_BULL, false,
          box.new(bar_index - 2, liqVoidTopBull, bar_index + 12, liqVoidBottomBull,
-                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 80),
+                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 60),
                  border_width=1, border_style=line.style_dashed,
-                 text="VOID", text_color=liqVoidColor, text_size=size.tiny, text_halign=text.align_right))
+                 text="VOID", text_color=liqVoidColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bullLiqVoids) >= 5
         oldLV = array.shift(bullLiqVoids)
         if not na(oldLV.visual)
@@ -1749,9 +1749,9 @@ if bullishLiqVoid and i_showFVG
 if bearishLiqVoid and i_showFVG
     newLV = LiquidityVoid.new(liqVoidTopBear, liqVoidBottomBear, bar_index, DIR_BEAR, false,
          box.new(bar_index - 2, liqVoidTopBear, bar_index + 12, liqVoidBottomBear,
-                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 80),
+                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 60),
                  border_width=1, border_style=line.style_dashed,
-                 text="VOID", text_color=liqVoidColor, text_size=size.tiny, text_halign=text.align_right))
+                 text="VOID", text_color=liqVoidColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bearLiqVoids) >= 5
         oldLV = array.shift(bearLiqVoids)
         if not na(oldLV.visual)
@@ -1848,7 +1848,7 @@ orgConfluenceZone = org3DayConfluence and
 // These are rejection blocks and they tend to promote new runs higher"
 // Different from Order Block - this is the CLOSE price of a single candle
 
-rejBlockColor = #CE93D8  // Light purple for rejection blocks
+rejBlockColor = #E8D4F0  // Soft pastel lavender for rejection blocks
 
 // Rejection Block criteria:
 // 1. Long wick (60%+ of candle range)
@@ -1860,7 +1860,7 @@ rejBlockColor = #CE93D8  // Light purple for rejection blocks
 if bullishRejBlock and i_showRejBlock
     newRB = RejectionBlock.new(close, high, low, bar_index, DIR_BULL, false,
          box.new(bar_index - 1, close, bar_index + 15, low,
-                 border_color=rejBlockColor, bgcolor=color.new(rejBlockColor, 85),
+                 border_color=rejBlockColor, bgcolor=color.new(rejBlockColor, 60),
                  border_width=1, border_style=line.style_dotted),
          label.new(bar_index, low, "RB", style=label.style_none,
                    textcolor=rejBlockColor, size=size.tiny))
@@ -1875,7 +1875,7 @@ if bullishRejBlock and i_showRejBlock
 if bearishRejBlock and i_showRejBlock
     newRB = RejectionBlock.new(close, high, low, bar_index, DIR_BEAR, false,
          box.new(bar_index - 1, high, bar_index + 15, close,
-                 border_color=rejBlockColor, bgcolor=color.new(rejBlockColor, 85),
+                 border_color=rejBlockColor, bgcolor=color.new(rejBlockColor, 60),
                  border_width=1, border_style=line.style_dotted),
          label.new(bar_index, high, "RB", style=label.style_none,
                    textcolor=rejBlockColor, size=size.tiny))
@@ -2536,8 +2536,8 @@ bullishRejection = i_showRejBlock and totalRange > 0 and lowerWick / totalRange 
 bearishRejection = i_showRejBlock and totalRange > 0 and upperWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close < open and inPremium
 
 // ICT-style Rejection Block colors (green/red - per ICT discount/premium)
-rbBullColor = #C5E1A5  // Pastel lime for bullish rejection (discount)
-rbBearColor = #EF9A9A  // Pastel red for bearish rejection (premium)
+rbBullColor = #D4EDDA  // Soft pastel mint for bullish rejection (discount)
+rbBearColor = #FFE0E0  // Soft pastel rose for bearish rejection (premium)
 rbDotsColor = #FFEB3B  // Pac-Man yellow for strength dots
 
 // RB Strength scoring function
@@ -2559,7 +2559,7 @@ if bullishRejection
     newRB = RejBlock.new(
          math.max(close, open), low, bar_index, DIR_BULL,
          box.new(bar_index, math.max(close, open), bar_index + 15, low,
-                 border_color=rbBullColor, bgcolor=color.new(rbBullColor, 75),
+                 border_color=rbBullColor, bgcolor=color.new(rbBullColor, 55),
                  border_width=2, border_style=line.style_solid,
                  text="RB " + rbDots, text_color=rbDotsColor, text_size=size.tiny, text_halign=text.align_right))
     if array.size(rejBlocks) >= 8
@@ -2577,7 +2577,7 @@ if bearishRejection
     newRB = RejBlock.new(
          high, math.min(close, open), bar_index, DIR_BEAR,
          box.new(bar_index, high, bar_index + 15, math.min(close, open),
-                 border_color=rbBearColor, bgcolor=color.new(rbBearColor, 75),
+                 border_color=rbBearColor, bgcolor=color.new(rbBearColor, 55),
                  border_width=2, border_style=line.style_solid,
                  text="RB " + rbDots, text_color=rbDotsColor, text_size=size.tiny, text_halign=text.align_right))
     if array.size(rejBlocks) >= 8
@@ -4023,19 +4023,19 @@ if i_showDOL and i_showPacMan and barstate.islast
         xSpacingToTarget = 8   // bars to reach target
         xSpacingPullback = 4   // bars for pullback
 
-        // Choose colors based on setup quality
-        pathColor = tradeReady ? pacmanYellow : highConf ? pacmanGold : color.new(pacmanCyan, 40)
-        pullbackColor = tradeReady ? color.new(pacmanYellow, 40) : highConf ? color.new(pacmanGold, 50) : color.new(pacmanCyan, 60)
-        fvgPbColor = color.new(#7C4DFF, 40)   // Purple for FVG pullback
-        obPbColor = color.new(#2196F3, 40)    // Blue for OB pullback
-        liqPbColor = color.new(#FF9800, 40)   // Orange for liquidity sweep
-        suspPbColor = color.new(#00E676, 30)  // Bright green for Suspension Block (highest priority)
-        viPbColor = color.new(#E040FB, 40)    // Magenta for Volume Imbalance
-        lvPbColor = color.new(#FF1744, 40)    // Red for Liquidity Void
-        rejPbColor = color.new(#FFAB00, 35)   // Amber for Rejection Block (ICT hidden gem)
-        lwCEPbColor = color.new(#00BFA5, 35)  // Teal for Longest Wick CE (ICT hidden gem)
-        wgCEPbColor = color.new(#B388FF, 35)  // Light purple for Wick Gradient CE (ICT notepad)
-        pathWidth = tradeReady ? 2 : highConf ? 2 : 1
+        // Choose colors based on setup quality - MORE VISIBLE
+        pathColor = tradeReady ? pacmanYellow : highConf ? pacmanGold : color.new(pacmanCyan, 20)
+        pullbackColor = tradeReady ? color.new(pacmanYellow, 30) : highConf ? color.new(pacmanGold, 40) : color.new(pacmanCyan, 50)
+        fvgPbColor = color.new(#7C4DFF, 30)   // Purple for FVG pullback
+        obPbColor = color.new(#2196F3, 30)    // Blue for OB pullback
+        liqPbColor = color.new(#FF9800, 30)   // Orange for liquidity sweep
+        suspPbColor = color.new(#00E676, 20)  // Bright green for Suspension Block (highest priority)
+        viPbColor = color.new(#E040FB, 30)    // Magenta for Volume Imbalance
+        lvPbColor = color.new(#FF1744, 30)    // Red for Liquidity Void
+        rejPbColor = color.new(#FFAB00, 25)   // Amber for Rejection Block (ICT hidden gem)
+        lwCEPbColor = color.new(#00BFA5, 25)  // Teal for Longest Wick CE (ICT hidden gem)
+        wgCEPbColor = color.new(#B388FF, 25)  // Light purple for Wick Gradient CE (ICT notepad)
+        pathWidth = tradeReady ? 3 : highConf ? 3 : 2
         pathStyle = tradeReady ? line.style_solid : line.style_dashed
 
         // Draw Pac-Man at start if trade ready
@@ -4075,10 +4075,10 @@ if i_showDOL and i_showPacMan and barstate.islast
                      style=label.style_none, textcolor=pathColor, size=size.small)
                 array.push(dolPathLabels, dotLabel)
 
-            // Add waypoint name label
+            // Add waypoint name label - MORE VISIBLE
             labelY = dolDirection == DIR_BULL ? targetY * 0.9998 : targetY * 1.0002
             nameLabel = label.new(targetX, labelY, wpName,
-                 style=label.style_none, textcolor=color.new(pathColor, 20), size=size.tiny, textalign=text.align_center)
+                 style=label.style_none, textcolor=color.new(pathColor, 0), size=size.small, textalign=text.align_center)
             array.push(dolPathLabels, nameLabel)
 
             // ═══ STEP 2: SMART PULLBACK - Find best retracement level ═══
@@ -4388,8 +4388,8 @@ var label clydeLabel = na
 if i_showPacMan and barstate.islast and not i_cleanMode
     label.delete(blinkyLabel)
     label.delete(clydeLabel)
-    blinkyLabel := label.new(bar_index + 20, high60IPDA, "👻 BSL", style=label.style_none, textcolor=#FF0000, size=size.small)
-    clydeLabel := label.new(bar_index + 20, low60IPDA, "👻 SSL", style=label.style_none, textcolor=#FFB852, size=size.small)
+    blinkyLabel := label.new(bar_index + 20, high60IPDA, "👻 BSL", style=label.style_none, textcolor=#FF0000, size=size.normal)
+    clydeLabel := label.new(bar_index + 20, low60IPDA, "👻 SSL", style=label.style_none, textcolor=#FFB852, size=size.normal)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LIQUIDITY SEQUENCING - Visual Lines (Simplified)
@@ -4403,17 +4403,17 @@ if barstate.islast
     label.delete(pdhLabel), label.delete(pdlLabel), label.delete(pwhLabel), label.delete(pwlLabel)
 
     if not na(pdh)
-        pdhLine := line.new(bar_index - 20, pdh, bar_index + 40, pdh, color=color.new(#FF9800, pdhSwept ? 70 : 30), width=1)
-        pdhLabel := label.new(bar_index + 40, pdh, pdhSwept ? "PDH ✗" : "PDH", style=label.style_none, textcolor=#FF9800, size=size.tiny)
+        pdhLine := line.new(bar_index - 20, pdh, bar_index + 40, pdh, color=color.new(#FF9800, pdhSwept ? 70 : 20), width=2)
+        pdhLabel := label.new(bar_index + 40, pdh, pdhSwept ? "PDH ✗" : "PDH", style=label.style_none, textcolor=#FF9800, size=size.small)
     if not na(pdl)
-        pdlLine := line.new(bar_index - 20, pdl, bar_index + 40, pdl, color=color.new(#FF9800, pdlSwept ? 70 : 30), width=1)
-        pdlLabel := label.new(bar_index + 40, pdl, pdlSwept ? "PDL ✗" : "PDL", style=label.style_none, textcolor=#FF9800, size=size.tiny)
+        pdlLine := line.new(bar_index - 20, pdl, bar_index + 40, pdl, color=color.new(#FF9800, pdlSwept ? 70 : 20), width=2)
+        pdlLabel := label.new(bar_index + 40, pdl, pdlSwept ? "PDL ✗" : "PDL", style=label.style_none, textcolor=#FF9800, size=size.small)
     if not na(pwh)
-        pwhLine := line.new(bar_index - 20, pwh, bar_index + 40, pwh, color=color.new(#E040FB, pwhSwept ? 70 : 30), width=1)
-        pwhLabel := label.new(bar_index + 40, pwh, pwhSwept ? "PWH ✗" : "PWH", style=label.style_none, textcolor=#E040FB, size=size.tiny)
+        pwhLine := line.new(bar_index - 20, pwh, bar_index + 40, pwh, color=color.new(#E040FB, pwhSwept ? 70 : 20), width=2)
+        pwhLabel := label.new(bar_index + 40, pwh, pwhSwept ? "PWH ✗" : "PWH", style=label.style_none, textcolor=#E040FB, size=size.small)
     if not na(pwl)
-        pwlLine := line.new(bar_index - 20, pwl, bar_index + 40, pwl, color=color.new(#E040FB, pwlSwept ? 70 : 30), width=1)
-        pwlLabel := label.new(bar_index + 40, pwl, pwlSwept ? "PWL ✗" : "PWL", style=label.style_none, textcolor=#E040FB, size=size.tiny)
+        pwlLine := line.new(bar_index - 20, pwl, bar_index + 40, pwl, color=color.new(#E040FB, pwlSwept ? 70 : 20), width=2)
+        pwlLabel := label.new(bar_index + 40, pwl, pwlSwept ? "PWL ✗" : "PWL", style=label.style_none, textcolor=#E040FB, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPOSITE TIER SIGNALS (Only on TRUE high-confluence events)
