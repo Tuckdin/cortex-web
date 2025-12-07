@@ -3593,30 +3593,11 @@ tier3WinRate = (tier3Wins + tier3Losses) > 0 ? (tier3Wins / (tier3Wins + tier3Lo
 
 sessionColor = asianSession ? color.new(#9C27B0, 97) : londonSession ? color.new(#2196F3, 97) : nyAMSession ? color.new(#4CAF50, 97) : nyPMSession ? color.new(#FF9800, 97) : na
 
-bgcolor(i_showSessions ? sessionColor : na, title="Session Background")
+// Session/Killzone/Silver Bullet backgrounds combined to reduce plot count
+combinedBg = inSilverBullet and i_showSilverBullet ? color.new(#00E5FF, 93) : (asianKZ or londonKZ or nyAMKZ or nyPMKZ) and i_showKillzones ? color.new(#FFC107, 95) : i_showSessions ? sessionColor : na
+bgcolor(combinedBg, title="Session/KZ Background")
 
-// Killzone highlight - subtle accent
-kzColor = (asianKZ or londonKZ or nyAMKZ or nyPMKZ) and i_showKillzones ? color.new(#FFC107, 95) : na
-bgcolor(kzColor, title="Killzone Highlight")
-
-// Silver Bullet highlight - slightly more visible for key windows
-bgcolor(i_showSilverBullet and inSilverBullet ? color.new(#00E5FF, 93) : na, title="Silver Bullet")
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// MARKET STRUCTURE LABELS (Clean minimal style)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// BOS - subtle small markers
-plotshape(i_showBOS and bullishBOS, title="BOS Bull", style=shape.triangleup,
-     location=location.abovebar, color=color.new(i_bullColor, 30), text="", size=size.tiny)
-plotshape(i_showBOS and bearishBOS, title="BOS Bear", style=shape.triangledown,
-     location=location.belowbar, color=color.new(i_bearColor, 30), text="", size=size.tiny)
-
-// CHoCH - more prominent as it's a reversal signal
-plotshape(i_showCHoCH and bullishCHoCH, title="CHoCH Bull", style=shape.diamond,
-     location=location.abovebar, color=i_neutralColor, text="⟲", textcolor=i_neutralColor, size=size.tiny)
-plotshape(i_showCHoCH and bearishCHoCH, title="CHoCH Bear", style=shape.diamond,
-     location=location.belowbar, color=i_neutralColor, text="⟲", textcolor=i_neutralColor, size=size.tiny)
+// BOS/CHoCH labels removed to reduce plot count - structure shown via dashboard and zones
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TURTLE SOUP LABELS (Clean style)
@@ -3628,50 +3609,19 @@ plotshape(i_showTurtleSoup and bullishTS, title="Turtle Soup Bull", style=shape.
 plotshape(i_showTurtleSoup and bearishTS, title="Turtle Soup Bear", style=shape.labeldown,
      location=location.abovebar, color=color.new(i_bearColor, 20), text="TS", textcolor=color.white, size=size.small)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// JUDAS SWING LABELS (Subtle accent)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-plotshape(i_showJudas and bullishJudas, title="Judas Bull", style=shape.circle,
-     location=location.belowbar, color=color.new(#9C27B0, 20), text="J", textcolor=color.white, size=size.tiny)
-plotshape(i_showJudas and bearishJudas, title="Judas Bear", style=shape.circle,
-     location=location.abovebar, color=color.new(#9C27B0, 20), text="J", textcolor=color.white, size=size.tiny)
+// Judas labels removed to reduce plot count - shown in dashboard AMD phase
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 2022 MODEL LABELS (Important signal - keep visible)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-plotshape(model2022Bull, title="2022 Model Bull", style=shape.labelup,
-     location=location.belowbar, color=color.new(#00BCD4, 10), text="2022", textcolor=color.white, size=size.small)
-plotshape(model2022Bear, title="2022 Model Bear", style=shape.labeldown,
-     location=location.abovebar, color=color.new(#00BCD4, 10), text="2022", textcolor=color.white, size=size.small)
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// UNICORN MODEL LABELS (Breaker + FVG confluence)
+// KEY MODEL LABELS (Combined to reduce plot count - info shown in dashboard)
+// Only showing UNICORN (highest conviction) as chart label
 // ═══════════════════════════════════════════════════════════════════════════════
 
 plotshape(unicornBull and barstate.isconfirmed, title="Unicorn Bull", style=shape.labelup,
-     location=location.belowbar, color=color.new(#AA00FF, 10), text="🦄 UNICORN", textcolor=color.white, size=size.small)
+     location=location.belowbar, color=color.new(#AA00FF, 10), text="🦄", textcolor=color.white, size=size.small)
 plotshape(unicornBear and barstate.isconfirmed, title="Unicorn Bear", style=shape.labeldown,
-     location=location.abovebar, color=color.new(#AA00FF, 10), text="🦄 UNICORN", textcolor=color.white, size=size.small)
+     location=location.abovebar, color=color.new(#AA00FF, 10), text="🦄", textcolor=color.white, size=size.small)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MMXM (Market Maker Model) LABELS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-plotshape(mmxmBullConfirm and barstate.isconfirmed, title="MMXM Bull", style=shape.labelup,
-     location=location.belowbar, color=color.new(#FF6D00, 10), text="MMXM ▲", textcolor=color.white, size=size.small)
-plotshape(mmxmBearConfirm and barstate.isconfirmed, title="MMXM Bear", style=shape.labeldown,
-     location=location.abovebar, color=color.new(#FF6D00, 10), text="MMXM ▼", textcolor=color.white, size=size.small)
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// AMD FRACTAL LABELS (Nested AMD alignment)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-plotshape(amdFractalBull and barstate.isconfirmed, title="AMD Fractal Bull", style=shape.diamond,
-     location=location.belowbar, color=color.new(#4CAF50, 10), text="AMD", textcolor=color.white, size=size.tiny)
-plotshape(amdFractalBear and barstate.isconfirmed, title="AMD Fractal Bear", style=shape.diamond,
-     location=location.abovebar, color=color.new(#F44336, 10), text="AMD", textcolor=color.white, size=size.tiny)
+// 2022 MODEL, MMXM, AMD FRACTAL signals shown in dashboard pattern name instead of chart labels
 
 // Swing points and EQH/EQL removed to reduce plot count - tracked via info table
 
@@ -4478,17 +4428,8 @@ tier1Bear = i_showComposite and compositeTier == TIER_1 and dolDirection == DIR_
 tier2Bull = i_showComposite and compositeTier == TIER_2 and dolDirection == DIR_BULL
 tier2Bear = i_showComposite and compositeTier == TIER_2 and dolDirection == DIR_BEAR
 
-// Tier 1 ELITE signals - clean badge style (only on trigger events)
-plotshape(tier1Bull and barstate.isconfirmed, title="ELITE Bull", style=shape.labelup,
-     location=location.belowbar, color=color.new(#00C853, 0), text="ELITE ▲", textcolor=color.white, size=size.small)
-plotshape(tier1Bear and barstate.isconfirmed, title="ELITE Bear", style=shape.labeldown,
-     location=location.abovebar, color=color.new(#FF1744, 0), text="ELITE ▼", textcolor=color.white, size=size.small)
-
-// Tier 2 PREMIUM signals
-plotshape(tier2Bull and barstate.isconfirmed and not tier1Bull, title="PREMIUM Bull", style=shape.labelup,
-     location=location.belowbar, color=color.new(#69F0AE, 0), text="PREMIUM ▲", textcolor=color.white, size=size.tiny)
-plotshape(tier2Bear and barstate.isconfirmed and not tier1Bear, title="PREMIUM Bear", style=shape.labeldown,
-     location=location.abovebar, color=color.new(#69F0AE, 0), text="PREMIUM ▼", textcolor=color.white, size=size.tiny)
+// Tier labels removed to reduce plot count - tier shown in dashboard
+// Entry zone box below provides visual for ELITE/PREMIUM setups
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ENTRY ZONE BOX & TARGET ARROW (For ELITE/PREMIUM setups)
@@ -4887,10 +4828,7 @@ alertcondition(tuesdayPrimeSetup, title="🏆 Tuesday PRIME Setup", message="�
 alertcondition(lcReversal and dolDirection == DIR_BULL, title="🇬🇧 LC Reversal Long", message="🇬🇧 LONDON CLOSE REVERSAL LONG on {{ticker}} - Post-manipulation bullish setup!")
 alertcondition(lcReversal and dolDirection == DIR_BEAR, title="🇬🇧 LC Reversal Short", message="🇬🇧 LONDON CLOSE REVERSAL SHORT on {{ticker}} - Post-manipulation bearish setup!")
 
-// Plot probability for external use
-plot(dolProbability, title="DOL Probability", display=display.none)
-plot(dolDirection, title="DOL Direction", display=display.none)
-plot(compositeTier, title="Composite Tier", display=display.none)
+// External data plots removed to reduce plot count - data available via alerts/webhooks
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🌙 TRUE DAY VISUALIZATION
