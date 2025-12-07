@@ -720,18 +720,18 @@ bullishOB = close[1] < open[1] and displacementUp and close > high[1]
 // Bearish OB: Last up candle before displacement down
 bearishOB = close[1] > open[1] and displacementDown and close < low[1]
 
-// ICT-style Order Block colors (blue for bullish, red for bearish)
-obBullColor = color.new(#00B4D8, 0)  // ICT blue
-obBearColor = color.new(#E63946, 0)  // ICT red
+// ICT-style Order Block colors (blue for bullish, orange for bearish - per ICT videos)
+obBullColor = #2962FF  // Bright ICT blue
+obBearColor = #FF6D00  // ICT orange
 
 // Create and manage Order Blocks - ICT style with labels
 if bullishOB and i_showOB
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BULL, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=color.new(obBullColor, 0), bgcolor=color.new(obBullColor, 70),
+                 border_color=obBullColor, bgcolor=color.new(obBullColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="OB", text_color=color.new(obBullColor, 0), text_size=size.tiny, text_halign=text.align_right),
+                 text="OB", text_color=obBullColor, text_size=size.tiny, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
                                        style=label.style_none, textcolor=color.new(obBullColor, 30), size=size.tiny) : na)
     if array.size(bullOBs) >= 10
@@ -746,9 +746,9 @@ if bearishOB and i_showOB
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BEAR, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=color.new(obBearColor, 0), bgcolor=color.new(obBearColor, 70),
+                 border_color=obBearColor, bgcolor=color.new(obBearColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="OB", text_color=color.new(obBearColor, 0), text_size=size.tiny, text_halign=text.align_right),
+                 text="OB", text_color=obBearColor, text_size=size.tiny, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
                                        style=label.style_none, textcolor=color.new(obBearColor, 30), size=size.tiny) : na)
     if array.size(bearOBs) >= 10
@@ -760,8 +760,8 @@ if bearishOB and i_showOB
     array.push(bearOBs, newOB)
 
 // ICT-style Breaker colors (orange tones - violated OBs become support/resistance)
-brkBullColor = color.new(#FF9F1C, 0)  // Orange for bullish breaker
-brkBearColor = color.new(#F77F00, 0)  // Dark orange for bearish breaker
+brkBullColor = #FF9100  // Bright orange for breakers
+brkBearColor = #FF6D00  // Amber orange for bearish breaker
 
 // Update OB Lifecycle States
 f_updateOBState(array<OrderBlock> obs, bool isBull) =>
@@ -800,19 +800,19 @@ f_updateOBState(array<OrderBlock> obs, bool isBull) =>
                     ob.isBreaker := true
                     // Update box to Breaker style
                     if not na(ob.visual)
-                        box.set_border_color(ob.visual, color.new(brkBearColor, 20))
-                        box.set_bgcolor(ob.visual, color.new(brkBearColor, 85))
+                        box.set_border_color(ob.visual, brkBearColor)
+                        box.set_bgcolor(ob.visual, color.new(brkBearColor, 75))
                         box.set_text(ob.visual, "BRK")
-                        box.set_text_color(ob.visual, color.new(brkBearColor, 10))
+                        box.set_text_color(ob.visual, brkBearColor)
                 else if not isBull and close > ob.top
                     ob.state := OB_VIOLATED
                     ob.isBreaker := true
                     // Update box to Breaker style
                     if not na(ob.visual)
-                        box.set_border_color(ob.visual, color.new(brkBullColor, 20))
-                        box.set_bgcolor(ob.visual, color.new(brkBullColor, 85))
+                        box.set_border_color(ob.visual, brkBullColor)
+                        box.set_bgcolor(ob.visual, color.new(brkBullColor, 75))
                         box.set_text(ob.visual, "BRK")
-                        box.set_text_color(ob.visual, color.new(brkBullColor, 10))
+                        box.set_text_color(ob.visual, brkBullColor)
 
             // Update label - Clean minimal indicators
             if not na(ob.stateLabel) and i_obShowLifecycle
@@ -845,8 +845,9 @@ bearishFVGBottom = high
 minFVGSize = i_fvgMinSize * f_tickSize()
 
 // ICT-style FVG colors (gold/amber for visibility)
-fvgBullColor = color.new(#FFB703, 0)  // Gold for bullish FVG
-fvgBearColor = color.new(#FB8500, 0)  // Amber for bearish FVG
+// ICT-style FVG colors (pink - per ICT videos)
+fvgBullColor = #FF4081  // Hot pink for bullish FVG
+fvgBearColor = #F50057  // Deep pink for bearish FVG
 
 // Create FVGs - ICT style with labels
 if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
@@ -855,9 +856,9 @@ if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
     newFVG = FVG.new(
          bullishFVGTop, bullishFVGBottom, bar_index, DIR_BULL, false, mitLevel,
          box.new(bar_index - 2, bullishFVGTop, bar_index + 15, bullishFVGBottom,
-                 border_color=color.new(fvgBullColor, 30), bgcolor=color.new(fvgBullColor, 88),
-                 border_width=1, border_style=line.style_solid,
-                 text="FVG", text_color=color.new(fvgBullColor, 20), text_size=size.tiny, text_halign=text.align_right))
+                 border_color=fvgBullColor, bgcolor=color.new(fvgBullColor, 75),
+                 border_width=2, border_style=line.style_solid,
+                 text="FVG", text_color=fvgBullColor, text_size=size.tiny, text_halign=text.align_right))
     if array.size(bullFVGs) >= 15
         oldFVG = array.shift(bullFVGs)
         if not na(oldFVG.visual)
@@ -870,9 +871,9 @@ if bearishFVG and i_showFVG and (bearishFVGTop - bearishFVGBottom) >= minFVGSize
     newFVG = FVG.new(
          bearishFVGTop, bearishFVGBottom, bar_index, DIR_BEAR, false, mitLevel,
          box.new(bar_index - 2, bearishFVGTop, bar_index + 15, bearishFVGBottom,
-                 border_color=color.new(fvgBearColor, 30), bgcolor=color.new(fvgBearColor, 88),
-                 border_width=1, border_style=line.style_solid,
-                 text="FVG", text_color=color.new(fvgBearColor, 20), text_size=size.tiny, text_halign=text.align_right))
+                 border_color=fvgBearColor, bgcolor=color.new(fvgBearColor, 75),
+                 border_width=2, border_style=line.style_solid,
+                 text="FVG", text_color=fvgBearColor, text_size=size.tiny, text_halign=text.align_right))
     if array.size(bearFVGs) >= 15
         oldFVG = array.shift(bearFVGs)
         if not na(oldFVG.visual)
@@ -907,9 +908,9 @@ f_updateFVGMitigation(bearFVGs, false)
 var array<FVG> bullIFVGs = array.new<FVG>()
 var array<FVG> bearIFVGs = array.new<FVG>()
 
-// ICT-style IFVG colors (purple tones - inverted zones)
-ifvgBearClr = color.new(#9D4EDD, 0)  // Purple for bearish IFVG
-ifvgBullClr = color.new(#7B2CBF, 0)  // Deep purple for bullish IFVG
+// ICT-style IFVG colors (bright purple - inverted zones)
+ifvgBearClr = #AA00FF  // Bright purple for bearish IFVG
+ifvgBullClr = #D500F9  // Vivid purple for bullish IFVG
 
 // Check for IFVG creation from mitigated FVGs
 f_checkIFVG(array<FVG> fvgs, array<FVG> ifvgs, bool wasBull) =>
@@ -931,9 +932,9 @@ f_checkIFVG(array<FVG> fvgs, array<FVG> ifvgs, bool wasBull) =>
                     newIFVG = FVG.new(
                          fvg.top, fvg.bottom, bar_index, newDir, false, (fvg.top + fvg.bottom) / 2,
                          box.new(bar_index - 1, fvg.top, bar_index + 10, fvg.bottom,
-                                 border_color=color.new(ifvgClr, 20), bgcolor=color.new(ifvgClr, 85),
+                                 border_color=ifvgClr, bgcolor=color.new(ifvgClr, 70),
                                  border_width=2, border_style=line.style_solid,
-                                 text="IFVG", text_color=color.new(ifvgClr, 10), text_size=size.tiny, text_halign=text.align_right))
+                                 text="IFVG", text_color=ifvgClr, text_size=size.tiny, text_halign=text.align_right))
                     if array.size(ifvgs) >= 5
                         oldIFVG = array.shift(ifvgs)
                         if not na(oldIFVG.visual)
@@ -1280,10 +1281,10 @@ bullishRejection = i_showRejBlock and totalRange > 0 and lowerWick / totalRange 
 // Bearish Rejection Block: Long upper wick at premium
 bearishRejection = i_showRejBlock and totalRange > 0 and upperWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close < open and inPremium
 
-// ICT-style Rejection Block colors (teal/coral)
-rbBullColor = color.new(#2EC4B6, 0)  // Teal for bullish rejection
-rbBearColor = color.new(#E71D36, 0)  // Coral red for bearish rejection
-rbDotsColor = color.new(#FFEB3B, 0)  // Pac-Man yellow for strength dots
+// ICT-style Rejection Block colors (green/red - per ICT discount/premium)
+rbBullColor = #00E676  // Bright green for bullish rejection (discount)
+rbBearColor = #FF1744  // Bright red for bearish rejection (premium)
+rbDotsColor = #FFEB3B  // Pac-Man yellow for strength dots
 
 // RB Strength scoring function
 f_rbStrength(float wickPct, float bodyPct, bool inKZ) =>
@@ -1304,7 +1305,7 @@ if bullishRejection
     newRB = RejBlock.new(
          math.max(close, open), low, bar_index, DIR_BULL,
          box.new(bar_index, math.max(close, open), bar_index + 15, low,
-                 border_color=color.new(rbBullColor, 20), bgcolor=color.new(rbBullColor, 85),
+                 border_color=rbBullColor, bgcolor=color.new(rbBullColor, 75),
                  border_width=2, border_style=line.style_solid,
                  text="RB " + rbDots, text_color=rbDotsColor, text_size=size.tiny, text_halign=text.align_right))
     if array.size(rejBlocks) >= 8
@@ -1322,7 +1323,7 @@ if bearishRejection
     newRB = RejBlock.new(
          high, math.min(close, open), bar_index, DIR_BEAR,
          box.new(bar_index, high, bar_index + 15, math.min(close, open),
-                 border_color=color.new(rbBearColor, 20), bgcolor=color.new(rbBearColor, 85),
+                 border_color=rbBearColor, bgcolor=color.new(rbBearColor, 75),
                  border_width=2, border_style=line.style_solid,
                  text="RB " + rbDots, text_color=rbDotsColor, text_size=size.tiny, text_halign=text.align_right))
     if array.size(rejBlocks) >= 8
@@ -1816,11 +1817,12 @@ if barstate.islast
             float l = array.get(nwogLows, i)
             float ce = array.get(nwogCEs, i)
 
-            // Progressive fading: newer = more visible, older = more faded
-            int fadeLevel = 50 + (i * 8)  // 50, 58, 66, 74, 82 for 5 weeks
-            int bgFade = 88 + (i * 2)     // 88, 90, 92, 94, 96 for 5 weeks
-            fadeLevel := math.min(fadeLevel, 90)
-            bgFade := math.min(bgFade, 97)
+            // ICT blue for NWOG - progressive fading for older weeks
+            nwogColor = #2196F3  // ICT blue
+            int fadeLevel = 0 + (i * 15)  // 0, 15, 30, 45, 60 for 5 weeks
+            int bgFade = 70 + (i * 5)     // 70, 75, 80, 85, 90 for 5 weeks
+            fadeLevel := math.min(fadeLevel, 70)
+            bgFade := math.min(bgFade, 90)
 
             // Label: NWOG-1 (current) through NWOG-5 (oldest)
             string nwogLabel = "NWOG-" + str.tostring(i + 1)
@@ -1828,17 +1830,17 @@ if barstate.islast
             // Draw box relative to current bar (safe approach)
             int boxLeft = bar_index - 50
             box newBox = box.new(boxLeft, h, bar_index + 10, l,
-                 border_color=color.new(#E040FB, fadeLevel), bgcolor=color.new(#E040FB, bgFade),
-                 border_width=1, border_style=line.style_dotted,
-                 text=nwogLabel, text_color=color.new(#E040FB, fadeLevel), text_size=size.tiny, text_halign=text.align_right)
+                 border_color=color.new(nwogColor, fadeLevel), bgcolor=color.new(nwogColor, bgFade),
+                 border_width=2, border_style=line.style_solid,
+                 text=nwogLabel, text_color=color.new(nwogColor, fadeLevel), text_size=size.tiny, text_halign=text.align_right)
             array.push(nwogBoxes, newBox)
 
             // Draw CE line for each NWOG
             if i_showNWOGCE
-                int ceFade = 30 + (i * 12)  // 30, 42, 54, 66, 78 for 5 weeks
-                ceFade := math.min(ceFade, 85)
+                int ceFade = 20 + (i * 15)  // 20, 35, 50, 65, 80 for 5 weeks
+                ceFade := math.min(ceFade, 80)
                 line ceLine = line.new(boxLeft, ce, bar_index + 10, ce,
-                     color=color.new(#E040FB, ceFade), width=i == 0 ? 2 : 1, style=line.style_dashed)
+                     color=color.new(nwogColor, ceFade), width=i == 0 ? 2 : 1, style=line.style_dashed)
                 array.push(nwogCELines, ceLine)
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1846,17 +1848,18 @@ if barstate.islast
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var box orgBox = na
+gapColor = #F50057  // ICT pink for Opening Range Gap
 
 if hasORG and not na(orgHigh) and not na(orgLow) and barstate.islast
     if not na(orgBox)
         box.delete(orgBox)
     orgBox := box.new(bar_index - 20, orgHigh, bar_index + 5, orgLow,
-         border_color=color.new(#FF9800, 50), bgcolor=color.new(#FF9800, 92),
-         border_width=1, border_style=line.style_dotted,
-         text="GAP", text_color=color.new(#FF9800, 40), text_size=size.tiny, text_halign=text.align_right)
+         border_color=gapColor, bgcolor=color.new(gapColor, 75),
+         border_width=2, border_style=line.style_solid,
+         text="GAP", text_color=gapColor, text_size=size.tiny, text_halign=text.align_right)
 
 // GAP CE line
-plot(hasORG and not na(orgCE) ? orgCE : na, "GAP CE", color=color.new(#FF9800, 50), linewidth=1, style=plot.style_linebr)
+plot(hasORG and not na(orgCE) ? orgCE : na, "GAP CE", color=color.new(gapColor, 30), linewidth=2, style=plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MIDNIGHT OPEN
