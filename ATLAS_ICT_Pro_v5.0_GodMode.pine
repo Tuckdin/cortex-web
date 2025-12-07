@@ -2604,8 +2604,8 @@ if i_showDOL and i_showPacMan and barstate.islast
                     array.set(wpStrength, j + 1, tempStr)
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // DRAW REALISTIC ZIGZAG PATH WITH PULLBACKS
-    // Price doesn't go straight - it retraces to OTE before continuing
+    // SMART PULLBACK SYSTEM - Multi-factor retracement analysis
+    // Priority: 1) FVG  2) Order Block  3) Liquidity  4) Equilibrium  5) OTE
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Limit to max 5 waypoints for clean visualization
@@ -2618,12 +2618,12 @@ if i_showDOL and i_showPacMan and barstate.islast
         xSpacingToTarget = 8   // bars to reach target
         xSpacingPullback = 4   // bars for pullback
 
-        // OTE retracement levels (Fib 0.62 - 0.79)
-        oteRetrace = 0.705  // Middle of OTE zone
-
         // Choose colors based on setup quality
         pathColor = tradeReady ? pacmanYellow : highConf ? pacmanGold : color.new(pacmanCyan, 40)
         pullbackColor = tradeReady ? color.new(pacmanYellow, 40) : highConf ? color.new(pacmanGold, 50) : color.new(pacmanCyan, 60)
+        fvgPbColor = color.new(#7C4DFF, 40)   // Purple for FVG pullback
+        obPbColor = color.new(#2196F3, 40)    // Blue for OB pullback
+        liqPbColor = color.new(#FF9800, 40)   // Orange for liquidity sweep
         pathWidth = tradeReady ? 2 : highConf ? 2 : 1
         pathStyle = tradeReady ? line.style_solid : line.style_dashed
 
@@ -2642,6 +2642,8 @@ if i_showDOL and i_showPacMan and barstate.islast
 
             // Calculate the move from previous point to this target
             moveSize = wpLevel - prevY
+            moveHigh = math.max(prevY, wpLevel)
+            moveLow = math.min(prevY, wpLevel)
 
             // ═══ STEP 1: Draw line from previous point TO the target ═══
             targetX = prevX + xSpacingToTarget
@@ -2668,23 +2670,140 @@ if i_showDOL and i_showPacMan and barstate.islast
                  style=label.style_none, textcolor=color.new(pathColor, 20), size=size.tiny, textalign=text.align_center)
             array.push(dolPathLabels, nameLabel)
 
-            // ═══ STEP 2: Draw PULLBACK from target (if not last waypoint) ═══
+            // ═══ STEP 2: SMART PULLBACK - Find best retracement level ═══
             if i < maxWaypoints - 1
-                // Calculate pullback level (OTE retracement of the move just made)
-                // For bullish: pullback DOWN from target
-                // For bearish: pullback UP from target
-                pullbackY = targetY - (moveSize * oteRetrace)
+                pullbackY = na
+                pbReason = ""
+                pbColor = pullbackColor
+
+                // ─────────────────────────────────────────────────────────────
+                // PRIORITY 1: Check for unfilled FVG in the pullback zone
+                // Price loves to retrace to fill imbalances
+                // ─────────────────────────────────────────────────────────────
+                if dolDirection == DIR_BULL
+                    // Bullish move - look for bearish FVG (SIBI) below target to fill
+                    if array.size(bearFVGs) > 0
+                        for j = 0 to math.min(array.size(bearFVGs) - 1, 8)
+                            fvg = array.get(bearFVGs, j)
+                            // FVG is in our pullback zone (between prevY and targetY)
+                            if not fvg.mitigated and fvg.top < targetY and fvg.bottom > moveLow
+                                pullbackY := fvg.top  // Retrace to top of bearish FVG
+                                pbReason := "FVG"
+                                pbColor := fvgPbColor
+                                break
+                else if dolDirection == DIR_BEAR
+                    // Bearish move - look for bullish FVG (BISI) above target to fill
+                    if array.size(bullFVGs) > 0
+                        for j = 0 to math.min(array.size(bullFVGs) - 1, 8)
+                            fvg = array.get(bullFVGs, j)
+                            if not fvg.mitigated and fvg.bottom > targetY and fvg.top < moveHigh
+                                pullbackY := fvg.bottom  // Retrace to bottom of bullish FVG
+                                pbReason := "FVG"
+                                pbColor := fvgPbColor
+                                break
+
+                // ─────────────────────────────────────────────────────────────
+                // PRIORITY 2: Check for Order Block to retest
+                // Institutions defend their entry points
+                // ─────────────────────────────────────────────────────────────
+                if na(pullbackY)
+                    if dolDirection == DIR_BULL
+                        // Look for bullish OB (support) below target
+                        if array.size(bullOBs) > 0
+                            for j = 0 to math.min(array.size(bullOBs) - 1, 5)
+                                ob = array.get(bullOBs, j)
+                                // Fresh or Tested OB in our range
+                                if (ob.state == OB_FRESH or ob.state == OB_TESTED) and ob.top < targetY and ob.top > moveLow
+                                    pullbackY := ob.top  // Retrace to top of OB
+                                    pbReason := "OB"
+                                    pbColor := obPbColor
+                                    break
+                    else if dolDirection == DIR_BEAR
+                        // Look for bearish OB (resistance) above target
+                        if array.size(bearOBs) > 0
+                            for j = 0 to math.min(array.size(bearOBs) - 1, 5)
+                                ob = array.get(bearOBs, j)
+                                if (ob.state == OB_FRESH or ob.state == OB_TESTED) and ob.bottom > targetY and ob.bottom < moveHigh
+                                    pullbackY := ob.bottom  // Retrace to bottom of OB
+                                    pbReason := "OB"
+                                    pbColor := obPbColor
+                                    break
+
+                // ─────────────────────────────────────────────────────────────
+                // PRIORITY 3: Check for nearby liquidity to sweep
+                // Price hunts stops before continuing
+                // ─────────────────────────────────────────────────────────────
+                if na(pullbackY)
+                    if dolDirection == DIR_BULL
+                        // Look for sellside liquidity (equal lows, session lows) to sweep
+                        // Check session lows that haven't been swept
+                        if not londonLowSwept and not na(londonLow) and londonLow < targetY and londonLow > moveLow
+                            pullbackY := londonLow * 0.9998  // Sweep just below
+                            pbReason := "LIQ"
+                            pbColor := liqPbColor
+                        else if not nyLowSwept and not na(nyLow) and nyLow < targetY and nyLow > moveLow
+                            pullbackY := nyLow * 0.9998
+                            pbReason := "LIQ"
+                            pbColor := liqPbColor
+                    else if dolDirection == DIR_BEAR
+                        // Look for buyside liquidity (equal highs, session highs) to sweep
+                        if not londonHighSwept and not na(londonHigh) and londonHigh > targetY and londonHigh < moveHigh
+                            pullbackY := londonHigh * 1.0002  // Sweep just above
+                            pbReason := "LIQ"
+                            pbColor := liqPbColor
+                        else if not nyHighSwept and not na(nyHigh) and nyHigh > targetY and nyHigh < moveHigh
+                            pullbackY := nyHigh * 1.0002
+                            pbReason := "LIQ"
+                            pbColor := liqPbColor
+
+                // ─────────────────────────────────────────────────────────────
+                // PRIORITY 4: Equilibrium (50%) - Fair value of the move
+                // ─────────────────────────────────────────────────────────────
+                if na(pullbackY)
+                    // Check if we're in a strong trend (use shallower pullback)
+                    // or ranging (use equilibrium)
+                    eqLevel = targetY - (moveSize * 0.5)
+
+                    // Use equilibrium if move was large (strong momentum = shallow retrace)
+                    if math.abs(moveSize) > math.abs(targetY * 0.005)  // > 0.5% move
+                        pullbackY := eqLevel
+                        pbReason := "EQ"
+
+                // ─────────────────────────────────────────────────────────────
+                // PRIORITY 5: OTE Zone (0.618-0.786) - Fallback
+                // ─────────────────────────────────────────────────────────────
+                if na(pullbackY)
+                    // Dynamic OTE based on volatility
+                    // Calm market = deeper retrace (0.79), volatile = shallower (0.62)
+                    atrValue = ta.atr(14)
+                    volatilityRatio = atrValue / close
+                    oteLevel = volatilityRatio > 0.02 ? 0.618 : volatilityRatio > 0.01 ? 0.705 : 0.786
+
+                    pullbackY := targetY - (moveSize * oteLevel)
+                    pbReason := "OTE"
+
+                // ─────────────────────────────────────────────────────────────
+                // DRAW THE PULLBACK
+                // ─────────────────────────────────────────────────────────────
                 pullbackX = targetX + xSpacingPullback
 
-                // Draw pullback line (thinner, more transparent)
+                // Draw pullback line
                 pullbackLine = line.new(targetX, targetY, pullbackX, pullbackY,
-                     color=pullbackColor, width=1, style=line.style_dotted)
+                     color=pbColor, width=1, style=line.style_dotted)
                 array.push(dolPathLines, pullbackLine)
 
-                // Small pullback marker
-                pbMarker = label.new(pullbackX, pullbackY, "◦",
-                     style=label.style_none, textcolor=pullbackColor, size=size.tiny)
+                // Pullback marker with reason
+                pbMarkerText = pbReason == "FVG" ? "◈" : pbReason == "OB" ? "◆" : pbReason == "LIQ" ? "◇" : pbReason == "EQ" ? "◦" : "○"
+                pbMarker = label.new(pullbackX, pullbackY, pbMarkerText,
+                     style=label.style_none, textcolor=pbColor, size=size.tiny)
                 array.push(dolPathLabels, pbMarker)
+
+                // Add reason label (tiny, below marker)
+                if pbReason != ""
+                    reasonY = dolDirection == DIR_BULL ? pullbackY * 0.9997 : pullbackY * 1.0003
+                    reasonLabel = label.new(pullbackX, reasonY, pbReason,
+                         style=label.style_none, textcolor=color.new(pbColor, 30), size=size.tiny, textalign=text.align_center)
+                    array.push(dolPathLabels, reasonLabel)
 
                 // Update previous point to pullback location for next segment
                 prevX := pullbackX
