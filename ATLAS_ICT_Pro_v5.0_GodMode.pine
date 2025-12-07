@@ -2262,9 +2262,9 @@ if i_showComposite and barstate.islast and (compositeTier == TIER_1 or composite
     ote62 = dolDirection == DIR_BULL ? swingLow + swingRange * 0.62 : swingHigh - swingRange * 0.62
     ote79 = dolDirection == DIR_BULL ? swingLow + swingRange * 0.79 : swingHigh - swingRange * 0.79
 
-    // Entry zone box color based on tier
-    entryBoxColor = compositeTier == TIER_1 ? color.new(#00E676, 85) : color.new(#69F0AE, 88)
-    entryBorderColor = compositeTier == TIER_1 ? color.new(#00E676, 30) : color.new(#69F0AE, 40)
+    // Entry zone box color based on tier (pastel colors)
+    entryBoxColor = compositeTier == TIER_1 ? color.new(#A8E6CF, 80) : color.new(#C8F7DC, 82)
+    entryBorderColor = compositeTier == TIER_1 ? color.new(#A8E6CF, 20) : color.new(#C8F7DC, 30)
 
     // Draw entry zone box (OTE area)
     if dolDirection == DIR_BULL
