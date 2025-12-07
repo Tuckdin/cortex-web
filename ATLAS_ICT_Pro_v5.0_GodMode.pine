@@ -1759,21 +1759,54 @@ plotshape(model2022Bear, title="2022 Model Bear", style=shape.labeldown,
 // Swing points and EQH/EQL removed to reduce plot count - tracked via info table
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// OTE SPAWN ZONE - Clean gradient style
+// OTE SPAWN ZONE - Dashed lines with levels
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var box oteBox = na
+var line oteLine62 = na
+var line oteLine705 = na
+var line oteLine79 = na
+var label oteLabel62 = na
+var label oteLabel705 = na
+var label oteLabel79 = na
+
+// OTE color - ICT cyan
+oteLineColor = #00BCD4
 
 if i_showOTE and barstate.islast
-    if not na(oteBox)
-        box.delete(oteBox)
+    // Clean up old lines
+    if not na(oteLine62)
+        line.delete(oteLine62)
+    if not na(oteLine705)
+        line.delete(oteLine705)
+    if not na(oteLine79)
+        line.delete(oteLine79)
+    if not na(oteLabel62)
+        label.delete(oteLabel62)
+    if not na(oteLabel705)
+        label.delete(oteLabel705)
+    if not na(oteLabel79)
+        label.delete(oteLabel79)
 
-    // Subtle cyan/teal for OTE zone - distinct but not overwhelming
-    oteColor = color.new(#00BCD4, 92)
-    oteBorder = color.new(#00BCD4, 70)
-    oteBox := box.new(bar_index - 30, math.max(oteTop, oteBottom), bar_index + 10, math.min(oteTop, oteBottom),
-         border_color=oteBorder, bgcolor=oteColor, border_width=1, border_style=line.style_dashed,
-         text="OTE", text_color=color.new(#00BCD4, 50), text_size=size.tiny, text_halign=text.align_right)
+    // Calculate OTE levels (62%, 70.5%, 79% of the range)
+    float ote62 = rangeLow + rangeSize * 0.62
+    float ote705 = rangeLow + rangeSize * 0.705
+    float ote79 = rangeLow + rangeSize * 0.79
+
+    // Draw dashed lines for each OTE level
+    oteLine62 := line.new(bar_index - 30, ote62, bar_index + 10, ote62,
+         color=color.new(oteLineColor, 40), width=1, style=line.style_dashed)
+    oteLine705 := line.new(bar_index - 30, ote705, bar_index + 10, ote705,
+         color=color.new(oteLineColor, 20), width=2, style=line.style_dashed)
+    oteLine79 := line.new(bar_index - 30, ote79, bar_index + 10, ote79,
+         color=color.new(oteLineColor, 40), width=1, style=line.style_dashed)
+
+    // Labels for OTE levels
+    oteLabel62 := label.new(bar_index + 11, ote62, "62%",
+         style=label.style_none, textcolor=color.new(oteLineColor, 30), size=size.tiny)
+    oteLabel705 := label.new(bar_index + 11, ote705, "OTE 70.5%",
+         style=label.style_none, textcolor=color.new(oteLineColor, 0), size=size.small)
+    oteLabel79 := label.new(bar_index + 11, ote79, "79%",
+         style=label.style_none, textcolor=color.new(oteLineColor, 30), size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PREMIUM/DISCOUNT ZONES - Subtle reference lines
@@ -1879,24 +1912,15 @@ plot(i_ipda60 and i_showIPDA ? low60IPDA : na, "IPDA 60 Low", color=color.new(co
 // PAC-MAN DOL PATH VISUALIZATION - Sleek arcade style
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var label pacmanLabel = na
 var line dolLine = na
 var label dolTargetLabel = na
-var line dolPathDots = na
 
 if i_showDOL and i_showPacMan and barstate.islast
     // Clean up old visuals
-    if not na(pacmanLabel)
-        label.delete(pacmanLabel)
     if not na(dolLine)
         line.delete(dolLine)
     if not na(dolTargetLabel)
         label.delete(dolTargetLabel)
-
-    // Draw Pac-Man at current price - cleaner circle icon
-    pacChar = dolDirection == DIR_BULL ? "◐" : dolDirection == DIR_BEAR ? "◑" : "●"
-    pacmanLabel := label.new(bar_index + 2, close, pacChar,
-         style=label.style_none, textcolor=i_pacmanColor, size=size.large)
 
     // Draw DOL path line - elegant arrow
     arrowColor = dolDirection == DIR_BULL ? color.new(i_bullColor, 20) : dolDirection == DIR_BEAR ? color.new(i_bearColor, 20) : color.new(i_neutralColor, 40)
@@ -1913,32 +1937,32 @@ if i_showDOL and i_showPacMan and barstate.islast
 // LIQUIDITY TARGETS (Institutional Levels) - Clean minimal
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var label ghostHighLabel = na
-var label ghostLowLabel = na
+var label cherryHighLabel = na
+var label cherryLowLabel = na
 var line bslLine = na
 var line sslLine = na
 
 if i_showPacMan and barstate.islast
-    if not na(ghostHighLabel)
-        label.delete(ghostHighLabel)
-    if not na(ghostLowLabel)
-        label.delete(ghostLowLabel)
+    if not na(cherryHighLabel)
+        label.delete(cherryHighLabel)
+    if not na(cherryLowLabel)
+        label.delete(cherryLowLabel)
     if not na(bslLine)
         line.delete(bslLine)
     if not na(sslLine)
         line.delete(sslLine)
 
-    // BSL - Ghost hunting highs with eyes 👻
+    // BSL - Cherries on both sides 🍒
     bslLine := line.new(bar_index - 20, high60IPDA, bar_index + 5, high60IPDA,
-         color=color.new(#FF5252, 60), width=1, style=line.style_dotted)
-    ghostHighLabel := label.new(bar_index + 6, high60IPDA, "👻 BSL",
-         style=label.style_none, textcolor=color.new(#FF5252, 20), size=size.small)
+         color=color.new(#FF5252, 40), width=2, style=line.style_dashed)
+    cherryHighLabel := label.new(bar_index + 6, high60IPDA, "🍒 BSL 🍒",
+         style=label.style_none, textcolor=color.new(#FF5252, 0), size=size.normal)
 
-    // SSL - Ghost hunting lows with eyes 👻
+    // SSL - Cherries on both sides 🍒
     sslLine := line.new(bar_index - 20, low60IPDA, bar_index + 5, low60IPDA,
-         color=color.new(#69F0AE, 60), width=1, style=line.style_dotted)
-    ghostLowLabel := label.new(bar_index + 6, low60IPDA, "👻 SSL",
-         style=label.style_none, textcolor=color.new(#69F0AE, 20), size=size.small)
+         color=color.new(#69F0AE, 40), width=2, style=line.style_dashed)
+    cherryLowLabel := label.new(bar_index + 6, low60IPDA, "🍒 SSL 🍒",
+         style=label.style_none, textcolor=color.new(#69F0AE, 0), size=size.normal)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPOSITE TIER SIGNALS (Only on TRUE high-confluence events)
