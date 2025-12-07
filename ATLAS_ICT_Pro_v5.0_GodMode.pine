@@ -2478,8 +2478,18 @@ plot(i_ipda60 and i_showIPDA ? low60IPDA : na, "IPDA 60 Low", color=color.new(co
 // PAC-MAN DOL PATH VISUALIZATION - Sleek arcade style
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAC-MAN DOL PATH - Dynamic "Most Likely Path" Visualization
+// ═══════════════════════════════════════════════════════════════════════════════
+
 var line dolLine = na
 var label dolTargetLabel = na
+var label[] pacmanDots = array.new_label(0)
+var line pacmanPath = na
+
+// Pac-Man themed colors
+pacmanYellow = #FFEB3B  // Classic Pac-Man yellow
+pacmanGold = #FFC107    // Golden pellets
 
 if i_showDOL and i_showPacMan and barstate.islast
     // Clean up old visuals
@@ -2487,12 +2497,79 @@ if i_showDOL and i_showPacMan and barstate.islast
         line.delete(dolLine)
     if not na(dolTargetLabel)
         label.delete(dolTargetLabel)
+    if not na(pacmanPath)
+        line.delete(pacmanPath)
 
-    // Draw DOL path line - elegant arrow (no label, BSL/SSL labels handled separately)
-    arrowColor = dolDirection == DIR_BULL ? color.new(i_bullColor, 20) : dolDirection == DIR_BEAR ? color.new(i_bearColor, 20) : color.new(i_neutralColor, 40)
+    // Clean up old dots
+    while array.size(pacmanDots) > 0
+        label.delete(array.pop(pacmanDots))
 
-    if not na(dolTarget)
-        dolLine := line.new(bar_index + 2, close, bar_index + 12, dolTarget, color=arrowColor, width=2, style=line.style_arrow_right)
+    // Determine if this is a "trade ready" setup (show yellow dots)
+    tradeReady = (compositeTier == TIER_1 or compositeTier == TIER_2) and
+                 (manipulationComplete or amdPhase == 3) and
+                 dolDirection != DIR_NEUTRAL
+
+    // High confluence but not quite trade ready (show gold path)
+    highConf = compositeTier <= TIER_3 and dolDirection != DIR_NEUTRAL
+
+    if not na(dolTarget) and dolDirection != DIR_NEUTRAL
+        priceRange = math.abs(dolTarget - close)
+
+        if tradeReady
+            // ═══ TRADE READY: Yellow Pac-Man Dots ═══
+            // Draw large yellow dots leading to target (Pac-Man eating pellets)
+            numDots = 5
+            for i = 0 to numDots - 1
+                dotProgress = (i + 1) / (numDots + 1)
+                dotX = bar_index + 2 + math.round(dotProgress * 15)
+                dotY = close + (dolTarget - close) * dotProgress
+
+                // Dots get bigger closer to target
+                dotSize = i < 2 ? size.small : i < 4 ? size.normal : size.large
+                dotChar = "●"
+
+                // Alternate between bright yellow and gold for animation effect
+                dotColor = i % 2 == 0 ? pacmanYellow : pacmanGold
+
+                newDot = label.new(dotX, dotY, dotChar,
+                     style=label.style_none, textcolor=dotColor, size=dotSize)
+                array.push(pacmanDots, newDot)
+
+            // Add Pac-Man at the start
+            pacmanIcon = dolDirection == DIR_BULL ? "ᗧ" : "ᗤ"  // Pac-Man facing direction
+            pacmanLabel = label.new(bar_index + 1, close, pacmanIcon,
+                 style=label.style_none, textcolor=pacmanYellow, size=size.large)
+            array.push(pacmanDots, pacmanLabel)
+
+            // Add target indicator (cherry/ghost)
+            targetIcon = "🎯"
+            targetLabel = label.new(bar_index + 18, dolTarget, targetIcon,
+                 style=label.style_none, textcolor=pacmanYellow, size=size.normal)
+            array.push(pacmanDots, targetLabel)
+
+        else if highConf
+            // ═══ HIGH CONFLUENCE: Gold dashed path with dots ═══
+            pathColor = dolDirection == DIR_BULL ? color.new(pacmanGold, 30) : color.new(pacmanGold, 30)
+
+            pacmanPath := line.new(bar_index + 2, close, bar_index + 15, dolTarget,
+                 color=pathColor, width=2, style=line.style_dashed)
+
+            // Add smaller dots along path
+            numDots = 3
+            for i = 0 to numDots - 1
+                dotProgress = (i + 1) / (numDots + 1)
+                dotX = bar_index + 2 + math.round(dotProgress * 13)
+                dotY = close + (dolTarget - close) * dotProgress
+
+                newDot = label.new(dotX, dotY, "•",
+                     style=label.style_none, textcolor=color.new(pacmanGold, 40), size=size.small)
+                array.push(pacmanDots, newDot)
+
+        else
+            // ═══ NORMAL: Subtle directional arrow ═══
+            arrowColor = dolDirection == DIR_BULL ? color.new(i_bullColor, 50) : color.new(i_bearColor, 50)
+            dolLine := line.new(bar_index + 2, close, bar_index + 12, dolTarget,
+                 color=arrowColor, width=1, style=line.style_arrow_right)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LIQUIDITY TARGETS (Institutional Levels) - Clean minimal
