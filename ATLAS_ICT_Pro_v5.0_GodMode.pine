@@ -921,6 +921,10 @@ f_checkIFVG(array<FVG> fvgs, array<FVG> ifvgs, bool wasBull) =>
                 // Check for reversal after mitigation
                 reversalCandle = wasBull ? (close < open and close < fvg.bottom) : (close > open and close > fvg.top)
                 if reversalCandle and i_showIFVG
+                    // Delete the original FVG box (transforms into IFVG)
+                    if not na(fvg.visual)
+                        box.delete(fvg.visual)
+
                     // Create IFVG (opposite direction)
                     newDir = wasBull ? DIR_BEAR : DIR_BULL
                     ifvgClr = wasBull ? ifvgBearClr : ifvgBullClr
