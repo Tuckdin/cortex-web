@@ -4849,14 +4849,39 @@ if i_showTrueDayOpen and barstate.islast and not na(trueDayOpen) and not i_clean
          style=label.style_none, textcolor=color.new(#9C27B0, 20), size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🇬🇧 LONDON CLOSE VISUALIZATION
+// 🇬🇧 LONDON CLOSE VISUALIZATION - Horizontal level lines
 // ═══════════════════════════════════════════════════════════════════════════════
 
 bgcolor(i_showLondonClose and inLondonClose and not i_cleanMode ? color.new(#FF6F00, 95) : na, title="London Close")
 
-plotshape(i_showLondonClose and lcReversal and not i_cleanMode, title="LC Reversal",
-     style=shape.diamond, location=location.abovebar, color=color.new(#FF6F00, 0),
-     text="LC", textcolor=color.white, size=size.tiny)
+// Draw London Close High/Low as horizontal levels extending into the future
+var line lcHighLine = na
+var line lcLowLine = na
+var label lcHighLabel = na
+var label lcLowLabel = na
+
+if barstate.islast and i_showLondonClose and not na(londonCloseHigh) and not na(londonCloseLow)
+    // Clean up old lines
+    if not na(lcHighLine)
+        line.delete(lcHighLine)
+    if not na(lcLowLine)
+        line.delete(lcLowLine)
+    if not na(lcHighLabel)
+        label.delete(lcHighLabel)
+    if not na(lcLowLabel)
+        label.delete(lcLowLabel)
+
+    // Draw LC High line
+    lcHighLine := line.new(bar_index - 20, londonCloseHigh, bar_index + 40, londonCloseHigh,
+         color=color.new(#FF6F00, 30), width=2, style=line.style_dashed)
+    lcHighLabel := label.new(bar_index + 40, londonCloseHigh, "LC Hi",
+         style=label.style_none, textcolor=#FF6F00, size=size.small)
+
+    // Draw LC Low line
+    lcLowLine := line.new(bar_index - 20, londonCloseLow, bar_index + 40, londonCloseLow,
+         color=color.new(#FF6F00, 30), width=2, style=line.style_dashed)
+    lcLowLabel := label.new(bar_index + 40, londonCloseLow, "LC Lo",
+         style=label.style_none, textcolor=#FF6F00, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 📡 WEBHOOK ALERTS (JSON Format)
