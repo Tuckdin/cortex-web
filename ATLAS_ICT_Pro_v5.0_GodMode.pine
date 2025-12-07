@@ -171,10 +171,12 @@ i_timezone = input.string("America/New_York", "Timezone", options=["America/New_
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPOSITE SCORING SETTINGS
 // ═══════════════════════════════════════════════════════════════════════════════
-grp_comp = "🏆 COMPOSITE SCORING"
+grp_comp = "🏆 COMPOSITE SCORING (5-Tier System)"
 i_showComposite = input.bool(true, "Show Composite Signals", group=grp_comp)
-i_tier1Threshold = input.int(80, "Tier 1 Threshold", minval=50, maxval=100, group=grp_comp)
-i_tier2Threshold = input.int(60, "Tier 2 Threshold", minval=30, maxval=80, group=grp_comp)
+i_tier1Threshold = input.int(90, "Tier 1 ELITE (90%+)", minval=85, maxval=100, group=grp_comp)
+i_tier2Threshold = input.int(80, "Tier 2 PREMIUM (80%+)", minval=70, maxval=90, group=grp_comp)
+i_tier3Threshold = input.int(65, "Tier 3 STRONG (65%+)", minval=55, maxval=80, group=grp_comp)
+i_tier4Threshold = input.int(50, "Tier 4 MODERATE (50%+)", minval=40, maxval=65, group=grp_comp)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COLORS (Refined Retro-Arcade Palette)
@@ -210,10 +212,12 @@ DIR_BULL = 1
 DIR_BEAR = -1
 DIR_NEUTRAL = 0
 
-// Composite Tiers
-TIER_1 = 1
-TIER_2 = 2
-TIER_3 = 3
+// Composite Tiers (5-Tier System)
+TIER_1 = 1  // ELITE: 90%+ - Highest probability setups
+TIER_2 = 2  // PREMIUM: 80-89% - Very strong setups
+TIER_3 = 3  // STRONG: 65-79% - Good setups
+TIER_4 = 4  // MODERATE: 50-64% - Developing setups
+TIER_5 = 5  // WEAK: Below 50% - Low probability
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        TYPE DEFINITIONS                                        ║
@@ -1362,6 +1366,132 @@ model2022Bull = i_show2022 and sweepLows[1] and displacementUp and bullishFVG
 model2022Bear = i_show2022 and sweepHighs[1] and displacementDown and bearishFVG
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        🦄 UNICORN MODEL DETECTION                              ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Unicorn Model: Breaker Block that contains/overlaps an FVG
+// This creates an institutional "unicorn" entry zone with multiple confluences
+
+// Check if any breaker block overlaps with an FVG
+var bool unicornBull = false
+var bool unicornBear = false
+unicornBull := false
+unicornBear := false
+
+// Scan for breaker + FVG overlap (Unicorn conditions)
+if array.size(orderBlocks) > 0
+    for i = 0 to math.min(array.size(orderBlocks) - 1, 5)
+        ob = array.get(orderBlocks, i)
+        if ob.isBreaker
+            // Check if this breaker overlaps with any bullish FVG
+            if ob.direction == DIR_BULL and array.size(bullFVGs) > 0
+                for j = 0 to math.min(array.size(bullFVGs) - 1, 3)
+                    fvg = array.get(bullFVGs, j)
+                    if fvg.top >= ob.bottom and fvg.bottom <= ob.top
+                        unicornBull := true
+                        break
+            // Check if this breaker overlaps with any bearish FVG
+            if ob.direction == DIR_BEAR and array.size(bearFVGs) > 0
+                for j = 0 to math.min(array.size(bearFVGs) - 1, 3)
+                    fvg = array.get(bearFVGs, j)
+                    if fvg.top >= ob.bottom and fvg.bottom <= ob.top
+                        unicornBear := true
+                        break
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        🔄 AMD FRACTAL (Nested AMD)                             ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// AMD within AMD: Track if we're seeing nested accumulation-manipulation-distribution
+// HTF AMD phase combined with LTF AMD phase alignment
+
+var string htfAMDPhase = "NONE"
+var string ltfAMDPhase = "NONE"
+var bool amdFractalBull = false
+var bool amdFractalBear = false
+
+// HTF AMD based on session structure
+htfAMDPhase := asianSession ? "ACCUMULATION" : londonSession ? "MANIPULATION" : nyAMSession ? "DISTRIBUTION" : "NONE"
+
+// LTF AMD based on intraday price action (within NY session)
+if nyAMSession or nyPMSession
+    // Check for mini accumulation (consolidation after manipulation)
+    isLTFAccumulation = ta.atr(5) < ta.atr(20) * 0.7  // Low volatility = accumulation
+    isLTFManipulation = displacementUp or displacementDown  // Displacement = manipulation
+    isLTFDistribution = bullishCHoCH or bearishCHoCH  // CHoCH = distribution starting
+
+    ltfAMDPhase := isLTFAccumulation ? "ACC" : isLTFManipulation ? "MAN" : isLTFDistribution ? "DIST" : "NONE"
+
+// AMD Fractal alignment: HTF Distribution + LTF showing same direction
+amdFractalBull := htfAMDPhase == "DISTRIBUTION" and ltfAMDPhase == "DIST" and bullishCHoCH
+amdFractalBear := htfAMDPhase == "DISTRIBUTION" and ltfAMDPhase == "DIST" and bearishCHoCH
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        📊 MMXM (Market Maker Model)                            ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// Market Maker Buy/Sell Model: Complete sequence detection
+// Buy Model: Sweep SSL → Displacement Up → FVG → OTE Entry
+// Sell Model: Sweep BSL → Displacement Down → FVG → OTE Entry
+
+var bool mmxmBullSetup = false
+var bool mmxmBearSetup = false
+var int mmxmBullBar = 0
+var int mmxmBearBar = 0
+
+// Detect MMXM Buy Model (Smart Money Accumulation)
+if sweepLows[1] and displacementUp and bullishFVG and inDiscount
+    mmxmBullSetup := true
+    mmxmBullBar := bar_index
+else if bar_index - mmxmBullBar > 20  // Reset after 20 bars
+    mmxmBullSetup := false
+
+// Detect MMXM Sell Model (Smart Money Distribution)
+if sweepHighs[1] and displacementDown and bearishFVG and inPremium
+    mmxmBearSetup := true
+    mmxmBearBar := bar_index
+else if bar_index - mmxmBearBar > 20  // Reset after 20 bars
+    mmxmBearSetup := false
+
+// MMXM confirmation when price enters OTE zone after setup
+mmxmBullConfirm = mmxmBullSetup and inOTE and msDirection == DIR_BULL
+mmxmBearConfirm = mmxmBearSetup and inOTE and msDirection == DIR_BEAR
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        📅 SEASONAL TENDENCIES                                  ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// ICT Seasonal Tendencies based on typical market behavior
+// Q1 (Jan-Mar): Dollar strength, indices weakness
+// Q2 (Apr-Jun): Dollar weakness, commodities rally
+// Q3 (Jul-Sep): Summer doldrums, low volatility
+// Q4 (Oct-Dec): Year-end rally, risk-on
+
+currentMonth = month(time)
+currentQuarter = currentMonth <= 3 ? 1 : currentMonth <= 6 ? 2 : currentMonth <= 9 ? 3 : 4
+
+// Seasonal bias for US indices/risk assets
+seasonalBullish = currentQuarter == 4 or currentMonth == 4 or currentMonth == 7  // Oct-Dec, April, July
+seasonalBearish = currentMonth == 9 or currentMonth == 2  // September, February (historically weak)
+seasonalNeutral = not seasonalBullish and not seasonalBearish
+
+// Seasonal strength indicator
+var string seasonalTendency = "NEUTRAL"
+seasonalTendency := seasonalBullish ? "BULLISH SEASON" : seasonalBearish ? "BEARISH SEASON" : "NEUTRAL SEASON"
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
+// ║                        📈 COT DATA (Placeholder)                               ║
+// ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+// NOTE: COT (Commitment of Traders) data requires external data feed
+// Pine Script doesn't have native access to COT reports
+// This is a placeholder for when external data integration is available
+// Users can manually set COT bias based on weekly COT report
+
+var string cotBias = "NEUTRAL"  // User can override via input
+// Future enhancement: Connect to external COT data source
+
+// ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        MIDNIGHT OPEN TRACKING                                  ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
@@ -1564,6 +1694,30 @@ if isMacroTime
     bullScore += 3
     bearScore += 3
 
+// 20. UNICORN MODEL (Weight: 20) - High conviction breaker + FVG overlap
+if unicornBull
+    bullScore += 20
+if unicornBear
+    bearScore += 20
+
+// 21. AMD FRACTAL (Weight: 15) - Nested AMD alignment
+if amdFractalBull
+    bullScore += 15
+if amdFractalBear
+    bearScore += 15
+
+// 22. MMXM (Weight: 18) - Market Maker Model confirmation
+if mmxmBullConfirm
+    bullScore += 18
+if mmxmBearConfirm
+    bearScore += 18
+
+// 23. SEASONAL TENDENCY (Weight: 5) - Historical seasonal bias
+if seasonalBullish and msDirection == DIR_BULL
+    bullScore += 5
+if seasonalBearish and msDirection == DIR_BEAR
+    bearScore += 5
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CALCULATE FINAL DOL DIRECTION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1581,13 +1735,31 @@ else
     dolDirection := DIR_NEUTRAL
     dolTarget := equilibrium
 
-// Build reason string
+// Build reason string with readable labels
 if dolDirection == DIR_BULL
-    dolReason := "MS+" + (htfBias == DIR_BULL ? " HTF+" : "") + (inDiscount ? " Disc+" : "") + (inOTE ? " OTE+" : "") + (bullishTS ? " TS+" : "") + (model2022Bull ? " 2022+" : "")
+    dolReason := "BULLISH STRUCTURE"
+    dolReason += htfBias == DIR_BULL ? " • HTF ALIGNED" : ""
+    dolReason += inDiscount ? " • IN DISCOUNT" : ""
+    dolReason += inOTE ? " • OTE ZONE" : ""
+    dolReason += bullishTS ? " • TURTLE SOUP" : ""
+    dolReason += model2022Bull ? " • 2022 MODEL" : ""
+    dolReason += unicornBull ? " • UNICORN" : ""
+    dolReason += mmxmBullConfirm ? " • MMXM" : ""
+    dolReason += amdFractalBull ? " • AMD FRACTAL" : ""
+    dolReason += seasonalBullish ? " • SEASONAL" : ""
 else if dolDirection == DIR_BEAR
-    dolReason := "MS-" + (htfBias == DIR_BEAR ? " HTF-" : "") + (inPremium ? " Prem-" : "") + (inOTE ? " OTE-" : "") + (bearishTS ? " TS-" : "") + (model2022Bear ? " 2022-" : "")
+    dolReason := "BEARISH STRUCTURE"
+    dolReason += htfBias == DIR_BEAR ? " • HTF ALIGNED" : ""
+    dolReason += inPremium ? " • IN PREMIUM" : ""
+    dolReason += inOTE ? " • OTE ZONE" : ""
+    dolReason += bearishTS ? " • TURTLE SOUP" : ""
+    dolReason += model2022Bear ? " • 2022 MODEL" : ""
+    dolReason += unicornBear ? " • UNICORN" : ""
+    dolReason += mmxmBearConfirm ? " • MMXM" : ""
+    dolReason += amdFractalBear ? " • AMD FRACTAL" : ""
+    dolReason += seasonalBearish ? " • SEASONAL" : ""
 else
-    dolReason := "Neutral"
+    dolReason := "NEUTRAL - NO CLEAR BIAS"
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        COMPOSITE PATTERN SCORING                               ║
@@ -1596,7 +1768,7 @@ else
 // Tier calculation based on confluence
 compositeScore := dolProbability
 
-// Count active confluence factors for pattern naming (12 factors total)
+// Count active confluence factors for pattern naming (16 factors total)
 confluenceCount = 0
 hasHTFAlignment = htfBias == DIR_BULL and msDirection == DIR_BULL or htfBias == DIR_BEAR and msDirection == DIR_BEAR
 hasZoneAlignment = (inDiscount and msDirection == DIR_BULL) or (inPremium and msDirection == DIR_BEAR)
@@ -1607,10 +1779,15 @@ hasJudas = bullishJudas or bearishJudas
 hasDisplacement = displacementUp or displacementDown
 hasSilverBullet = inSilverBullet
 hasFreshOB = atBullOB or atBearOB
-// New factors for expanded scoring
+// Expanded factors
 hasKillzone = londonKZ or nyAMKZ or nyPMKZ
 hasFVGPresent = array.size(bullFVGs) > 0 or array.size(bearFVGs) > 0
 hasMTFAlignment = (mtfBiasW == 1 and mtfBiasD == 1 and mtfBias1H == 1 and mtfBias15m == 1) or (mtfBiasW == -1 and mtfBiasD == -1 and mtfBias1H == -1 and mtfBias15m == -1)
+// New ICT models
+hasUnicorn = unicornBull or unicornBear
+hasMMXM = mmxmBullConfirm or mmxmBearConfirm
+hasAMDFractal = amdFractalBull or amdFractalBear
+hasSeasonal = (seasonalBullish and msDirection == DIR_BULL) or (seasonalBearish and msDirection == DIR_BEAR)
 
 if hasHTFAlignment
     confluenceCount += 1
@@ -1636,29 +1813,58 @@ if hasFVGPresent
     confluenceCount += 1
 if hasMTFAlignment
     confluenceCount += 1
+if hasUnicorn
+    confluenceCount += 2  // Unicorn is worth 2 points (high conviction)
+if hasMMXM
+    confluenceCount += 2  // MMXM is worth 2 points (complete sequence)
+if hasAMDFractal
+    confluenceCount += 1
+if hasSeasonal
+    confluenceCount += 1
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PATTERN NAMES (Based on confluence combination)
+// PATTERN NAMES (5-Tier System Based on confluence combination)
 // ═══════════════════════════════════════════════════════════════════════════════
 patternName := ""
 
-// TIER 1 PATTERNS (12+ points / 80%+ probability)
+// TIER 1 ELITE (90%+) - Highest probability setups
 if compositeScore >= i_tier1Threshold
-    if hasModel2022 and hasOTEEntry and hasHTFAlignment
+    if hasUnicorn and hasOTEEntry and hasHTFAlignment
+        patternName := "🦄 UNICORN SETUP"  // Legendary breaker + FVG confluence
+    else if hasMMXM and hasOTEEntry
+        patternName := "📊 MMXM CONFIRMED"  // Full market maker sequence
+    else if hasModel2022 and hasOTEEntry and hasHTFAlignment and hasMTFAlignment
+        patternName := "💎 DIAMOND SETUP"  // Perfect alignment
+    else if hasModel2022 and hasOTEEntry and hasHTFAlignment
         patternName := "🏆 THE APEX"  // Perfect 2022 model setup
-    else if hasTurtleSoup and hasOTEEntry and hasZoneAlignment
-        patternName := "🏆 SWEET SPOT"  // TS + OTE + Zone
-    else if hasJudas and hasHTFAlignment and hasSilverBullet
-        patternName := "🏆 JUDAS TRAP"  // London false move in SB window
-    else if hasDisplacement and hasFreshOB and hasZoneAlignment
-        patternName := "🏆 EXECUTION"  // Clean displacement entry
-    else if confluenceCount >= 6
-        patternName := "🏆 MEGA SETUP"  // 6+ confluences
+    else if hasTurtleSoup and hasOTEEntry and hasZoneAlignment and hasSilverBullet
+        patternName := "🏆 PERFECT STORM"  // All key elements
+    else if confluenceCount >= 8
+        patternName := "🏆 MEGA CONFLUENCE"  // 8+ confluences
     else
-        patternName := "🏆 TIER 1"
+        patternName := "🏆 ELITE SETUP"
 
-// TIER 2 PATTERNS (8-11 points / 60-79% probability)
+// TIER 2 PREMIUM (80-89%) - Very strong setups
 else if compositeScore >= i_tier2Threshold
+    if hasUnicorn
+        patternName := "🦄 UNICORN ZONE"  // Breaker + FVG overlap
+    else if hasMMXM
+        patternName := "📊 MMXM SETUP"  // Market maker sequence forming
+    else if hasAMDFractal
+        patternName := "🔄 AMD FRACTAL"  // Nested AMD alignment
+    else if hasTurtleSoup and hasOTEEntry and hasZoneAlignment
+        patternName := "⭐ SWEET SPOT"  // TS + OTE + Zone
+    else if hasJudas and hasHTFAlignment and hasSilverBullet
+        patternName := "⭐ JUDAS TRAP"  // London false move in SB window
+    else if hasDisplacement and hasFreshOB and hasZoneAlignment
+        patternName := "⭐ EXECUTION"  // Clean displacement entry
+    else if confluenceCount >= 5
+        patternName := "⭐ PREMIUM SETUP"  // 5+ confluences
+    else
+        patternName := "⭐ STRONG BIAS"
+
+// TIER 3 STRONG (65-79%) - Good setups
+else if compositeScore >= i_tier3Threshold
     if hasOTEEntry and hasZoneAlignment
         patternName := "🥈 OTE ZONE"  // OTE + P/D alignment
     else if hasTurtleSoup and hasHTFAlignment
@@ -1669,29 +1875,44 @@ else if compositeScore >= i_tier2Threshold
         patternName := "🥈 BULLET TIME"  // SB in correct zone
     else if hasJudas
         patternName := "🥈 JUDAS MOVE"  // Judas swing detected
-    else if confluenceCount >= 4
-        patternName := "🥈 FOUNDATION"  // Solid base setup
+    else if hasSeasonal
+        patternName := "🥈 SEASONAL PLAY"  // Seasonal tendency aligned
     else
-        patternName := "🥈 TIER 2"
+        patternName := "🥈 GOOD SETUP"
 
-// TIER 3 PATTERNS (5-7 points / 40-59% probability)
-else
+// TIER 4 MODERATE (50-64%) - Developing setups
+else if compositeScore >= i_tier4Threshold
     if hasZoneAlignment
         patternName := "🥉 ZONE PLAY"
     else if hasDisplacement
         patternName := "🥉 MOMENTUM"
     else if hasFreshOB
         patternName := "🥉 OB WATCH"
+    else if hasKillzone
+        patternName := "🥉 KILLZONE"
     else
         patternName := "🥉 DEVELOPING"
+
+// TIER 5 WEAK (Below 50%) - Low probability
+else
+    if hasFVGPresent
+        patternName := "⚠️ FVG ONLY"
+    else if hasKillzone
+        patternName := "⚠️ WAITING"
+    else
+        patternName := "⚠️ NO SETUP"
 
 if i_showComposite
     if compositeScore >= i_tier1Threshold
         compositeTier := TIER_1
     else if compositeScore >= i_tier2Threshold
         compositeTier := TIER_2
-    else
+    else if compositeScore >= i_tier3Threshold
         compositeTier := TIER_3
+    else if compositeScore >= i_tier4Threshold
+        compositeTier := TIER_4
+    else
+        compositeTier := TIER_5
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        🎨 VISUAL RENDERING                                     ║
@@ -1755,6 +1976,33 @@ plotshape(model2022Bull, title="2022 Model Bull", style=shape.labelup,
      location=location.belowbar, color=color.new(#00BCD4, 10), text="2022", textcolor=color.white, size=size.small)
 plotshape(model2022Bear, title="2022 Model Bear", style=shape.labeldown,
      location=location.abovebar, color=color.new(#00BCD4, 10), text="2022", textcolor=color.white, size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UNICORN MODEL LABELS (Breaker + FVG confluence)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+plotshape(unicornBull and barstate.isconfirmed, title="Unicorn Bull", style=shape.labelup,
+     location=location.belowbar, color=color.new(#AA00FF, 10), text="🦄 UNICORN", textcolor=color.white, size=size.small)
+plotshape(unicornBear and barstate.isconfirmed, title="Unicorn Bear", style=shape.labeldown,
+     location=location.abovebar, color=color.new(#AA00FF, 10), text="🦄 UNICORN", textcolor=color.white, size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MMXM (Market Maker Model) LABELS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+plotshape(mmxmBullConfirm and barstate.isconfirmed, title="MMXM Bull", style=shape.labelup,
+     location=location.belowbar, color=color.new(#FF6D00, 10), text="MMXM ▲", textcolor=color.white, size=size.small)
+plotshape(mmxmBearConfirm and barstate.isconfirmed, title="MMXM Bear", style=shape.labeldown,
+     location=location.abovebar, color=color.new(#FF6D00, 10), text="MMXM ▼", textcolor=color.white, size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AMD FRACTAL LABELS (Nested AMD alignment)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+plotshape(amdFractalBull and barstate.isconfirmed, title="AMD Fractal Bull", style=shape.diamond,
+     location=location.belowbar, color=color.new(#4CAF50, 10), text="AMD", textcolor=color.white, size=size.tiny)
+plotshape(amdFractalBear and barstate.isconfirmed, title="AMD Fractal Bear", style=shape.diamond,
+     location=location.abovebar, color=color.new(#F44336, 10), text="AMD", textcolor=color.white, size=size.tiny)
 
 // Swing points and EQH/EQL removed to reduce plot count - tracked via info table
 
@@ -1970,18 +2218,18 @@ if i_showPacMan and barstate.islast
 
 // Tier 1 requires ACTUAL confluence events, not just high probability
 // Must have at least one of these triggers: Model2022, TurtleSoup, Judas, or CHoCH
-hasTriggerEvent = model2022Bull or model2022Bear or bullishTS or bearishTS or bullishJudas or bearishJudas or bullishCHoCH or bearishCHoCH
+hasTriggerEvent = model2022Bull or model2022Bear or bullishTS or bearishTS or bullishJudas or bearishJudas or bullishCHoCH or bearishCHoCH or unicornBull or unicornBear or mmxmBullConfirm or mmxmBearConfirm or amdFractalBull or amdFractalBear
 
 tier1Bull = i_showComposite and compositeTier == TIER_1 and dolDirection == DIR_BULL and hasTriggerEvent
 tier1Bear = i_showComposite and compositeTier == TIER_1 and dolDirection == DIR_BEAR and hasTriggerEvent
 tier2Bull = i_showComposite and compositeTier == TIER_2 and dolDirection == DIR_BULL
 tier2Bear = i_showComposite and compositeTier == TIER_2 and dolDirection == DIR_BEAR
 
-// Tier 1 signals - clean badge style (only on trigger events)
-plotshape(tier1Bull and barstate.isconfirmed, title="Tier 1 Bull", style=shape.labelup,
-     location=location.belowbar, color=color.new(#00C853, 0), text="T1", textcolor=color.white, size=size.small)
-plotshape(tier1Bear and barstate.isconfirmed, title="Tier 1 Bear", style=shape.labeldown,
-     location=location.abovebar, color=color.new(#FF1744, 0), text="T1", textcolor=color.white, size=size.small)
+// Tier 1 ELITE signals - clean badge style (only on trigger events)
+plotshape(tier1Bull and barstate.isconfirmed, title="ELITE Bull", style=shape.labelup,
+     location=location.belowbar, color=color.new(#00C853, 0), text="ELITE ▲", textcolor=color.white, size=size.small)
+plotshape(tier1Bear and barstate.isconfirmed, title="ELITE Bear", style=shape.labeldown,
+     location=location.abovebar, color=color.new(#FF1744, 0), text="ELITE ▼", textcolor=color.white, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DOL PROBABILITY DASHBOARD (GOD MODE INFO TABLE) - SLEEK ARCADE DESIGN
@@ -2043,10 +2291,10 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 3, "Zone", text_color=textDim, text_size=size.tiny, bgcolor=zoneBg, text_halign=text.align_left)
     table.cell(infoTable, 1, 3, zoneText, text_color=zoneColor, text_size=size.small, bgcolor=zoneBg, text_halign=text.align_right)
 
-    // ═══ PATTERN NAME - Featured ═══
-    patternColor = compositeTier == TIER_1 ? i_bullColor : compositeTier == TIER_2 ? i_neutralColor : textDim
-    patternBg = compositeTier == TIER_1 ? color.new(i_bullColor, 88) : tableBgAlt
-    cleanPattern = str.replace_all(str.replace_all(str.replace_all(patternName, "🏆 ", ""), "🥈 ", ""), "🥉 ", "")
+    // ═══ PATTERN NAME - Featured (5-Tier Colors) ═══
+    patternColor = compositeTier == TIER_1 ? #00E676 : compositeTier == TIER_2 ? #69F0AE : compositeTier == TIER_3 ? #FFD740 : compositeTier == TIER_4 ? #FF9800 : #FF5252
+    patternBg = compositeTier == TIER_1 ? color.new(#00E676, 88) : compositeTier == TIER_2 ? color.new(#69F0AE, 90) : tableBgAlt
+    cleanPattern = str.replace_all(str.replace_all(str.replace_all(str.replace_all(str.replace_all(str.replace_all(patternName, "💎 ", ""), "🏆 ", ""), "⭐ ", ""), "🥈 ", ""), "🥉 ", ""), "⚠️ ", "")
     table.cell(infoTable, 0, 4, cleanPattern, text_color=patternColor, text_size=size.small, bgcolor=patternBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 4, 1, 4)
 
@@ -2074,14 +2322,15 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 7, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_left)
     table.cell(infoTable, 1, 7, sessDisplay, text_color=kzActive ? kzColor : textDim, text_size=size.small, bgcolor=tableBg, text_halign=text.align_right)
 
-    // ═══ CONFLUENCE COUNT (12 factors) ═══
-    // Build dots string dynamically
+    // ═══ CONFLUENCE COUNT (16 factors) ═══
+    // Build dots string dynamically (capped at 16 for display)
     confDots = ""
-    for i = 0 to 11
-        confDots := confDots + (i < confluenceCount ? "●" : "○")
-    confLabel = confluenceCount >= 10 ? "STRONG" : confluenceCount >= 7 ? "GOOD" : confluenceCount >= 4 ? "MODERATE" : "WEAK"
-    confColor = confluenceCount >= 10 ? color.new(#00E676, 0) : confluenceCount >= 7 ? i_bullColor : confluenceCount >= 4 ? i_pacmanColor : textDim
-    confDisplay = "(" + str.tostring(confluenceCount) + "/12)"
+    displayCount = math.min(confluenceCount, 16)
+    for i = 0 to 15
+        confDots := confDots + (i < displayCount ? "●" : "○")
+    confLabel = confluenceCount >= 12 ? "STRONG" : confluenceCount >= 8 ? "GOOD" : confluenceCount >= 5 ? "MODERATE" : "WEAK"
+    confColor = confluenceCount >= 12 ? color.new(#00E676, 0) : confluenceCount >= 8 ? i_bullColor : confluenceCount >= 5 ? i_pacmanColor : textDim
+    confDisplay = "(" + str.tostring(confluenceCount) + "/16)"
     table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
     table.cell(infoTable, 1, 8, confDots + " " + confDisplay, text_color=confColor, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_right)
 
@@ -2119,9 +2368,10 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 12, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBgAlt, text_halign=text.align_left)
     table.cell(infoTable, 1, 12, str.tostring(dolTarget, format.mintick), text_color=dirColor, text_size=size.small, bgcolor=tableBgAlt, text_halign=text.align_right)
 
-    // ═══ TIER INDICATOR BAR ═══
-    tierBar = compositeTier == TIER_1 ? "████████████" : compositeTier == TIER_2 ? "████████░░░░" : "████░░░░░░░░"
-    tierColor = compositeTier == TIER_1 ? i_bullColor : compositeTier == TIER_2 ? i_neutralColor : textDim
+    // ═══ TIER INDICATOR BAR (5-Tier System) ═══
+    tierLabel = compositeTier == TIER_1 ? "ELITE" : compositeTier == TIER_2 ? "PREMIUM" : compositeTier == TIER_3 ? "STRONG" : compositeTier == TIER_4 ? "MODERATE" : "WEAK"
+    tierBar = compositeTier == TIER_1 ? "████████████ " + tierLabel : compositeTier == TIER_2 ? "██████████░░ " + tierLabel : compositeTier == TIER_3 ? "████████░░░░ " + tierLabel : compositeTier == TIER_4 ? "██████░░░░░░ " + tierLabel : "████░░░░░░░░ " + tierLabel
+    tierColor = compositeTier == TIER_1 ? #00E676 : compositeTier == TIER_2 ? #69F0AE : compositeTier == TIER_3 ? #FFD740 : compositeTier == TIER_4 ? #FF9800 : #FF5252
     table.cell(infoTable, 0, 13, tierBar, text_color=tierColor, text_size=size.tiny, bgcolor=headerBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 13, 1, 13)
 
@@ -2136,6 +2386,18 @@ alertcondition(tier1Bear, title="🏆 Tier 1 Short", message="🏆 TIER 1 SHORT 
 // 2022 Model alerts
 alertcondition(model2022Bull, title="📚 2022 Model Long", message="📚 2022 MODEL LONG on {{ticker}} - Sweep + Displacement + FVG")
 alertcondition(model2022Bear, title="📚 2022 Model Short", message="📚 2022 MODEL SHORT on {{ticker}} - Sweep + Displacement + FVG")
+
+// Unicorn Model alerts (high conviction)
+alertcondition(unicornBull, title="🦄 Unicorn Long", message="🦄 UNICORN SETUP LONG on {{ticker}} - Breaker + FVG confluence!")
+alertcondition(unicornBear, title="🦄 Unicorn Short", message="🦄 UNICORN SETUP SHORT on {{ticker}} - Breaker + FVG confluence!")
+
+// MMXM alerts
+alertcondition(mmxmBullConfirm, title="📊 MMXM Long", message="📊 MMXM BUY MODEL on {{ticker}} - Market Maker sequence confirmed!")
+alertcondition(mmxmBearConfirm, title="📊 MMXM Short", message="📊 MMXM SELL MODEL on {{ticker}} - Market Maker sequence confirmed!")
+
+// AMD Fractal alerts
+alertcondition(amdFractalBull, title="🔄 AMD Fractal Long", message="🔄 AMD FRACTAL LONG on {{ticker}} - Nested AMD alignment!")
+alertcondition(amdFractalBear, title="🔄 AMD Fractal Short", message="🔄 AMD FRACTAL SHORT on {{ticker}} - Nested AMD alignment!")
 
 // Plot probability for external use
 plot(dolProbability, title="DOL Probability", display=display.none)
