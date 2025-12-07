@@ -2054,6 +2054,14 @@ timeRiskReason := ""
 isHighProbTime := false
 isLowProbTime := false
 
+// Day of week detection (used for time-based risk assessment)
+currentDOW = dayofweek
+isMonday = currentDOW == dayofweek.monday
+isTuesday = currentDOW == dayofweek.tuesday
+isWednesday = currentDOW == dayofweek.wednesday
+isThursday = currentDOW == dayofweek.thursday
+isFriday = currentDOW == dayofweek.friday
+
 // Day of week assessment
 if isMonday
     if nyHour >= 9 and nyHour < 11
@@ -2348,12 +2356,7 @@ pmLow = ta.lowest(low, int(math.min(monthlyBars, bar_index)))
 
 // Weekly Profile Detection
 // ICT teaches specific weekly patterns based on day of week
-currentDOW = dayofweek
-isMonday = currentDOW == dayofweek.monday
-isTuesday = currentDOW == dayofweek.tuesday
-isWednesday = currentDOW == dayofweek.wednesday
-isThursday = currentDOW == dayofweek.thursday
-isFriday = currentDOW == dayofweek.friday
+// Note: currentDOW and day flags already defined in TIME-BASED RISK section above
 
 // Weekly Profile Types based on ICT teachings:
 // - Classic: Mon/Tue consolidation, Wed reversal, Thu/Fri expansion
