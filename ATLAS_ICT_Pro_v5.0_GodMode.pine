@@ -698,22 +698,30 @@ f_cleanOldOBs(array<OrderBlock> obs, int maxAge) =>
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🎨 UNIFIED COLOR PALETTE - Harmonious ICT-Inspired Theme
 // ═══════════════════════════════════════════════════════════════════════════════
-// Bullish family: Teal/Cyan tones
-COLOR_BULL_PRIMARY = #00BCD4    // Cyan - Order Blocks
-COLOR_BULL_ACCENT = #26A69A     // Teal - Suspension Blocks, Rejection Blocks
-COLOR_BULL_SOFT = #4DB6AC       // Light teal - secondary elements
+// ORDER BLOCKS - Sky blue / Peach (distinct from others)
+COLOR_OB_BULL = #87CEEB         // Light sky blue for bullish OB
+COLOR_OB_BEAR = #FFCCBC         // Light peach for bearish OB
 
-// Bearish family: Orange/Red tones
-COLOR_BEAR_PRIMARY = #FF7043    // Deep orange - Order Blocks
-COLOR_BEAR_ACCENT = #EF5350     // Red - Suspension Blocks, Rejection Blocks
-COLOR_BEAR_SOFT = #FF8A65       // Light orange - secondary elements
+// FVG - Silver gray (neutral, distinct)
+COLOR_FVG = #B0BEC5             // Light silver-gray for FVGs
 
-// Neutral elements - ICT soft palette
-COLOR_FVG = #90A4AE             // Soft blue-gray for FVGs
-COLOR_IFVG_BULL = #81C784       // Soft sage green for bullish IFVG
-COLOR_IFVG_BEAR = #E57373       // Soft coral for bearish IFVG
-COLOR_VI = #9575CD              // Soft lavender for Volume Imbalance
-COLOR_VOID = #BA68C8            // Soft orchid for Liquidity Void
+// IFVG - Mint / Rose (soft pastels)
+COLOR_IFVG_BULL = #A5D6A7       // Light mint green for bullish IFVG
+COLOR_IFVG_BEAR = #F48FB1       // Light rose pink for bearish IFVG
+
+// VOLUME IMBALANCE - Lavender (unique purple)
+COLOR_VI = #CE93D8              // Light lavender for Volume Imbalance
+
+// LIQUIDITY VOID - Orchid (distinct from VI)
+COLOR_VOID = #E1BEE7            // Light orchid for Liquidity Void
+
+// SUSPENSION BLOCKS - Amber / Coral
+COLOR_SB_BULL = #FFE082         // Light amber for bullish SB
+COLOR_SB_BEAR = #EF9A9A         // Light coral for bearish SB
+
+// REJECTION BLOCKS - Lime / Salmon (distinct from all)
+COLOR_RB_BULL = #C5E1A5         // Light lime for bullish RB
+COLOR_RB_BEAR = #FFAB91         // Light salmon for bearish RB
 
 // Level lines - harmonized palette
 COLOR_DAILY = #FF9800           // Orange for PDH/PDL
@@ -1309,8 +1317,8 @@ bullishOB = close[1] < open[1] and displacementUp and close > high[1]
 bearishOB = close[1] > open[1] and displacementDown and close < low[1]
 
 // ICT-style Order Block colors - using unified palette
-obBullColor = COLOR_BULL_PRIMARY  // Cyan for bullish
-obBearColor = COLOR_BEAR_PRIMARY  // Deep orange for bearish
+obBullColor = COLOR_OB_BULL  // Light sky blue for bullish
+obBearColor = COLOR_OB_BEAR  // Light peach for bearish
 
 // Killzone and Silver Bullet checks for scoring
 pdaKzActive = londonKZ or nyAMKZ or nyPMKZ
@@ -1736,8 +1744,8 @@ if bearishVI and i_showFVG
 // "Being suspended between two volume imbalances" - ICT
 // Extremely powerful PD Array - acts like FVG but single candle
 
-suspBlockBullColor = COLOR_BULL_ACCENT  // Teal for bullish SUSP (unified palette)
-suspBlockBearColor = COLOR_BEAR_ACCENT  // Red for bearish SUSP (unified palette)
+suspBlockBullColor = COLOR_SB_BULL  // Light amber for bullish SUSP
+suspBlockBearColor = COLOR_SB_BEAR  // Light coral for bearish SUSP
 
 // Suspension Block killzone check for scoring
 sbKzActive = londonKZ or nyAMKZ or nyPMKZ or inSilverBullet
@@ -2591,9 +2599,9 @@ bullishRejection = i_showRejBlock and totalRange > 0 and lowerWick / totalRange 
 // Bearish Rejection Block: Long upper wick at premium
 bearishRejection = i_showRejBlock and totalRange > 0 and upperWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close < open and inPremium
 
-// ICT-style Rejection Block colors - soft palette matching IFVG
-rbBullColor = #81C784  // Soft sage green for bullish rejection (discount)
-rbBearColor = #E57373  // Soft coral for bearish rejection (premium)
+// ICT-style Rejection Block colors - distinct from other PD arrays
+rbBullColor = COLOR_RB_BULL  // Light lime for bullish rejection (discount)
+rbBearColor = COLOR_RB_BEAR  // Light salmon for bearish rejection (premium)
 
 // RB Strength scoring function (0-100 scale)
 f_rbStrength(float wickPct, float bodyPct, bool inKZ, bool inSB, bool isBull, int msBias) =>
