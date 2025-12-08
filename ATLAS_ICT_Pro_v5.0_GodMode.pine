@@ -735,55 +735,217 @@ COLOR_SD = #80CBC4              // Light teal for SD projections
 COLOR_LC = #FF6F00              // Amber for London Close
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📊 PD ARRAY QUALITY SCORING FUNCTIONS
+// 📊 COMPREHENSIVE PD ARRAY QUALITY SCORING (0-100 Scale)
 // ═══════════════════════════════════════════════════════════════════════════════
-// Score each PD Array on quality factors: size, displacement, location, timing
+// Each PD Array scored on multiple ICT factors for accurate strength assessment
 
-// OB Score: Based on displacement strength and zone location
-f_obScore(float obTop, float obBottom, bool isBull, bool inKZ, float atr) =>
-    score = 1
+// ─────────────────────────────────────────────────────────────────────────────────
+// ORDER BLOCK SCORE (0-100)
+// Factors: Size, Displacement, Zone, Timing, Market Structure, HTF
+// ─────────────────────────────────────────────────────────────────────────────────
+f_obScoreComprehensive(float obTop, float obBottom, bool isBull, bool inKZ, bool inSB,
+                        float atr, float rangeH, float rangeL, int msBias, int htfBiasDir,
+                        bool hasDisplacement) =>
+    score = 0.0
     obSize = obTop - obBottom
-    // Size bonus: larger OBs = stronger imbalance
-    score := obSize > atr * 0.5 ? score + 1 : score
-    // Killzone bonus
-    score := inKZ ? score + 1 : score
-    math.min(score, 3)
+    obMid = (obTop + obBottom) / 2
+    rangeSize = rangeH - rangeL
+    eq = rangeL + rangeSize * 0.5
+    premZone = rangeL + rangeSize * 0.7
+    discZone = rangeL + rangeSize * 0.3
 
-// FVG Score: Based on gap size and displacement
-f_fvgScore(float fvgTop, float fvgBottom, float atr, bool inKZ) =>
-    score = 1
+    // 1. SIZE SCORE (0-20): Larger OBs = stronger institutional footprint
+    sizeRatio = obSize / atr
+    score += sizeRatio >= 1.5 ? 20 : sizeRatio >= 1.0 ? 16 : sizeRatio >= 0.7 ? 12 : sizeRatio >= 0.4 ? 8 : 4
+
+    // 2. DISPLACEMENT SCORE (0-15): Strong displacement = institutional commitment
+    score += hasDisplacement ? 15 : 5
+
+    // 3. ZONE ALIGNMENT (0-20): Bullish OB in discount, Bearish OB in premium
+    inCorrectZone = isBull ? obMid < discZone : obMid > premZone
+    inOTE = isBull ? (obMid >= rangeL + rangeSize * 0.62 and obMid <= rangeL + rangeSize * 0.79) : (obMid <= rangeH - rangeSize * 0.62 and obMid >= rangeH - rangeSize * 0.79)
+    score += inOTE ? 20 : inCorrectZone ? 15 : obMid < eq and isBull ? 8 : obMid > eq and not isBull ? 8 : 0
+
+    // 4. TIMING SCORE (0-15): Killzone + Silver Bullet
+    score += inSB ? 15 : inKZ ? 10 : 3
+
+    // 5. MARKET STRUCTURE ALIGNMENT (0-15): OB direction matches MS
+    msAligned = (isBull and msBias == 1) or (not isBull and msBias == -1)
+    score += msAligned ? 15 : msBias == 0 ? 7 : 0
+
+    // 6. HTF ALIGNMENT (0-15): OB direction matches HTF bias
+    htfAligned = (isBull and htfBiasDir >= 0) or (not isBull and htfBiasDir <= 0)
+    score += htfAligned ? 15 : 5
+
+    math.min(math.round(score), 100)
+
+// ─────────────────────────────────────────────────────────────────────────────────
+// FVG SCORE (0-100)
+// Factors: Gap Size, Displacement, Zone, Timing, Market Structure, HTF
+// ─────────────────────────────────────────────────────────────────────────────────
+f_fvgScoreComprehensive(float fvgTop, float fvgBottom, bool isBull, bool inKZ, bool inSB,
+                         float atr, float rangeH, float rangeL, int msBias, int htfBiasDir,
+                         float dispCandle) =>
+    score = 0.0
     gapSize = fvgTop - fvgBottom
-    // Large gap bonus
-    score := gapSize > atr * 0.3 ? score + 1 : score
-    // Killzone bonus
-    score := inKZ ? score + 1 : score
-    math.min(score, 3)
+    fvgMid = (fvgTop + fvgBottom) / 2
+    rangeSize = rangeH - rangeL
+    eq = rangeL + rangeSize * 0.5
+    premZone = rangeL + rangeSize * 0.7
+    discZone = rangeL + rangeSize * 0.3
 
-// VI Score: Based on body gap size
-f_viScore(float viTop, float viBottom, float atr) =>
-    score = 1
+    // 1. GAP SIZE (0-20): Larger gaps = stronger imbalance
+    gapRatio = gapSize / atr
+    score += gapRatio >= 0.8 ? 20 : gapRatio >= 0.5 ? 16 : gapRatio >= 0.3 ? 12 : gapRatio >= 0.15 ? 8 : 4
+
+    // 2. DISPLACEMENT CANDLE (0-15): Strong candle that created the FVG
+    dispRatio = dispCandle / atr
+    score += dispRatio >= 2.0 ? 15 : dispRatio >= 1.5 ? 12 : dispRatio >= 1.0 ? 8 : 4
+
+    // 3. ZONE ALIGNMENT (0-20): Bullish FVG in discount, Bearish in premium
+    inCorrectZone = isBull ? fvgMid < discZone : fvgMid > premZone
+    inOTE = isBull ? (fvgMid >= rangeL + rangeSize * 0.62 and fvgMid <= rangeL + rangeSize * 0.79) : (fvgMid <= rangeH - rangeSize * 0.62 and fvgMid >= rangeH - rangeSize * 0.79)
+    score += inOTE ? 20 : inCorrectZone ? 15 : fvgMid < eq and isBull ? 8 : fvgMid > eq and not isBull ? 8 : 0
+
+    // 4. TIMING (0-15)
+    score += inSB ? 15 : inKZ ? 10 : 3
+
+    // 5. MARKET STRUCTURE (0-15)
+    msAligned = (isBull and msBias == 1) or (not isBull and msBias == -1)
+    score += msAligned ? 15 : msBias == 0 ? 7 : 0
+
+    // 6. HTF ALIGNMENT (0-15)
+    htfAligned = (isBull and htfBiasDir >= 0) or (not isBull and htfBiasDir <= 0)
+    score += htfAligned ? 15 : 5
+
+    math.min(math.round(score), 100)
+
+// ─────────────────────────────────────────────────────────────────────────────────
+// VOLUME IMBALANCE SCORE (0-100)
+// Factors: Gap Size, Zone, Timing, Market Structure, HTF
+// ─────────────────────────────────────────────────────────────────────────────────
+f_viScoreComprehensive(float viTop, float viBottom, bool isBull, bool inKZ, bool inSB,
+                        float atr, float rangeH, float rangeL, int msBias, int htfBiasDir) =>
+    score = 0.0
     gapSize = viTop - viBottom
-    score := gapSize > atr * 0.2 ? score + 1 : score
-    score := gapSize > atr * 0.4 ? score + 1 : score
-    math.min(score, 3)
+    viMid = (viTop + viBottom) / 2
+    rangeSize = rangeH - rangeL
+    eq = rangeL + rangeSize * 0.5
+    premZone = rangeL + rangeSize * 0.7
+    discZone = rangeL + rangeSize * 0.3
 
-// Suspension Block Score: Always high quality (VI at both ends)
-f_sbScore(bool inKZ, float displacement) =>
-    score = 2  // Base high score for suspension blocks
-    score := inKZ ? score + 1 : score
-    math.min(score, 3)
+    // 1. GAP SIZE (0-25): Body gaps are significant
+    gapRatio = gapSize / atr
+    score += gapRatio >= 0.6 ? 25 : gapRatio >= 0.4 ? 20 : gapRatio >= 0.25 ? 15 : gapRatio >= 0.15 ? 10 : 5
 
-// Liquidity Void Score: Based on void size
-f_lvScore(float lvTop, float lvBottom, float atr) =>
-    score = 1
+    // 2. ZONE ALIGNMENT (0-25)
+    inCorrectZone = isBull ? viMid < discZone : viMid > premZone
+    inOTE = isBull ? (viMid >= rangeL + rangeSize * 0.62 and viMid <= rangeL + rangeSize * 0.79) : (viMid <= rangeH - rangeSize * 0.62 and viMid >= rangeH - rangeSize * 0.79)
+    score += inOTE ? 25 : inCorrectZone ? 20 : viMid < eq and isBull ? 10 : viMid > eq and not isBull ? 10 : 0
+
+    // 3. TIMING (0-20)
+    score += inSB ? 20 : inKZ ? 14 : 4
+
+    // 4. MARKET STRUCTURE (0-15)
+    msAligned = (isBull and msBias == 1) or (not isBull and msBias == -1)
+    score += msAligned ? 15 : msBias == 0 ? 7 : 0
+
+    // 5. HTF ALIGNMENT (0-15)
+    htfAligned = (isBull and htfBiasDir >= 0) or (not isBull and htfBiasDir <= 0)
+    score += htfAligned ? 15 : 5
+
+    math.min(math.round(score), 100)
+
+// ─────────────────────────────────────────────────────────────────────────────────
+// SUSPENSION BLOCK SCORE (0-100)
+// Base high score (VI at both ends = rare, powerful), plus standard factors
+// ─────────────────────────────────────────────────────────────────────────────────
+f_sbScoreComprehensive(float sbTop, float sbBottom, bool isBull, bool inKZ, bool inSB,
+                        float atr, float rangeH, float rangeL, int msBias, int htfBiasDir) =>
+    score = 0.0
+    sbMid = (sbTop + sbBottom) / 2
+    rangeSize = rangeH - rangeL
+    eq = rangeL + rangeSize * 0.5
+    premZone = rangeL + rangeSize * 0.7
+    discZone = rangeL + rangeSize * 0.3
+
+    // 1. BASE SCORE (30): Suspension blocks are inherently high quality
+    score += 30
+
+    // 2. ZONE ALIGNMENT (0-25)
+    inCorrectZone = isBull ? sbMid < discZone : sbMid > premZone
+    inOTE = isBull ? (sbMid >= rangeL + rangeSize * 0.62 and sbMid <= rangeL + rangeSize * 0.79) : (sbMid <= rangeH - rangeSize * 0.62 and sbMid >= rangeH - rangeSize * 0.79)
+    score += inOTE ? 25 : inCorrectZone ? 20 : sbMid < eq and isBull ? 10 : sbMid > eq and not isBull ? 10 : 0
+
+    // 3. TIMING (0-20)
+    score += inSB ? 20 : inKZ ? 14 : 4
+
+    // 4. MARKET STRUCTURE (0-15)
+    msAligned = (isBull and msBias == 1) or (not isBull and msBias == -1)
+    score += msAligned ? 15 : msBias == 0 ? 7 : 0
+
+    // 5. HTF ALIGNMENT (0-10)
+    htfAligned = (isBull and htfBiasDir >= 0) or (not isBull and htfBiasDir <= 0)
+    score += htfAligned ? 10 : 3
+
+    math.min(math.round(score), 100)
+
+// ─────────────────────────────────────────────────────────────────────────────────
+// LIQUIDITY VOID SCORE (0-100)
+// Factors: Void Size, Displacement, Zone, Timing, MS, HTF
+// ─────────────────────────────────────────────────────────────────────────────────
+f_lvScoreComprehensive(float lvTop, float lvBottom, bool isBull, bool inKZ, bool inSB,
+                        float atr, float rangeH, float rangeL, int msBias, int htfBiasDir,
+                        float candleRange) =>
+    score = 0.0
     voidSize = lvTop - lvBottom
-    score := voidSize > atr * 1.5 ? score + 1 : score
-    score := voidSize > atr * 2.5 ? score + 1 : score
-    math.min(score, 3)
+    lvMid = (lvTop + lvBottom) / 2
+    rangeSize = rangeH - rangeL
+    eq = rangeL + rangeSize * 0.5
+    premZone = rangeL + rangeSize * 0.7
+    discZone = rangeL + rangeSize * 0.3
 
-// Convert score to dots display
-f_scoreDots(int score) =>
-    score >= 3 ? "●●●" : score >= 2 ? "●●○" : "●○○"
+    // 1. VOID SIZE (0-25): Larger voids = more price inefficiency
+    voidRatio = voidSize / atr
+    score += voidRatio >= 3.0 ? 25 : voidRatio >= 2.0 ? 20 : voidRatio >= 1.5 ? 15 : voidRatio >= 1.0 ? 10 : 5
+
+    // 2. DISPLACEMENT (0-15): Candle that created the void
+    dispRatio = candleRange / atr
+    score += dispRatio >= 3.0 ? 15 : dispRatio >= 2.5 ? 12 : dispRatio >= 2.0 ? 9 : 5
+
+    // 3. ZONE ALIGNMENT (0-20)
+    inCorrectZone = isBull ? lvMid < discZone : lvMid > premZone
+    inOTE = isBull ? (lvMid >= rangeL + rangeSize * 0.62 and lvMid <= rangeL + rangeSize * 0.79) : (lvMid <= rangeH - rangeSize * 0.62 and lvMid >= rangeH - rangeSize * 0.79)
+    score += inOTE ? 20 : inCorrectZone ? 15 : lvMid < eq and isBull ? 8 : lvMid > eq and not isBull ? 8 : 0
+
+    // 4. TIMING (0-15)
+    score += inSB ? 15 : inKZ ? 10 : 3
+
+    // 5. MARKET STRUCTURE (0-15)
+    msAligned = (isBull and msBias == 1) or (not isBull and msBias == -1)
+    score += msAligned ? 15 : msBias == 0 ? 7 : 0
+
+    // 6. HTF ALIGNMENT (0-10)
+    htfAligned = (isBull and htfBiasDir >= 0) or (not isBull and htfBiasDir <= 0)
+    score += htfAligned ? 10 : 3
+
+    math.min(math.round(score), 100)
+
+// ─────────────────────────────────────────────────────────────────────────────────
+// SCORE DISPLAY FUNCTIONS
+// ─────────────────────────────────────────────────────────────────────────────────
+// Convert 0-100 score to visual rating
+f_scoreToRating(int score) =>
+    score >= 85 ? "S" : score >= 70 ? "A" : score >= 55 ? "B" : score >= 40 ? "C" : "D"
+
+// Convert 0-100 score to color grade
+f_scoreToColor(int score, color baseColor) =>
+    score >= 85 ? color.new(baseColor, 0) : score >= 70 ? color.new(baseColor, 20) : score >= 55 ? color.new(baseColor, 40) : score >= 40 ? color.new(baseColor, 55) : color.new(baseColor, 70)
+
+// Format score display: "OB 78 [A]"
+f_formatScore(string name, int score) =>
+    rating = f_scoreToRating(score)
+    name + " " + str.tostring(score) + " [" + rating + "]"
 
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        SESSION DETECTION                                       ║
@@ -1309,6 +1471,10 @@ bullishJudas = i_showJudas and inJudasSession and not na(asianLow) and low < asi
 // ║                        ORDER BLOCK DETECTION                                   ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
 
+// Early range calculation for comprehensive scoring (20-bar lookback)
+pdRangeH = ta.highest(high, 20)
+pdRangeL = ta.lowest(low, 20)
+
 // Displacement detection (atrVal defined earlier in Turtle Soup section)
 displacementUp = (close - open) > atrVal * 1.5 and close > open
 displacementDown = (open - close) > atrVal * 1.5 and close < open
@@ -1323,19 +1489,21 @@ bearishOB = close[1] > open[1] and displacementDown and close < low[1]
 obBullColor = COLOR_BULL_PRIMARY  // Cyan for bullish
 obBearColor = COLOR_BEAR_PRIMARY  // Deep orange for bearish
 
-// Killzone check for scoring
-obKzActive = londonKZ or nyAMKZ or nyPMKZ or inSilverBullet
+// Killzone and Silver Bullet checks for scoring
+pdaKzActive = londonKZ or nyAMKZ or nyPMKZ
+pdaSbActive = inSilverBullet
 
-// Create and manage Order Blocks - ICT style with quality scores
+// Create and manage Order Blocks - ICT style with COMPREHENSIVE quality scores
 if bullishOB and i_showOB
-    obScore = f_obScore(high[1], low[1], true, obKzActive, atrVal)
-    obDots = f_scoreDots(obScore)
+    obScore = f_obScoreComprehensive(high[1], low[1], true, pdaKzActive, pdaSbActive, atrVal, pdRangeH, pdRangeL, msDirection, htfBias, displacementUp)
+    obLabel = f_formatScore("OB", obScore)
+    obBoxColor = f_scoreToColor(obScore, obBullColor)
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BULL, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=obBullColor, bgcolor=color.new(obBullColor, 75),
+                 border_color=obBoxColor, bgcolor=color.new(obBullColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="OB " + obDots, text_color=obBullColor, text_size=size.small, text_halign=text.align_right),
+                 text=obLabel, text_color=obBoxColor, text_size=size.small, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
                                        style=label.style_none, textcolor=color.new(obBullColor, 30), size=size.small) : na)
     if array.size(bullOBs) >= 10
@@ -1347,14 +1515,15 @@ if bullishOB and i_showOB
     array.push(bullOBs, newOB)
 
 if bearishOB and i_showOB
-    obScore = f_obScore(high[1], low[1], false, obKzActive, atrVal)
-    obDots = f_scoreDots(obScore)
+    obScore = f_obScoreComprehensive(high[1], low[1], false, pdaKzActive, pdaSbActive, atrVal, pdRangeH, pdRangeL, msDirection, htfBias, displacementDown)
+    obLabel = f_formatScore("OB", obScore)
+    obBoxColor = f_scoreToColor(obScore, obBearColor)
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BEAR, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=obBearColor, bgcolor=color.new(obBearColor, 75),
+                 border_color=obBoxColor, bgcolor=color.new(obBearColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="OB " + obDots, text_color=obBearColor, text_size=size.small, text_halign=text.align_right),
+                 text=obLabel, text_color=obBoxColor, text_size=size.small, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
                                        style=label.style_none, textcolor=color.new(obBearColor, 30), size=size.small) : na)
     if array.size(bearOBs) >= 10
@@ -1498,21 +1667,22 @@ minFVGSize = i_fvgMinSize * f_tickSize()
 fvgBullColor = COLOR_FVG  // Blue-gray for FVGs
 fvgBearColor = COLOR_FVG  // Same color, direction shown by position
 
-// Killzone check for FVG scoring
-fvgKzActive = londonKZ or nyAMKZ or nyPMKZ or inSilverBullet
+// Displacement candle size for FVG scoring
+fvgDispCandle = math.abs(close[1] - open[1])
 
-// Create FVGs - ICT style with quality scores
+// Create FVGs - ICT style with COMPREHENSIVE quality scores
 if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
     mitPct = f_getMitPct()
     mitLevel = bullishFVGBottom + (bullishFVGTop - bullishFVGBottom) * mitPct
-    fvgScore = f_fvgScore(bullishFVGTop, bullishFVGBottom, atrVal, fvgKzActive)
-    fvgDots = f_scoreDots(fvgScore)
+    fvgScore = f_fvgScoreComprehensive(bullishFVGTop, bullishFVGBottom, true, pdaKzActive, pdaSbActive, atrVal, pdRangeH, pdRangeL, msDirection, htfBias, fvgDispCandle)
+    fvgLabel = f_formatScore("FVG", fvgScore)
+    fvgBoxColor = f_scoreToColor(fvgScore, fvgBullColor)
     newFVG = FVG.new(
          bullishFVGTop, bullishFVGBottom, bar_index, DIR_BULL, false, mitLevel,
          box.new(bar_index - 2, bullishFVGTop, bar_index + 15, bullishFVGBottom,
-                 border_color=fvgBullColor, bgcolor=color.new(fvgBullColor, 75),
+                 border_color=fvgBoxColor, bgcolor=color.new(fvgBullColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="FVG " + fvgDots, text_color=fvgBullColor, text_size=size.small, text_halign=text.align_right))
+                 text=fvgLabel, text_color=fvgBoxColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bullFVGs) >= 15
         oldFVG = array.shift(bullFVGs)
         if not na(oldFVG.visual)
@@ -1522,14 +1692,15 @@ if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
 if bearishFVG and i_showFVG and (bearishFVGTop - bearishFVGBottom) >= minFVGSize
     mitPct = f_getMitPct()
     mitLevel = bearishFVGTop - (bearishFVGTop - bearishFVGBottom) * mitPct
-    fvgScore = f_fvgScore(bearishFVGTop, bearishFVGBottom, atrVal, fvgKzActive)
-    fvgDots = f_scoreDots(fvgScore)
+    fvgScore = f_fvgScoreComprehensive(bearishFVGTop, bearishFVGBottom, false, pdaKzActive, pdaSbActive, atrVal, pdRangeH, pdRangeL, msDirection, htfBias, fvgDispCandle)
+    fvgLabel = f_formatScore("FVG", fvgScore)
+    fvgBoxColor = f_scoreToColor(fvgScore, fvgBearColor)
     newFVG = FVG.new(
          bearishFVGTop, bearishFVGBottom, bar_index, DIR_BEAR, false, mitLevel,
          box.new(bar_index - 2, bearishFVGTop, bar_index + 15, bearishFVGBottom,
-                 border_color=fvgBearColor, bgcolor=color.new(fvgBearColor, 75),
+                 border_color=fvgBoxColor, bgcolor=color.new(fvgBearColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="FVG " + fvgDots, text_color=fvgBearColor, text_size=size.small, text_halign=text.align_right))
+                 text=fvgLabel, text_color=fvgBoxColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bearFVGs) >= 15
         oldFVG = array.shift(bearFVGs)
         if not na(oldFVG.visual)
@@ -1700,15 +1871,16 @@ bearishVI = currBodyHigh < prevBodyLow and (prevBodyLow - currBodyHigh) >= minVI
 viTopBear = prevBodyLow
 viBottomBear = currBodyHigh
 
-// Create VI boxes with quality scores
+// Create VI boxes with COMPREHENSIVE quality scores
 if bullishVI and i_showFVG
-    viScore = f_viScore(viTopBull, viBottomBull, atrVal)
-    viDots = f_scoreDots(viScore)
+    viScore = f_viScoreComprehensive(viTopBull, viBottomBull, true, pdaKzActive, pdaSbActive, atrVal, pdRangeH, pdRangeL, msDirection, htfBias)
+    viLabel = f_formatScore("VI", viScore)
+    viBoxColor = f_scoreToColor(viScore, viColor)
     newVI = VolumeImbalance.new(viTopBull, viBottomBull, bar_index, DIR_BULL, false,
          box.new(bar_index - 1, viTopBull, bar_index + 10, viBottomBull,
-                 border_color=viColor, bgcolor=color.new(viColor, 75),
+                 border_color=viBoxColor, bgcolor=color.new(viColor, 75),
                  border_width=1, border_style=line.style_dotted,
-                 text="VI " + viDots, text_color=viColor, text_size=size.small, text_halign=text.align_right))
+                 text=viLabel, text_color=viBoxColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bullVIs) >= 10
         oldVI = array.shift(bullVIs)
         if not na(oldVI.visual)
@@ -1716,13 +1888,14 @@ if bullishVI and i_showFVG
     array.push(bullVIs, newVI)
 
 if bearishVI and i_showFVG
-    viScore = f_viScore(viTopBear, viBottomBear, atrVal)
-    viDots = f_scoreDots(viScore)
+    viScore = f_viScoreComprehensive(viTopBear, viBottomBear, false, pdaKzActive, pdaSbActive, atrVal, pdRangeH, pdRangeL, msDirection, htfBias)
+    viLabel = f_formatScore("VI", viScore)
+    viBoxColor = f_scoreToColor(viScore, viColor)
     newVI = VolumeImbalance.new(viTopBear, viBottomBear, bar_index, DIR_BEAR, false,
          box.new(bar_index - 1, viTopBear, bar_index + 10, viBottomBear,
-                 border_color=viColor, bgcolor=color.new(viColor, 75),
+                 border_color=viBoxColor, bgcolor=color.new(viColor, 75),
                  border_width=1, border_style=line.style_dotted,
-                 text="VI " + viDots, text_color=viColor, text_size=size.small, text_halign=text.align_right))
+                 text=viLabel, text_color=viBoxColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bearVIs) >= 10
         oldVI = array.shift(bearVIs)
         if not na(oldVI.visual)
@@ -1771,16 +1944,17 @@ bearishSuspBlock = viAtLow and viAtHighBear and close[1] < open[1]
 suspBlockTopBear = prevCandleBodyLow  // Higher VI level
 suspBlockBottomBear = currBodyHighForSusp  // Lower VI level
 
-// Create Suspension Block boxes with quality scores (SUSP = always high quality)
+// Create Suspension Block boxes with COMPREHENSIVE quality scores
 if bullishSuspBlock and i_showFVG
-    sbScore = f_sbScore(sbKzActive, atrVal)
-    sbDots = f_scoreDots(sbScore)
+    sbScore = f_sbScoreComprehensive(suspBlockTopBull, suspBlockBottomBull, true, pdaKzActive, pdaSbActive, atrVal, pdRangeH, pdRangeL, msDirection, htfBias)
+    sbLabel = f_formatScore("SUSP", sbScore)
+    sbBoxColor = f_scoreToColor(sbScore, suspBlockBullColor)
     newSB = SuspensionBlock.new(suspBlockTopBull, suspBlockBottomBull, prevCandleBodyHigh, prevCandleBodyLow,
          bar_index - 1, DIR_BULL, false, false,
          box.new(bar_index - 2, suspBlockTopBull, bar_index + 15, suspBlockBottomBull,
-                 border_color=suspBlockBullColor, bgcolor=color.new(suspBlockBullColor, 75),
+                 border_color=sbBoxColor, bgcolor=color.new(suspBlockBullColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="SUSP " + sbDots, text_color=suspBlockBullColor, text_size=size.small, text_halign=text.align_right),
+                 text=sbLabel, text_color=sbBoxColor, text_size=size.small, text_halign=text.align_right),
          label.new(bar_index - 1, suspBlockTopBull, "⬡",
                    style=label.style_none, textcolor=suspBlockBullColor, size=size.small))
     if array.size(bullSuspBlocks) >= 5
@@ -1792,14 +1966,15 @@ if bullishSuspBlock and i_showFVG
     array.push(bullSuspBlocks, newSB)
 
 if bearishSuspBlock and i_showFVG
-    sbScore = f_sbScore(sbKzActive, atrVal)
-    sbDots = f_scoreDots(sbScore)
+    sbScore = f_sbScoreComprehensive(suspBlockTopBear, suspBlockBottomBear, false, pdaKzActive, pdaSbActive, atrVal, pdRangeH, pdRangeL, msDirection, htfBias)
+    sbLabel = f_formatScore("SUSP", sbScore)
+    sbBoxColor = f_scoreToColor(sbScore, suspBlockBearColor)
     newSB = SuspensionBlock.new(suspBlockTopBear, suspBlockBottomBear, prevCandleBodyHigh, prevCandleBodyLow,
          bar_index - 1, DIR_BEAR, false, false,
          box.new(bar_index - 2, suspBlockTopBear, bar_index + 15, suspBlockBottomBear,
-                 border_color=suspBlockBearColor, bgcolor=color.new(suspBlockBearColor, 75),
+                 border_color=sbBoxColor, bgcolor=color.new(suspBlockBearColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="SUSP " + sbDots, text_color=suspBlockBearColor, text_size=size.small, text_halign=text.align_right),
+                 text=sbLabel, text_color=sbBoxColor, text_size=size.small, text_halign=text.align_right),
          label.new(bar_index - 1, suspBlockTopBear, "⬡",
                    style=label.style_none, textcolor=suspBlockBearColor, size=size.small))
     if array.size(bearSuspBlocks) >= 5
@@ -1836,15 +2011,16 @@ bearishLiqVoid = largeCandle and close < open and noOverlapLow
 liqVoidTopBear = math.min(low[1], low[2])
 liqVoidBottomBear = high
 
-// Create Liquidity Void boxes with quality scores
+// Create Liquidity Void boxes with COMPREHENSIVE quality scores
 if bullishLiqVoid and i_showFVG
-    lvScore = f_lvScore(liqVoidTopBull, liqVoidBottomBull, atrVal)
-    lvDots = f_scoreDots(lvScore)
+    lvScore = f_lvScoreComprehensive(liqVoidTopBull, liqVoidBottomBull, true, pdaKzActive, pdaSbActive, atrVal, pdRangeH, pdRangeL, msDirection, htfBias, totalRange)
+    lvLabel = f_formatScore("VOID", lvScore)
+    lvBoxColor = f_scoreToColor(lvScore, liqVoidColor)
     newLV = LiquidityVoid.new(liqVoidTopBull, liqVoidBottomBull, bar_index, DIR_BULL, false,
          box.new(bar_index - 2, liqVoidTopBull, bar_index + 12, liqVoidBottomBull,
-                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 75),
+                 border_color=lvBoxColor, bgcolor=color.new(liqVoidColor, 75),
                  border_width=1, border_style=line.style_dashed,
-                 text="VOID " + lvDots, text_color=liqVoidColor, text_size=size.small, text_halign=text.align_right))
+                 text=lvLabel, text_color=lvBoxColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bullLiqVoids) >= 5
         oldLV = array.shift(bullLiqVoids)
         if not na(oldLV.visual)
@@ -1852,13 +2028,14 @@ if bullishLiqVoid and i_showFVG
     array.push(bullLiqVoids, newLV)
 
 if bearishLiqVoid and i_showFVG
-    lvScore = f_lvScore(liqVoidTopBear, liqVoidBottomBear, atrVal)
-    lvDots = f_scoreDots(lvScore)
+    lvScore = f_lvScoreComprehensive(liqVoidTopBear, liqVoidBottomBear, false, pdaKzActive, pdaSbActive, atrVal, pdRangeH, pdRangeL, msDirection, htfBias, totalRange)
+    lvLabel = f_formatScore("VOID", lvScore)
+    lvBoxColor = f_scoreToColor(lvScore, liqVoidColor)
     newLV = LiquidityVoid.new(liqVoidTopBear, liqVoidBottomBear, bar_index, DIR_BEAR, false,
          box.new(bar_index - 2, liqVoidTopBear, bar_index + 12, liqVoidBottomBear,
-                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 75),
+                 border_color=lvBoxColor, bgcolor=color.new(liqVoidColor, 75),
                  border_width=1, border_style=line.style_dashed,
-                 text="VOID " + lvDots, text_color=liqVoidColor, text_size=size.small, text_halign=text.align_right))
+                 text=lvLabel, text_color=lvBoxColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bearLiqVoids) >= 5
         oldLV = array.shift(bearLiqVoids)
         if not na(oldLV.visual)
