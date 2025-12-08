@@ -3743,7 +3743,7 @@ fill(premiumPlot, rangeHighPlot, color=color.new(i_bearColor, 90), title="Premiu
 fill(discountPlot, rangeLowPlot, color=color.new(i_bullColor, 90), title="Discount Zone Fill")
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CBDR GRID - Subtle background grid lines (toggle-able)
+// CBDR & SD LEVELS - Grouped by Category, Extended & Brighter
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var line cbdrGridHigh = na
@@ -3754,6 +3754,10 @@ var label cbdrLabelHigh = na
 var label cbdrLabelLow = na
 var label cbdrLabelSD1High = na
 var label cbdrLabelSD1Low = na
+
+// CBDR/SD Colors - Teal theme, BRIGHTER
+cbdrMainColor = #26A69A  // Teal for CBDR
+cbdrSDColor = #4DB6AC    // Lighter teal for SD projections
 
 // Draw CBDR as subtle grid on last bar only
 if barstate.islast and i_showCBDR
@@ -3775,35 +3779,31 @@ if barstate.islast and i_showCBDR
     if not na(cbdrLabelSD1Low)
         label.delete(cbdrLabelSD1Low)
 
-    // Subtle grid color
-    cbdrGridColor = color.new(color.teal, 85)
-    cbdrSDColor = color.new(color.teal, 90)
-
-    // CBDR High/Low - subtle dotted lines extending full width
+    // ─── CBDR RANGE (Core Range) - Teal, Dashed ───
     if not na(cbdrHigh)
-        cbdrGridHigh := line.new(bar_index - 200, cbdrHigh, bar_index + 30, cbdrHigh,
-             color=cbdrGridColor, width=1, style=line.style_dotted, extend=extend.left)
-        cbdrLabelHigh := label.new(bar_index + 30, cbdrHigh, "CBDR Hi",
-             style=label.style_none, textcolor=color.new(color.teal, 50), size=size.tiny, textalign=text.align_left)
+        cbdrGridHigh := line.new(bar_index - 100, cbdrHigh, bar_index + 50, cbdrHigh,
+             color=color.new(cbdrMainColor, 30), width=2, style=line.style_dashed)
+        cbdrLabelHigh := label.new(bar_index + 50, cbdrHigh, "CBDR Hi",
+             style=label.style_none, textcolor=cbdrMainColor, size=size.small, textalign=text.align_left)
 
     if not na(cbdrLow)
-        cbdrGridLow := line.new(bar_index - 200, cbdrLow, bar_index + 30, cbdrLow,
-             color=cbdrGridColor, width=1, style=line.style_dotted, extend=extend.left)
-        cbdrLabelLow := label.new(bar_index + 30, cbdrLow, "CBDR Lo",
-             style=label.style_none, textcolor=color.new(color.teal, 50), size=size.tiny, textalign=text.align_left)
+        cbdrGridLow := line.new(bar_index - 100, cbdrLow, bar_index + 50, cbdrLow,
+             color=color.new(cbdrMainColor, 30), width=2, style=line.style_dashed)
+        cbdrLabelLow := label.new(bar_index + 50, cbdrLow, "CBDR Lo",
+             style=label.style_none, textcolor=cbdrMainColor, size=size.small, textalign=text.align_left)
 
-    // SD Projections - even more subtle, with labels
+    // ─── SD PROJECTIONS - Lighter Teal, Dotted ───
     if i_showCBDRProjections and not na(cbdrSD1High)
-        cbdrGridSD1High := line.new(bar_index - 200, cbdrSD1High, bar_index + 30, cbdrSD1High,
-             color=cbdrSDColor, width=1, style=line.style_dotted, extend=extend.left)
-        cbdrLabelSD1High := label.new(bar_index + 30, cbdrSD1High, "SD+",
-             style=label.style_none, textcolor=color.new(color.teal, 70), size=size.tiny, textalign=text.align_left)
+        cbdrGridSD1High := line.new(bar_index - 100, cbdrSD1High, bar_index + 50, cbdrSD1High,
+             color=color.new(cbdrSDColor, 40), width=1, style=line.style_dotted)
+        cbdrLabelSD1High := label.new(bar_index + 50, cbdrSD1High, "SD+",
+             style=label.style_none, textcolor=cbdrSDColor, size=size.small, textalign=text.align_left)
 
     if i_showCBDRProjections and not na(cbdrSD1Low)
-        cbdrGridSD1Low := line.new(bar_index - 200, cbdrSD1Low, bar_index + 30, cbdrSD1Low,
-             color=cbdrSDColor, width=1, style=line.style_dotted, extend=extend.left)
-        cbdrLabelSD1Low := label.new(bar_index + 30, cbdrSD1Low, "SD-",
-             style=label.style_none, textcolor=color.new(color.teal, 70), size=size.tiny, textalign=text.align_left)
+        cbdrGridSD1Low := line.new(bar_index - 100, cbdrSD1Low, bar_index + 50, cbdrSD1Low,
+             color=color.new(cbdrSDColor, 40), width=1, style=line.style_dotted)
+        cbdrLabelSD1Low := label.new(bar_index + 50, cbdrSD1Low, "SD-",
+             style=label.style_none, textcolor=cbdrSDColor, size=size.small, textalign=text.align_left)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NWOG ZONE - Multi-week display with progressive fading
@@ -3830,29 +3830,29 @@ if barstate.islast
             float l = array.get(nwogLows, i)
             float ce = array.get(nwogCEs, i)
 
-            // Pastel periwinkle for NWOG - progressive fading for older weeks
-            nwogColor = #B39DDB  // Pastel purple/periwinkle
-            int fadeLevel = 0 + (i * 15)  // 0, 15, 30, 45, 60 for 5 weeks
-            int bgFade = 70 + (i * 5)     // 70, 75, 80, 85, 90 for 5 weeks
-            fadeLevel := math.min(fadeLevel, 70)
-            bgFade := math.min(bgFade, 90)
+            // BRIGHTER purple for NWOG - progressive fading for older weeks
+            nwogColor = #CE93D8  // Brighter purple for visibility
+            int fadeLevel = 0 + (i * 10)  // Less fading: 0, 10, 20, 30, 40
+            int bgFade = 65 + (i * 5)     // 65, 70, 75, 80, 85 for 5 weeks
+            fadeLevel := math.min(fadeLevel, 50)
+            bgFade := math.min(bgFade, 85)
 
             // Label: NWOG-1 (current) through NWOG-5 (oldest)
             string nwogLabel = "NWOG-" + str.tostring(i + 1)
 
-            // Draw box relative to current bar (safe approach)
-            int boxLeft = bar_index - 50
-            box newBox = box.new(boxLeft, h, bar_index + 10, l,
+            // Draw box relative to current bar - EXTENDED further
+            int boxLeft = bar_index - 100
+            box newBox = box.new(boxLeft, h, bar_index + 50, l,
                  border_color=color.new(nwogColor, fadeLevel), bgcolor=color.new(nwogColor, bgFade),
                  border_width=2, border_style=line.style_solid,
-                 text=nwogLabel, text_color=color.new(nwogColor, fadeLevel), text_size=size.tiny, text_halign=text.align_right)
+                 text=nwogLabel, text_color=color.new(nwogColor, fadeLevel), text_size=size.small, text_halign=text.align_right)
             array.push(nwogBoxes, newBox)
 
-            // Draw CE line for each NWOG
+            // Draw CE line for each NWOG - BRIGHTER
             if i_showNWOGCE
-                int ceFade = 20 + (i * 15)  // 20, 35, 50, 65, 80 for 5 weeks
-                ceFade := math.min(ceFade, 80)
-                line ceLine = line.new(boxLeft, ce, bar_index + 10, ce,
+                int ceFade = 10 + (i * 10)  // Brighter: 10, 20, 30, 40, 50
+                ceFade := math.min(ceFade, 60)
+                line ceLine = line.new(boxLeft, ce, bar_index + 50, ce,
                      color=color.new(nwogColor, ceFade), width=i == 0 ? 2 : 1, style=line.style_dashed)
                 array.push(nwogCELines, ceLine)
 
@@ -4405,28 +4405,39 @@ if i_showPacMan and barstate.islast and not i_cleanMode
     clydeLabel := label.new(bar_index + 20, low60IPDA, "👻 SSL", style=label.style_none, textcolor=#FFB852, size=size.normal)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LIQUIDITY SEQUENCING - Visual Lines (Simplified)
+// LIQUIDITY LEVELS - PDH/PDL (Daily) and PWH/PWL (Weekly) - Extended & Grouped
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var line pdhLine = na, var line pdlLine = na, var line pwhLine = na, var line pwlLine = na
-var label pdhLabel = na, var label pdlLabel = na, var label pwhLabel = na, var label pwlLabel = na
+// Daily levels - Orange, dashed lines
+var line pdhLine = na, var line pdlLine = na
+var label pdhLabel = na, var label pdlLabel = na
+// Weekly levels - Purple, solid lines
+var line pwhLine = na, var line pwlLine = na
+var label pwhLabel = na, var label pwlLabel = na
+
+// PDH/PDL/PWH/PWL color scheme
+pdhColor = #FF9800  // Orange for Daily
+pwColor = #E040FB   // Purple for Weekly
 
 if barstate.islast
     line.delete(pdhLine), line.delete(pdlLine), line.delete(pwhLine), line.delete(pwlLine)
     label.delete(pdhLabel), label.delete(pdlLabel), label.delete(pwhLabel), label.delete(pwlLabel)
 
+    // ─── DAILY LEVELS (PDH/PDL) - Orange, Dashed ───
     if not na(pdh)
-        pdhLine := line.new(bar_index - 20, pdh, bar_index + 40, pdh, color=color.new(#FF9800, pdhSwept ? 70 : 20), width=2)
-        pdhLabel := label.new(bar_index + 40, pdh, pdhSwept ? "PDH ✗" : "PDH", style=label.style_none, textcolor=#FF9800, size=size.small)
+        pdhLine := line.new(bar_index - 100, pdh, bar_index + 50, pdh, color=color.new(pdhColor, pdhSwept ? 60 : 15), width=2, style=line.style_dashed)
+        pdhLabel := label.new(bar_index + 50, pdh, pdhSwept ? "PDH ✗" : "PDH", style=label.style_none, textcolor=pdhColor, size=size.small)
     if not na(pdl)
-        pdlLine := line.new(bar_index - 20, pdl, bar_index + 40, pdl, color=color.new(#FF9800, pdlSwept ? 70 : 20), width=2)
-        pdlLabel := label.new(bar_index + 40, pdl, pdlSwept ? "PDL ✗" : "PDL", style=label.style_none, textcolor=#FF9800, size=size.small)
+        pdlLine := line.new(bar_index - 100, pdl, bar_index + 50, pdl, color=color.new(pdhColor, pdlSwept ? 60 : 15), width=2, style=line.style_dashed)
+        pdlLabel := label.new(bar_index + 50, pdl, pdlSwept ? "PDL ✗" : "PDL", style=label.style_none, textcolor=pdhColor, size=size.small)
+
+    // ─── WEEKLY LEVELS (PWH/PWL) - Purple, Solid ───
     if not na(pwh)
-        pwhLine := line.new(bar_index - 20, pwh, bar_index + 40, pwh, color=color.new(#E040FB, pwhSwept ? 70 : 20), width=2)
-        pwhLabel := label.new(bar_index + 40, pwh, pwhSwept ? "PWH ✗" : "PWH", style=label.style_none, textcolor=#E040FB, size=size.small)
+        pwhLine := line.new(bar_index - 100, pwh, bar_index + 50, pwh, color=color.new(pwColor, pwhSwept ? 60 : 15), width=2, style=line.style_solid)
+        pwhLabel := label.new(bar_index + 50, pwh, pwhSwept ? "PWH ✗" : "PWH", style=label.style_none, textcolor=pwColor, size=size.small)
     if not na(pwl)
-        pwlLine := line.new(bar_index - 20, pwl, bar_index + 40, pwl, color=color.new(#E040FB, pwlSwept ? 70 : 20), width=2)
-        pwlLabel := label.new(bar_index + 40, pwl, pwlSwept ? "PWL ✗" : "PWL", style=label.style_none, textcolor=#E040FB, size=size.small)
+        pwlLine := line.new(bar_index - 100, pwl, bar_index + 50, pwl, color=color.new(pwColor, pwlSwept ? 60 : 15), width=2, style=line.style_solid)
+        pwlLabel := label.new(bar_index + 50, pwl, pwlSwept ? "PWL ✗" : "PWL", style=label.style_none, textcolor=pwColor, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPOSITE TIER SIGNALS (Only on TRUE high-confluence events)
@@ -4623,39 +4634,39 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 1, tierLabel + " | " + patternName, text_color=tierColor, text_size=size.small, bgcolor=color.new(tierColor, 90), text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 1, 1, 1)
 
-    // Row 2: MTF Bias (compact)
+    // Row 2: MTF Bias (Multi-Timeframe alignment check)
     wA = mtfBiasW == 1 ? "↑" : mtfBiasW == -1 ? "↓" : "—"
     dA = mtfBiasD == 1 ? "↑" : mtfBiasD == -1 ? "↓" : "—"
     hA = mtfBias1H == 1 ? "↑" : mtfBias1H == -1 ? "↓" : "—"
     bullCnt = (mtfBiasW == 1 ? 1 : 0) + (mtfBiasD == 1 ? 1 : 0) + (mtfBias1H == 1 ? 1 : 0)
     bearCnt = (mtfBiasW == -1 ? 1 : 0) + (mtfBiasD == -1 ? 1 : 0) + (mtfBias1H == -1 ? 1 : 0)
     mtfCol = bullCnt >= 2 ? i_bullColor : bearCnt >= 2 ? i_bearColor : textDim
-    table.cell(infoTable, 0, 2, "MTF", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 2, "HTF Bias", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 2, "W" + wA + " D" + dA + " 1H" + hA, text_color=mtfCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 3: Zone
-    zoneText = inPremium ? "PREMIUM" : inDiscount ? "DISCOUNT" : inOTE ? "◉ OTE" : "EQ"
+    // Row 3: Zone (Where price is - Premium=sell zone, Discount=buy zone, OTE=optimal entry)
+    zoneText = inPremium ? "SELL ZONE" : inDiscount ? "BUY ZONE" : inOTE ? "◉ OTE ENTRY" : "EQ (Wait)"
     zoneColor = inOTE ? #00BCD4 : inDiscount ? i_bullColor : inPremium ? i_bearColor : textDim
-    table.cell(infoTable, 0, 3, "Zone", text_color=textDim, text_size=size.tiny, bgcolor=inOTE ? color.new(#00BCD4, 90) : tableBg)
+    table.cell(infoTable, 0, 3, "Price Zone", text_color=textDim, text_size=size.tiny, bgcolor=inOTE ? color.new(#00BCD4, 90) : tableBg)
     table.cell(infoTable, 1, 3, zoneText, text_color=zoneColor, text_size=size.small, bgcolor=inOTE ? color.new(#00BCD4, 90) : tableBg)
 
-    // Row 4: Session
-    sessName = inSilverBullet ? "◉ SILVER BULLET" : londonKZ or nyAMKZ or nyPMKZ ? "◉ KILLZONE" : asianSession ? "ASIA" : londonSession ? "LONDON" : nyAMSession ? "NY-AM" : "OFF"
-    table.cell(infoTable, 0, 4, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    // Row 4: Session (Time window - SB=best, KZ=good, OFF=avoid)
+    sessName = inSilverBullet ? "◉ SILVER BULLET" : londonKZ or nyAMKZ or nyPMKZ ? "◉ KILLZONE" : asianSession ? "ASIA (Wait)" : londonSession ? "LONDON" : nyAMSession ? "NY-AM" : "OFF (Avoid)"
+    table.cell(infoTable, 0, 4, "Time Window", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 4, sessName, text_color=inSilverBullet ? #00E5FF : textBright, text_size=size.small, bgcolor=tableBg)
 
-    // Row 5: Turtle Soup Stage
-    tsText = tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? "◎ STALK" : tsStage == "TRAP" ? "◉ TRAP" : tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? "✓ CONFIRM" : "—"
+    // Row 5: Turtle Soup Stage (Liquidity hunt pattern)
+    tsText = tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? "◎ STALKING" : tsStage == "TRAP" ? "◉ TRAPPED!" : tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? "✓ CONFIRMED" : "—"
     tsColor = tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? #00E676 : tsStage == "TRAP" ? #FFD740 : textDim
-    table.cell(infoTable, 0, 5, "Turtle Soup", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 5, "Liq Sweep", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 5, tsText, text_color=tsColor, text_size=size.small, bgcolor=tableBg)
 
-    // Row 6: AMD Phase
-    amdText = amdPhase == 1 ? "ACCUM" : amdPhase == 2 ? (asianHighSwept ? "JUDAS ▲" : asianLowSwept ? "JUDAS ▼" : "MANIP") : amdPhase == 3 ? "DIST" : "—"
-    table.cell(infoTable, 0, 6, "AMD", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    // Row 6: AMD Phase (Daily cycle: Accumulate→Manipulate→Distribute)
+    amdText = amdPhase == 1 ? "BUILDING" : amdPhase == 2 ? (asianHighSwept ? "FAKE UP ▲" : asianLowSwept ? "FAKE DOWN ▼" : "HUNTING") : amdPhase == 3 ? "REAL MOVE" : "—"
+    table.cell(infoTable, 0, 6, "Daily Cycle", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 6, amdText, text_color=manipulationComplete ? dirColor : textDim, text_size=size.small, bgcolor=tableBg)
 
-    // Row 7: Liquidity Sequence (key targets)
+    // Row 7: Liquidity Path (Where price is heading)
     liqSeq = ""
     if dolDirection == DIR_BULL
         if not pdhSwept and not na(pdh) and pdh > close
@@ -4668,49 +4679,52 @@ if i_showDOLTable and barstate.islast
         if not pwlSwept and not na(pwl) and pwl < close
             liqSeq := liqSeq + "PWL"
     liqSeq := liqSeq == "" ? "—" : liqSeq
-    table.cell(infoTable, 0, 7, "Liq Path", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 7, "Target Liq", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 7, liqSeq, text_color=dirColor, text_size=size.small, bgcolor=tableBg)
 
-    // Row 8: Confluence
-    table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 8, str.tostring(confluenceCount) + "/16", text_color=confluenceCount >= 8 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
+    // Row 8: Confluence (How many factors align - need 8+ for high probability)
+    confText = str.tostring(confluenceCount) + "/16" + (confluenceCount >= 10 ? " ✓✓" : confluenceCount >= 8 ? " ✓" : "")
+    table.cell(infoTable, 0, 8, "# Factors", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 8, confText, text_color=confluenceCount >= 8 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
 
-    // Row 9: Target
-    table.cell(infoTable, 0, 9, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    // Row 9: Target (Price objective)
+    table.cell(infoTable, 0, 9, "Price Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 9, not na(dolTarget) ? str.tostring(dolTarget, format.mintick) : "—", text_color=dirColor, text_size=size.small, bgcolor=tableBg)
 
-    // Row 10: R:R
-    table.cell(infoTable, 0, 10, "R:R", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 10, str.tostring(riskReward, "#.#") + ":1", text_color=riskReward >= 2 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
+    // Row 10: R:R (Risk/Reward - want 2:1 or better)
+    rrText = str.tostring(riskReward, "#.#") + ":1" + (riskReward >= 3 ? " ✓✓" : riskReward >= 2 ? " ✓" : "")
+    table.cell(infoTable, 0, 10, "Risk:Reward", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 10, rrText, text_color=riskReward >= 2 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
 
-    // Row 11: Key Factors
+    // Row 11: Key Reason (Why this setup)
     table.cell(infoTable, 0, 11, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 11, 1, 11)
 
-    // Row 12: Day Type
-    dayTypeText = isSeekDestroyDay ? "⚔ SEEK&DESTROY" : isExpansionDay ? "📈 EXPANSION" : isAccumulationDay ? "📦 ACCUMULATION" : "—"
+    // Row 12: Day Type (Expected market behavior today)
+    dayTypeText = isSeekDestroyDay ? "⚔ CHOPPY" : isExpansionDay ? "📈 TRENDING" : isAccumulationDay ? "📦 RANGING" : "—"
     dayTypeCol = isSeekDestroyDay ? #FF9800 : isExpansionDay ? #4CAF50 : isAccumulationDay ? #2196F3 : textDim
-    table.cell(infoTable, 0, 12, "Day", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 12, "Day Type", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 12, dayTypeText, text_color=dayTypeCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 13: PD Arrays Active (using ternary to avoid extra scopes)
+    // Row 13: PD Arrays Active (Entry zones available)
     pdActive = (hasSuspensionBlock ? "SB " : "") + (hasFVGPresent ? "FVG " : "") + (hasVolumeImbalance ? "VI " : "") + (hasLiquidityVoid ? "LV " : "") + (hasNDOGAlignment ? "NDOG " : "") + (hasFreshOB ? "OB" : "")
-    table.cell(infoTable, 0, 13, "PD Arrays", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 13, pdActive == "" ? "—" : pdActive, text_color=hasSuspensionBlock ? #00E5FF : textBright, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 13, "Entry Zones", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 13, pdActive == "" ? "None" : pdActive, text_color=hasSuspensionBlock ? #00E5FF : textBright, text_size=size.tiny, bgcolor=tableBg)
 
-    // Row 14: Time Risk
+    // Row 14: Time Risk (Best times to trade)
     trCol = timeRiskMultiplier >= 1.2 ? #00E676 : timeRiskMultiplier >= 1.0 ? textBright : timeRiskMultiplier >= 0.7 ? #FFD740 : #FF5252
-    table.cell(infoTable, 0, 14, "Time Risk", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 14, timeRiskReason + " ×" + str.tostring(timeRiskMultiplier, "#.#"), text_color=trCol, text_size=size.small, bgcolor=tableBg)
+    trText = timeRiskReason + (timeRiskMultiplier >= 1.0 ? " GO" : " WAIT")
+    table.cell(infoTable, 0, 14, "Time Score", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 14, trText, text_color=trCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 15: Discount Sensitivity
-    sensText = discountSensitivity ? "◉ ACTIVE " + str.tostring(sensitivityCount) + "/6" : "—"
+    // Row 15: Discount Sensitivity (Probability of entry holding)
+    sensText = discountSensitivity ? "◉ HIGH PROB " + str.tostring(sensitivityCount) + "/6" : "—"
     sensCol = discountSensitivity ? #00E5FF : textDim
-    table.cell(infoTable, 0, 15, "Sensitivity", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 15, "Entry Prob", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 15, sensText, text_color=sensCol, text_size=size.small, bgcolor=discountSensitivity ? color.new(#00E5FF, 90) : tableBg)
 
-    // Row 16: Take Trade Signal
-    takeIt = (takeTradeSignalBull or takeTradeSignalBear) ? "🚀 TAKE IT!" : "—"
+    // Row 16: Take Trade Signal (All systems go!)
+    takeIt = (takeTradeSignalBull or takeTradeSignalBear) ? "🚀 EXECUTE NOW!" : "⏳ WAIT..."
     table.cell(infoTable, 0, 16, takeIt, text_color=(takeTradeSignalBull or takeTradeSignalBear) ? #00FF00 : textDim, text_size=size.small, bgcolor=(takeTradeSignalBull or takeTradeSignalBear) ? color.new(#00FF00, 80) : tableBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 16, 1, 16)
 
