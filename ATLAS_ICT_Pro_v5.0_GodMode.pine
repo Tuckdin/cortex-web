@@ -1249,11 +1249,11 @@ if bullishOB and i_showOB
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BULL, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=obBullColor, bgcolor=color.new(obBullColor, 35),
+                 border_color=obBullColor, bgcolor=color.new(obBullColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="OB", text_color=obBullColor, text_size=size.tiny, text_halign=text.align_right),
+                 text="OB", text_color=obBullColor, text_size=size.small, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
-                                       style=label.style_none, textcolor=color.new(obBullColor, 30), size=size.tiny) : na)
+                                       style=label.style_none, textcolor=color.new(obBullColor, 30), size=size.small) : na)
     if array.size(bullOBs) >= 10
         oldOB = array.shift(bullOBs)
         if not na(oldOB.visual)
@@ -1266,11 +1266,11 @@ if bearishOB and i_showOB
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BEAR, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
-                 border_color=obBearColor, bgcolor=color.new(obBearColor, 35),
+                 border_color=obBearColor, bgcolor=color.new(obBearColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="OB", text_color=obBearColor, text_size=size.tiny, text_halign=text.align_right),
+                 text="OB", text_color=obBearColor, text_size=size.small, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
-                                       style=label.style_none, textcolor=color.new(obBearColor, 30), size=size.tiny) : na)
+                                       style=label.style_none, textcolor=color.new(obBearColor, 30), size=size.small) : na)
     if array.size(bearOBs) >= 10
         oldOB = array.shift(bearOBs)
         if not na(oldOB.visual)
@@ -1419,9 +1419,9 @@ if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
     newFVG = FVG.new(
          bullishFVGTop, bullishFVGBottom, bar_index, DIR_BULL, false, mitLevel,
          box.new(bar_index - 2, bullishFVGTop, bar_index + 15, bullishFVGBottom,
-                 border_color=fvgBullColor, bgcolor=color.new(fvgBullColor, 35),
+                 border_color=fvgBullColor, bgcolor=color.new(fvgBullColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="FVG", text_color=fvgBullColor, text_size=size.tiny, text_halign=text.align_right))
+                 text="FVG", text_color=fvgBullColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bullFVGs) >= 15
         oldFVG = array.shift(bullFVGs)
         if not na(oldFVG.visual)
@@ -1434,9 +1434,9 @@ if bearishFVG and i_showFVG and (bearishFVGTop - bearishFVGBottom) >= minFVGSize
     newFVG = FVG.new(
          bearishFVGTop, bearishFVGBottom, bar_index, DIR_BEAR, false, mitLevel,
          box.new(bar_index - 2, bearishFVGTop, bar_index + 15, bearishFVGBottom,
-                 border_color=fvgBearColor, bgcolor=color.new(fvgBearColor, 35),
+                 border_color=fvgBearColor, bgcolor=color.new(fvgBearColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="FVG", text_color=fvgBearColor, text_size=size.tiny, text_halign=text.align_right))
+                 text="FVG", text_color=fvgBearColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bearFVGs) >= 15
         oldFVG = array.shift(bearFVGs)
         if not na(oldFVG.visual)
@@ -1495,9 +1495,9 @@ f_checkIFVG(array<FVG> fvgs, array<FVG> ifvgs, bool wasBull) =>
                     newIFVG = FVG.new(
                          fvg.top, fvg.bottom, bar_index, newDir, false, (fvg.top + fvg.bottom) / 2,
                          box.new(bar_index - 1, fvg.top, bar_index + 10, fvg.bottom,
-                                 border_color=ifvgClr, bgcolor=color.new(ifvgClr, 40),
+                                 border_color=ifvgClr, bgcolor=color.new(ifvgClr, 75),
                                  border_width=2, border_style=line.style_solid,
-                                 text="IFVG", text_color=ifvgClr, text_size=size.tiny, text_halign=text.align_right))
+                                 text="IFVG", text_color=ifvgClr, text_size=size.small, text_halign=text.align_right))
                     if array.size(ifvgs) >= 5
                         oldIFVG = array.shift(ifvgs)
                         if not na(oldIFVG.visual)
@@ -1611,7 +1611,7 @@ viBottomBear = currBodyHigh
 if bullishVI and i_showFVG
     newVI = VolumeImbalance.new(viTopBull, viBottomBull, bar_index, DIR_BULL, false,
          box.new(bar_index - 1, viTopBull, bar_index + 10, viBottomBull,
-                 border_color=viColor, bgcolor=color.new(viColor, 40),
+                 border_color=viColor, bgcolor=color.new(viColor, 75),
                  border_width=1, border_style=line.style_dotted,
                  text="VI", text_color=viColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bullVIs) >= 10
@@ -1623,7 +1623,7 @@ if bullishVI and i_showFVG
 if bearishVI and i_showFVG
     newVI = VolumeImbalance.new(viTopBear, viBottomBear, bar_index, DIR_BEAR, false,
          box.new(bar_index - 1, viTopBear, bar_index + 10, viBottomBear,
-                 border_color=viColor, bgcolor=color.new(viColor, 40),
+                 border_color=viColor, bgcolor=color.new(viColor, 75),
                  border_width=1, border_style=line.style_dotted,
                  text="VI", text_color=viColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bearVIs) >= 10
@@ -1676,9 +1676,9 @@ if bullishSuspBlock and i_showFVG
     newSB = SuspensionBlock.new(suspBlockTopBull, suspBlockBottomBull, prevCandleBodyHigh, prevCandleBodyLow,
          bar_index - 1, DIR_BULL, false, false,
          box.new(bar_index - 2, suspBlockTopBull, bar_index + 15, suspBlockBottomBull,
-                 border_color=suspBlockBullColor, bgcolor=color.new(suspBlockBullColor, 35),
+                 border_color=suspBlockBullColor, bgcolor=color.new(suspBlockBullColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="SUSP", text_color=suspBlockBullColor, text_size=size.tiny, text_halign=text.align_right),
+                 text="SUSP", text_color=suspBlockBullColor, text_size=size.small, text_halign=text.align_right),
          label.new(bar_index - 1, suspBlockTopBull, "⬡",
                    style=label.style_none, textcolor=suspBlockBullColor, size=size.small))
     if array.size(bullSuspBlocks) >= 5
@@ -1693,9 +1693,9 @@ if bearishSuspBlock and i_showFVG
     newSB = SuspensionBlock.new(suspBlockTopBear, suspBlockBottomBear, prevCandleBodyHigh, prevCandleBodyLow,
          bar_index - 1, DIR_BEAR, false, false,
          box.new(bar_index - 2, suspBlockTopBear, bar_index + 15, suspBlockBottomBear,
-                 border_color=suspBlockBearColor, bgcolor=color.new(suspBlockBearColor, 35),
+                 border_color=suspBlockBearColor, bgcolor=color.new(suspBlockBearColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="SUSP", text_color=suspBlockBearColor, text_size=size.tiny, text_halign=text.align_right),
+                 text="SUSP", text_color=suspBlockBearColor, text_size=size.small, text_halign=text.align_right),
          label.new(bar_index - 1, suspBlockTopBear, "⬡",
                    style=label.style_none, textcolor=suspBlockBearColor, size=size.small))
     if array.size(bearSuspBlocks) >= 5
@@ -1736,7 +1736,7 @@ liqVoidBottomBear = high
 if bullishLiqVoid and i_showFVG
     newLV = LiquidityVoid.new(liqVoidTopBull, liqVoidBottomBull, bar_index, DIR_BULL, false,
          box.new(bar_index - 2, liqVoidTopBull, bar_index + 12, liqVoidBottomBull,
-                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 40),
+                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 75),
                  border_width=1, border_style=line.style_dashed,
                  text="VOID", text_color=liqVoidColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bullLiqVoids) >= 5
@@ -1748,7 +1748,7 @@ if bullishLiqVoid and i_showFVG
 if bearishLiqVoid and i_showFVG
     newLV = LiquidityVoid.new(liqVoidTopBear, liqVoidBottomBear, bar_index, DIR_BEAR, false,
          box.new(bar_index - 2, liqVoidTopBear, bar_index + 12, liqVoidBottomBear,
-                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 40),
+                 border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 75),
                  border_width=1, border_style=line.style_dashed,
                  text="VOID", text_color=liqVoidColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bearLiqVoids) >= 5
@@ -1860,10 +1860,10 @@ rejBlockBearColor = #EF5350  // ICT red for bearish rejection
 if bullishRejBlock and i_showRejBlock
     newRB = RejectionBlock.new(close, high, low, bar_index, DIR_BULL, false,
          box.new(bar_index - 1, close, bar_index + 15, low,
-                 border_color=rejBlockBullColor, bgcolor=color.new(rejBlockBullColor, 40),
+                 border_color=rejBlockBullColor, bgcolor=color.new(rejBlockBullColor, 75),
                  border_width=1, border_style=line.style_dotted),
          label.new(bar_index, low, "RB", style=label.style_none,
-                   textcolor=rejBlockBullColor, size=size.tiny))
+                   textcolor=rejBlockBullColor, size=size.small))
     if array.size(bullRejBlocks) >= 8
         oldRB = array.shift(bullRejBlocks)
         if not na(oldRB.visual)
@@ -1875,10 +1875,10 @@ if bullishRejBlock and i_showRejBlock
 if bearishRejBlock and i_showRejBlock
     newRB = RejectionBlock.new(close, high, low, bar_index, DIR_BEAR, false,
          box.new(bar_index - 1, high, bar_index + 15, close,
-                 border_color=rejBlockBearColor, bgcolor=color.new(rejBlockBearColor, 40),
+                 border_color=rejBlockBearColor, bgcolor=color.new(rejBlockBearColor, 75),
                  border_width=1, border_style=line.style_dotted),
          label.new(bar_index, high, "RB", style=label.style_none,
-                   textcolor=rejBlockBearColor, size=size.tiny))
+                   textcolor=rejBlockBearColor, size=size.small))
     if array.size(bearRejBlocks) >= 8
         oldRB = array.shift(bearRejBlocks)
         if not na(oldRB.visual)
@@ -3724,12 +3724,23 @@ if barstate.islast
          style=label.style_none, textcolor=mmLabelColor, size=size.small, textalign=text.align_left)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PREMIUM/DISCOUNT ZONES - Subtle reference lines
+// PREMIUM/DISCOUNT ZONES - Filled zones (ICT grid style)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-plot(i_showPDZones ? premiumZone : na, "Premium Zone", color=color.new(i_bearColor, 80), linewidth=1, style=plot.style_linebr)
-plot(i_showPDZones ? discountZone : na, "Discount Zone", color=color.new(i_bullColor, 80), linewidth=1, style=plot.style_linebr)
-plot(i_showEQ ? equilibrium : na, "Equilibrium", color=color.new(#78909C, 60), linewidth=1, style=plot.style_linebr)
+// Premium Zone (above EQ) - Red/Bear zone
+premiumPlot = plot(i_showPDZones ? premiumZone : na, "Premium Zone", color=color.new(i_bearColor, 50), linewidth=2, style=plot.style_linebr)
+// Discount Zone (below EQ) - Green/Bull zone
+discountPlot = plot(i_showPDZones ? discountZone : na, "Discount Zone", color=color.new(i_bullColor, 50), linewidth=2, style=plot.style_linebr)
+// Equilibrium - center line
+eqPlot = plot(i_showEQ ? equilibrium : na, "Equilibrium", color=color.new(#78909C, 30), linewidth=2, style=plot.style_linebr)
+// Range High/Low for fills
+rangeHighPlot = plot(i_showPDZones ? rangeHigh : na, "Range High", color=na, display=display.none)
+rangeLowPlot = plot(i_showPDZones ? rangeLow : na, "Range Low", color=na, display=display.none)
+
+// Fill Premium Zone (from premium line to range high) - subtle red
+fill(premiumPlot, rangeHighPlot, color=color.new(i_bearColor, 90), title="Premium Zone Fill")
+// Fill Discount Zone (from discount line to range low) - subtle green
+fill(discountPlot, rangeLowPlot, color=color.new(i_bullColor, 90), title="Discount Zone Fill")
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CBDR GRID - Subtle background grid lines (toggle-able)
@@ -3864,18 +3875,20 @@ if hasORG and not na(orgHigh) and not na(orgLow) and barstate.islast
 plot(hasORG and not na(orgCE) ? orgCE : na, "GAP CE", color=color.new(gapColor, 30), linewidth=2, style=plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MIDNIGHT OPEN
+// MIDNIGHT OPEN - thicker line for visibility
 // ═══════════════════════════════════════════════════════════════════════════════
 
-plot(i_showMidnight and not na(midnightOpen) ? midnightOpen : na, "Midnight Open", color=color.new(color.white, 50), linewidth=1, style=plot.style_linebr)
+plot(i_showMidnight and not na(midnightOpen) ? midnightOpen : na, "Midnight Open", color=color.new(color.white, 30), linewidth=2, style=plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// IPDA LEVELS
+// IPDA LEVELS - Filled zone between high/low
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// IPDA plots reduced to stay under 64 plot limit
-plot(i_ipda60 and i_showIPDA ? high60IPDA : na, "IPDA 60 High", color=color.new(color.blue, 60), linewidth=1, style=plot.style_linebr)
-plot(i_ipda60 and i_showIPDA ? low60IPDA : na, "IPDA 60 Low", color=color.new(color.blue, 60), linewidth=1, style=plot.style_linebr)
+// IPDA 60 zone with fill
+ipda60HighPlot = plot(i_ipda60 and i_showIPDA ? high60IPDA : na, "IPDA 60 High", color=color.new(color.blue, 40), linewidth=2, style=plot.style_linebr)
+ipda60LowPlot = plot(i_ipda60 and i_showIPDA ? low60IPDA : na, "IPDA 60 Low", color=color.new(color.blue, 40), linewidth=2, style=plot.style_linebr)
+// Fill between IPDA 60 high and low
+fill(ipda60HighPlot, ipda60LowPlot, color=color.new(color.blue, 92), title="IPDA 60 Zone Fill")
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAC-MAN DOL PATH VISUALIZATION - Sleek arcade style
