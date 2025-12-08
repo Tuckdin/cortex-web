@@ -706,6 +706,85 @@ f_cleanOldOBs(array<OrderBlock> obs, int maxAge) =>
                     label.delete(ob.stateLabel)
                 array.remove(obs, i)
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🎨 UNIFIED COLOR PALETTE - Harmonious ICT-Inspired Theme
+// ═══════════════════════════════════════════════════════════════════════════════
+// Bullish family: Teal/Cyan tones
+COLOR_BULL_PRIMARY = #00BCD4    // Cyan - Order Blocks
+COLOR_BULL_ACCENT = #26A69A     // Teal - Suspension Blocks, Rejection Blocks
+COLOR_BULL_SOFT = #4DB6AC       // Light teal - secondary elements
+
+// Bearish family: Orange/Red tones
+COLOR_BEAR_PRIMARY = #FF7043    // Deep orange - Order Blocks
+COLOR_BEAR_ACCENT = #EF5350     // Red - Suspension Blocks, Rejection Blocks
+COLOR_BEAR_SOFT = #FF8A65       // Light orange - secondary elements
+
+// Neutral elements
+COLOR_FVG = #78909C             // Blue-gray for FVGs
+COLOR_IFVG_BULL = #FFEB3B       // Yellow for bullish IFVG
+COLOR_IFVG_BEAR = #FFC107       // Amber for bearish IFVG
+COLOR_VI = #7E57C2              // Purple for Volume Imbalance
+COLOR_VOID = #AB47BC            // Magenta for Liquidity Void
+
+// Level lines - harmonized palette
+COLOR_DAILY = #FF9800           // Orange for PDH/PDL
+COLOR_WEEKLY = #E040FB          // Purple for PWH/PWL
+COLOR_NWOG = #BA68C8            // Bright purple for NWOG
+COLOR_CBDR = #26A69A            // Teal for CBDR
+COLOR_SD = #80CBC4              // Light teal for SD projections
+COLOR_LC = #FF6F00              // Amber for London Close
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📊 PD ARRAY QUALITY SCORING FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+// Score each PD Array on quality factors: size, displacement, location, timing
+
+// OB Score: Based on displacement strength and zone location
+f_obScore(float obTop, float obBottom, bool isBull, bool inKZ, float atr) =>
+    score = 1
+    obSize = obTop - obBottom
+    // Size bonus: larger OBs = stronger imbalance
+    score := obSize > atr * 0.5 ? score + 1 : score
+    // Killzone bonus
+    score := inKZ ? score + 1 : score
+    math.min(score, 3)
+
+// FVG Score: Based on gap size and displacement
+f_fvgScore(float fvgTop, float fvgBottom, float atr, bool inKZ) =>
+    score = 1
+    gapSize = fvgTop - fvgBottom
+    // Large gap bonus
+    score := gapSize > atr * 0.3 ? score + 1 : score
+    // Killzone bonus
+    score := inKZ ? score + 1 : score
+    math.min(score, 3)
+
+// VI Score: Based on body gap size
+f_viScore(float viTop, float viBottom, float atr) =>
+    score = 1
+    gapSize = viTop - viBottom
+    score := gapSize > atr * 0.2 ? score + 1 : score
+    score := gapSize > atr * 0.4 ? score + 1 : score
+    math.min(score, 3)
+
+// Suspension Block Score: Always high quality (VI at both ends)
+f_sbScore(bool inKZ, float displacement) =>
+    score = 2  // Base high score for suspension blocks
+    score := inKZ ? score + 1 : score
+    math.min(score, 3)
+
+// Liquidity Void Score: Based on void size
+f_lvScore(float lvTop, float lvBottom, float atr) =>
+    score = 1
+    voidSize = lvTop - lvBottom
+    score := voidSize > atr * 1.5 ? score + 1 : score
+    score := voidSize > atr * 2.5 ? score + 1 : score
+    math.min(score, 3)
+
+// Convert score to dots display
+f_scoreDots(int score) =>
+    score >= 3 ? "●●●" : score >= 2 ? "●●○" : "●○○"
+
 // ╔═══════════════════════════════════════════════════════════════════════════════╗
 // ║                        SESSION DETECTION                                       ║
 // ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -1240,18 +1319,23 @@ bullishOB = close[1] < open[1] and displacementUp and close > high[1]
 // Bearish OB: Last up candle before displacement down
 bearishOB = close[1] > open[1] and displacementDown and close < low[1]
 
-// ICT-style Order Block colors - cyan for bullish, orange for bearish (per ICT mentorship)
-obBullColor = #00BCD4  // ICT cyan/teal for bullish
-obBearColor = #FF5722  // ICT orange for bearish
+// ICT-style Order Block colors - using unified palette
+obBullColor = COLOR_BULL_PRIMARY  // Cyan for bullish
+obBearColor = COLOR_BEAR_PRIMARY  // Deep orange for bearish
 
-// Create and manage Order Blocks - ICT style with labels
+// Killzone check for scoring
+obKzActive = londonKZ or nyAMKZ or nyPMKZ or inSilverBullet
+
+// Create and manage Order Blocks - ICT style with quality scores
 if bullishOB and i_showOB
+    obScore = f_obScore(high[1], low[1], true, obKzActive, atrVal)
+    obDots = f_scoreDots(obScore)
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BULL, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
                  border_color=obBullColor, bgcolor=color.new(obBullColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="OB", text_color=obBullColor, text_size=size.small, text_halign=text.align_right),
+                 text="OB " + obDots, text_color=obBullColor, text_size=size.small, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
                                        style=label.style_none, textcolor=color.new(obBullColor, 30), size=size.small) : na)
     if array.size(bullOBs) >= 10
@@ -1263,12 +1347,14 @@ if bullishOB and i_showOB
     array.push(bullOBs, newOB)
 
 if bearishOB and i_showOB
+    obScore = f_obScore(high[1], low[1], false, obKzActive, atrVal)
+    obDots = f_scoreDots(obScore)
     newOB = OrderBlock.new(
          high[1], low[1], bar_index - 1, DIR_BEAR, OB_FRESH, false,
          box.new(bar_index - 1, high[1], bar_index + 20, low[1],
                  border_color=obBearColor, bgcolor=color.new(obBearColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="OB", text_color=obBearColor, text_size=size.small, text_halign=text.align_right),
+                 text="OB " + obDots, text_color=obBearColor, text_size=size.small, text_halign=text.align_right),
          i_obShowLifecycle ? label.new(bar_index - 1, high[1], "●",
                                        style=label.style_none, textcolor=color.new(obBearColor, 30), size=size.small) : na)
     if array.size(bearOBs) >= 10
@@ -1408,20 +1494,25 @@ bearishFVGBottom = high
 // Check minimum size
 minFVGSize = i_fvgMinSize * f_tickSize()
 
-// ICT-style FVG colors - silver/gray (ICT uses neutral colors for imbalances)
-fvgBullColor = #78909C  // ICT silver/gray for bullish FVG
-fvgBearColor = #90A4AE  // ICT silver/gray for bearish FVG
+// ICT-style FVG colors - using unified palette
+fvgBullColor = COLOR_FVG  // Blue-gray for FVGs
+fvgBearColor = COLOR_FVG  // Same color, direction shown by position
 
-// Create FVGs - ICT style with labels
+// Killzone check for FVG scoring
+fvgKzActive = londonKZ or nyAMKZ or nyPMKZ or inSilverBullet
+
+// Create FVGs - ICT style with quality scores
 if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
     mitPct = f_getMitPct()
     mitLevel = bullishFVGBottom + (bullishFVGTop - bullishFVGBottom) * mitPct
+    fvgScore = f_fvgScore(bullishFVGTop, bullishFVGBottom, atrVal, fvgKzActive)
+    fvgDots = f_scoreDots(fvgScore)
     newFVG = FVG.new(
          bullishFVGTop, bullishFVGBottom, bar_index, DIR_BULL, false, mitLevel,
          box.new(bar_index - 2, bullishFVGTop, bar_index + 15, bullishFVGBottom,
                  border_color=fvgBullColor, bgcolor=color.new(fvgBullColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="FVG", text_color=fvgBullColor, text_size=size.small, text_halign=text.align_right))
+                 text="FVG " + fvgDots, text_color=fvgBullColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bullFVGs) >= 15
         oldFVG = array.shift(bullFVGs)
         if not na(oldFVG.visual)
@@ -1431,12 +1522,14 @@ if bullishFVG and i_showFVG and (bullishFVGTop - bullishFVGBottom) >= minFVGSize
 if bearishFVG and i_showFVG and (bearishFVGTop - bearishFVGBottom) >= minFVGSize
     mitPct = f_getMitPct()
     mitLevel = bearishFVGTop - (bearishFVGTop - bearishFVGBottom) * mitPct
+    fvgScore = f_fvgScore(bearishFVGTop, bearishFVGBottom, atrVal, fvgKzActive)
+    fvgDots = f_scoreDots(fvgScore)
     newFVG = FVG.new(
          bearishFVGTop, bearishFVGBottom, bar_index, DIR_BEAR, false, mitLevel,
          box.new(bar_index - 2, bearishFVGTop, bar_index + 15, bearishFVGBottom,
                  border_color=fvgBearColor, bgcolor=color.new(fvgBearColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="FVG", text_color=fvgBearColor, text_size=size.small, text_halign=text.align_right))
+                 text="FVG " + fvgDots, text_color=fvgBearColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bearFVGs) >= 15
         oldFVG = array.shift(bearFVGs)
         if not na(oldFVG.visual)
@@ -1471,9 +1564,9 @@ f_updateFVGMitigation(bearFVGs, false)
 var array<FVG> bullIFVGs = array.new<FVG>()
 var array<FVG> bearIFVGs = array.new<FVG>()
 
-// ICT-style IFVG colors - yellow/gold (inverted FVG is a key reversal signal)
-ifvgBearClr = #FFC107  // ICT amber/gold for bearish IFVG
-ifvgBullClr = #FFEB3B  // ICT yellow for bullish IFVG
+// ICT-style IFVG colors - using unified palette
+ifvgBearClr = COLOR_IFVG_BEAR  // Amber for bearish IFVG
+ifvgBullClr = COLOR_IFVG_BULL  // Yellow for bullish IFVG
 
 // Check for IFVG creation from mitigated FVGs
 f_checkIFVG(array<FVG> fvgs, array<FVG> ifvgs, bool wasBull) =>
@@ -1489,7 +1582,7 @@ f_checkIFVG(array<FVG> fvgs, array<FVG> ifvgs, bool wasBull) =>
                     if not na(fvg.visual)
                         box.delete(fvg.visual)
 
-                    // Create IFVG (opposite direction)
+                    // Create IFVG (opposite direction) - IFVGs are always high quality (reversal confirmed)
                     newDir = wasBull ? DIR_BEAR : DIR_BULL
                     ifvgClr = wasBull ? ifvgBearClr : ifvgBullClr
                     newIFVG = FVG.new(
@@ -1497,7 +1590,7 @@ f_checkIFVG(array<FVG> fvgs, array<FVG> ifvgs, bool wasBull) =>
                          box.new(bar_index - 1, fvg.top, bar_index + 10, fvg.bottom,
                                  border_color=ifvgClr, bgcolor=color.new(ifvgClr, 75),
                                  border_width=2, border_style=line.style_solid,
-                                 text="IFVG", text_color=ifvgClr, text_size=size.small, text_halign=text.align_right))
+                                 text="IFVG ●●●", text_color=ifvgClr, text_size=size.small, text_halign=text.align_right))
                     if array.size(ifvgs) >= 5
                         oldIFVG = array.shift(ifvgs)
                         if not na(oldIFVG.visual)
@@ -1586,7 +1679,7 @@ if hasEQL and i_showEQL
 // Bullish VI: Current candle body low > previous candle body high
 // Bearish VI: Current candle body high < previous candle body low
 
-viColor = #7E57C2  // ICT purple for Volume Imbalance
+viColor = COLOR_VI  // Purple for Volume Imbalance (unified palette)
 
 // Body calculations
 currBodyHigh = math.max(close, open)
@@ -1607,13 +1700,15 @@ bearishVI = currBodyHigh < prevBodyLow and (prevBodyLow - currBodyHigh) >= minVI
 viTopBear = prevBodyLow
 viBottomBear = currBodyHigh
 
-// Create VI boxes
+// Create VI boxes with quality scores
 if bullishVI and i_showFVG
+    viScore = f_viScore(viTopBull, viBottomBull, atrVal)
+    viDots = f_scoreDots(viScore)
     newVI = VolumeImbalance.new(viTopBull, viBottomBull, bar_index, DIR_BULL, false,
          box.new(bar_index - 1, viTopBull, bar_index + 10, viBottomBull,
                  border_color=viColor, bgcolor=color.new(viColor, 75),
                  border_width=1, border_style=line.style_dotted,
-                 text="VI", text_color=viColor, text_size=size.small, text_halign=text.align_right))
+                 text="VI " + viDots, text_color=viColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bullVIs) >= 10
         oldVI = array.shift(bullVIs)
         if not na(oldVI.visual)
@@ -1621,11 +1716,13 @@ if bullishVI and i_showFVG
     array.push(bullVIs, newVI)
 
 if bearishVI and i_showFVG
+    viScore = f_viScore(viTopBear, viBottomBear, atrVal)
+    viDots = f_scoreDots(viScore)
     newVI = VolumeImbalance.new(viTopBear, viBottomBear, bar_index, DIR_BEAR, false,
          box.new(bar_index - 1, viTopBear, bar_index + 10, viBottomBear,
                  border_color=viColor, bgcolor=color.new(viColor, 75),
                  border_width=1, border_style=line.style_dotted,
-                 text="VI", text_color=viColor, text_size=size.small, text_halign=text.align_right))
+                 text="VI " + viDots, text_color=viColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bearVIs) >= 10
         oldVI = array.shift(bearVIs)
         if not na(oldVI.visual)
@@ -1639,8 +1736,11 @@ if bearishVI and i_showFVG
 // "Being suspended between two volume imbalances" - ICT
 // Extremely powerful PD Array - acts like FVG but single candle
 
-suspBlockBullColor = #26A69A  // ICT teal/green for bullish SUSP
-suspBlockBearColor = #EF5350  // ICT red for bearish SUSP
+suspBlockBullColor = COLOR_BULL_ACCENT  // Teal for bullish SUSP (unified palette)
+suspBlockBearColor = COLOR_BEAR_ACCENT  // Red for bearish SUSP (unified palette)
+
+// Suspension Block killzone check for scoring
+sbKzActive = londonKZ or nyAMKZ or nyPMKZ or inSilverBullet
 
 // Check for VI at both ends of a single candle
 // VI HIGH: Gap between this candle's body high and next candle's body low
@@ -1671,14 +1771,16 @@ bearishSuspBlock = viAtLow and viAtHighBear and close[1] < open[1]
 suspBlockTopBear = prevCandleBodyLow  // Higher VI level
 suspBlockBottomBear = currBodyHighForSusp  // Lower VI level
 
-// Create Suspension Block boxes
+// Create Suspension Block boxes with quality scores (SUSP = always high quality)
 if bullishSuspBlock and i_showFVG
+    sbScore = f_sbScore(sbKzActive, atrVal)
+    sbDots = f_scoreDots(sbScore)
     newSB = SuspensionBlock.new(suspBlockTopBull, suspBlockBottomBull, prevCandleBodyHigh, prevCandleBodyLow,
          bar_index - 1, DIR_BULL, false, false,
          box.new(bar_index - 2, suspBlockTopBull, bar_index + 15, suspBlockBottomBull,
                  border_color=suspBlockBullColor, bgcolor=color.new(suspBlockBullColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="SUSP", text_color=suspBlockBullColor, text_size=size.small, text_halign=text.align_right),
+                 text="SUSP " + sbDots, text_color=suspBlockBullColor, text_size=size.small, text_halign=text.align_right),
          label.new(bar_index - 1, suspBlockTopBull, "⬡",
                    style=label.style_none, textcolor=suspBlockBullColor, size=size.small))
     if array.size(bullSuspBlocks) >= 5
@@ -1690,12 +1792,14 @@ if bullishSuspBlock and i_showFVG
     array.push(bullSuspBlocks, newSB)
 
 if bearishSuspBlock and i_showFVG
+    sbScore = f_sbScore(sbKzActive, atrVal)
+    sbDots = f_scoreDots(sbScore)
     newSB = SuspensionBlock.new(suspBlockTopBear, suspBlockBottomBear, prevCandleBodyHigh, prevCandleBodyLow,
          bar_index - 1, DIR_BEAR, false, false,
          box.new(bar_index - 2, suspBlockTopBear, bar_index + 15, suspBlockBottomBear,
                  border_color=suspBlockBearColor, bgcolor=color.new(suspBlockBearColor, 75),
                  border_width=2, border_style=line.style_solid,
-                 text="SUSP", text_color=suspBlockBearColor, text_size=size.small, text_halign=text.align_right),
+                 text="SUSP " + sbDots, text_color=suspBlockBearColor, text_size=size.small, text_halign=text.align_right),
          label.new(bar_index - 1, suspBlockTopBear, "⬡",
                    style=label.style_none, textcolor=suspBlockBearColor, size=size.small))
     if array.size(bearSuspBlocks) >= 5
@@ -1712,7 +1816,7 @@ if bearishSuspBlock and i_showFVG
 // Liquidity Void: Large displacement candle where price moved too fast
 // Creates an area price will likely return to fill
 
-liqVoidColor = #AB47BC  // ICT magenta/purple for Liquidity Void
+liqVoidColor = COLOR_VOID  // Magenta/purple for Liquidity Void (unified palette)
 
 // Large candle detection (> 2x ATR)
 largeCandle = totalRange > atrVal * 2
@@ -1732,13 +1836,15 @@ bearishLiqVoid = largeCandle and close < open and noOverlapLow
 liqVoidTopBear = math.min(low[1], low[2])
 liqVoidBottomBear = high
 
-// Create Liquidity Void boxes
+// Create Liquidity Void boxes with quality scores
 if bullishLiqVoid and i_showFVG
+    lvScore = f_lvScore(liqVoidTopBull, liqVoidBottomBull, atrVal)
+    lvDots = f_scoreDots(lvScore)
     newLV = LiquidityVoid.new(liqVoidTopBull, liqVoidBottomBull, bar_index, DIR_BULL, false,
          box.new(bar_index - 2, liqVoidTopBull, bar_index + 12, liqVoidBottomBull,
                  border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 75),
                  border_width=1, border_style=line.style_dashed,
-                 text="VOID", text_color=liqVoidColor, text_size=size.small, text_halign=text.align_right))
+                 text="VOID " + lvDots, text_color=liqVoidColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bullLiqVoids) >= 5
         oldLV = array.shift(bullLiqVoids)
         if not na(oldLV.visual)
@@ -1746,11 +1852,13 @@ if bullishLiqVoid and i_showFVG
     array.push(bullLiqVoids, newLV)
 
 if bearishLiqVoid and i_showFVG
+    lvScore = f_lvScore(liqVoidTopBear, liqVoidBottomBear, atrVal)
+    lvDots = f_scoreDots(lvScore)
     newLV = LiquidityVoid.new(liqVoidTopBear, liqVoidBottomBear, bar_index, DIR_BEAR, false,
          box.new(bar_index - 2, liqVoidTopBear, bar_index + 12, liqVoidBottomBear,
                  border_color=liqVoidColor, bgcolor=color.new(liqVoidColor, 75),
                  border_width=1, border_style=line.style_dashed,
-                 text="VOID", text_color=liqVoidColor, text_size=size.small, text_halign=text.align_right))
+                 text="VOID " + lvDots, text_color=liqVoidColor, text_size=size.small, text_halign=text.align_right))
     if array.size(bearLiqVoids) >= 5
         oldLV = array.shift(bearLiqVoids)
         if not na(oldLV.visual)
@@ -3743,7 +3851,7 @@ fill(premiumPlot, rangeHighPlot, color=color.new(i_bearColor, 90), title="Premiu
 fill(discountPlot, rangeLowPlot, color=color.new(i_bullColor, 90), title="Discount Zone Fill")
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CBDR & SD LEVELS - Grouped by Category, Extended & Brighter
+// CBDR GRID - BRIGHTER lines extended like PDH/LC (unified palette)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var line cbdrGridHigh = na
@@ -3755,11 +3863,7 @@ var label cbdrLabelLow = na
 var label cbdrLabelSD1High = na
 var label cbdrLabelSD1Low = na
 
-// CBDR/SD Colors - Teal theme, BRIGHTER
-cbdrMainColor = #26A69A  // Teal for CBDR
-cbdrSDColor = #4DB6AC    // Lighter teal for SD projections
-
-// Draw CBDR as subtle grid on last bar only
+// Draw CBDR with unified colors - BRIGHTER and EXTENDED
 if barstate.islast and i_showCBDR
     // Clean up previous grid lines and labels
     if not na(cbdrGridHigh)
@@ -3779,40 +3883,45 @@ if barstate.islast and i_showCBDR
     if not na(cbdrLabelSD1Low)
         label.delete(cbdrLabelSD1Low)
 
-    // ─── CBDR RANGE (Core Range) - Teal, Dashed ───
+    // BRIGHTER colors using unified palette
+    cbdrGridColor = color.new(COLOR_CBDR, 30)  // Teal, much more visible
+    cbdrSDColor = color.new(COLOR_SD, 40)      // Light teal for SD
+
+    // CBDR High/Low - EXTENDED 150 back, 60 forward with dashed style
     if not na(cbdrHigh)
-        cbdrGridHigh := line.new(bar_index - 100, cbdrHigh, bar_index + 50, cbdrHigh,
-             color=color.new(cbdrMainColor, 30), width=2, style=line.style_dashed)
-        cbdrLabelHigh := label.new(bar_index + 50, cbdrHigh, "CBDR Hi",
-             style=label.style_none, textcolor=cbdrMainColor, size=size.small, textalign=text.align_left)
+        cbdrGridHigh := line.new(bar_index - 150, cbdrHigh, bar_index + 60, cbdrHigh,
+             color=cbdrGridColor, width=2, style=line.style_dashed)
+        cbdrLabelHigh := label.new(bar_index + 60, cbdrHigh, "CBDR Hi",
+             style=label.style_none, textcolor=color.new(COLOR_CBDR, 20), size=size.small, textalign=text.align_left)
 
     if not na(cbdrLow)
-        cbdrGridLow := line.new(bar_index - 100, cbdrLow, bar_index + 50, cbdrLow,
-             color=color.new(cbdrMainColor, 30), width=2, style=line.style_dashed)
-        cbdrLabelLow := label.new(bar_index + 50, cbdrLow, "CBDR Lo",
-             style=label.style_none, textcolor=cbdrMainColor, size=size.small, textalign=text.align_left)
+        cbdrGridLow := line.new(bar_index - 150, cbdrLow, bar_index + 60, cbdrLow,
+             color=cbdrGridColor, width=2, style=line.style_dashed)
+        cbdrLabelLow := label.new(bar_index + 60, cbdrLow, "CBDR Lo",
+             style=label.style_none, textcolor=color.new(COLOR_CBDR, 20), size=size.small, textalign=text.align_left)
 
-    // ─── SD PROJECTIONS - Lighter Teal, Dotted ───
+    // SD Projections - BRIGHTER, EXTENDED, dotted style to differentiate
     if i_showCBDRProjections and not na(cbdrSD1High)
-        cbdrGridSD1High := line.new(bar_index - 100, cbdrSD1High, bar_index + 50, cbdrSD1High,
-             color=color.new(cbdrSDColor, 40), width=1, style=line.style_dotted)
-        cbdrLabelSD1High := label.new(bar_index + 50, cbdrSD1High, "SD+",
-             style=label.style_none, textcolor=cbdrSDColor, size=size.small, textalign=text.align_left)
+        cbdrGridSD1High := line.new(bar_index - 150, cbdrSD1High, bar_index + 60, cbdrSD1High,
+             color=cbdrSDColor, width=1, style=line.style_dotted)
+        cbdrLabelSD1High := label.new(bar_index + 60, cbdrSD1High, "SD+1",
+             style=label.style_none, textcolor=color.new(COLOR_SD, 30), size=size.small, textalign=text.align_left)
 
     if i_showCBDRProjections and not na(cbdrSD1Low)
-        cbdrGridSD1Low := line.new(bar_index - 100, cbdrSD1Low, bar_index + 50, cbdrSD1Low,
-             color=color.new(cbdrSDColor, 40), width=1, style=line.style_dotted)
-        cbdrLabelSD1Low := label.new(bar_index + 50, cbdrSD1Low, "SD-",
-             style=label.style_none, textcolor=cbdrSDColor, size=size.small, textalign=text.align_left)
+        cbdrGridSD1Low := line.new(bar_index - 150, cbdrSD1Low, bar_index + 60, cbdrSD1Low,
+             color=cbdrSDColor, width=1, style=line.style_dotted)
+        cbdrLabelSD1Low := label.new(bar_index + 60, cbdrSD1Low, "SD-1",
+             style=label.style_none, textcolor=color.new(COLOR_SD, 30), size=size.small, textalign=text.align_left)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NWOG ZONE - Multi-week display with progressive fading
+// NWOG ZONE - Multi-week display with progressive fading (BRIGHTER + EXTENDED)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var box[] nwogBoxes = array.new_box(0)
 var line[] nwogCELines = array.new_line(0)
+var label[] nwogLabels = array.new_label(0)
 
-// Clean up old boxes and lines on last bar
+// Clean up old boxes, lines, and labels on last bar
 if barstate.islast
     // Delete existing boxes using while loop (safer for empty arrays)
     while array.size(nwogBoxes) > 0
@@ -3822,6 +3931,10 @@ if barstate.islast
     while array.size(nwogCELines) > 0
         line.delete(array.pop(nwogCELines))
 
+    // Delete existing labels
+    while array.size(nwogLabels) > 0
+        label.delete(array.pop(nwogLabels))
+
     // Draw new boxes for each stored NWOG
     int nwogCount = array.size(nwogHighs)
     if i_showNWOG and nwogCount > 0
@@ -3830,29 +3943,34 @@ if barstate.islast
             float l = array.get(nwogLows, i)
             float ce = array.get(nwogCEs, i)
 
-            // BRIGHTER purple for NWOG - progressive fading for older weeks
-            nwogColor = #CE93D8  // Brighter purple for visibility
-            int fadeLevel = 0 + (i * 10)  // Less fading: 0, 10, 20, 30, 40
-            int bgFade = 65 + (i * 5)     // 65, 70, 75, 80, 85 for 5 weeks
+            // BRIGHT purple using unified color palette - less fading
+            nwogColor = COLOR_NWOG  // Bright purple (#BA68C8)
+            int fadeLevel = 0 + (i * 10)  // 0, 10, 20, 30, 40 for 5 weeks (less fading)
+            int bgFade = 75 + (i * 4)     // 75, 79, 83, 87, 91 for 5 weeks
             fadeLevel := math.min(fadeLevel, 50)
-            bgFade := math.min(bgFade, 85)
+            bgFade := math.min(bgFade, 91)
 
             // Label: NWOG-1 (current) through NWOG-5 (oldest)
             string nwogLabel = "NWOG-" + str.tostring(i + 1)
 
-            // Draw box relative to current bar - EXTENDED further
-            int boxLeft = bar_index - 100
-            box newBox = box.new(boxLeft, h, bar_index + 50, l,
+            // Draw box EXTENDED - 150 bars back, 60 bars forward
+            int boxLeft = bar_index - 150
+            int boxRight = bar_index + 60
+            box newBox = box.new(boxLeft, h, boxRight, l,
                  border_color=color.new(nwogColor, fadeLevel), bgcolor=color.new(nwogColor, bgFade),
-                 border_width=2, border_style=line.style_solid,
-                 text=nwogLabel, text_color=color.new(nwogColor, fadeLevel), text_size=size.small, text_halign=text.align_right)
+                 border_width=2, border_style=line.style_solid)
             array.push(nwogBoxes, newBox)
 
-            // Draw CE line for each NWOG - BRIGHTER
+            // Add label at the right side (extended)
+            label nwogLbl = label.new(boxRight, h, nwogLabel,
+                 style=label.style_none, textcolor=color.new(nwogColor, fadeLevel), size=size.small, textalign=text.align_left)
+            array.push(nwogLabels, nwogLbl)
+
+            // Draw CE line for each NWOG - EXTENDED and BRIGHTER
             if i_showNWOGCE
-                int ceFade = 10 + (i * 10)  // Brighter: 10, 20, 30, 40, 50
+                int ceFade = 10 + (i * 10)  // 10, 20, 30, 40, 50 for 5 weeks (brighter)
                 ceFade := math.min(ceFade, 60)
-                line ceLine = line.new(boxLeft, ce, bar_index + 50, ce,
+                line ceLine = line.new(boxLeft, ce, boxRight, ce,
                      color=color.new(nwogColor, ceFade), width=i == 0 ? 2 : 1, style=line.style_dashed)
                 array.push(nwogCELines, ceLine)
 
@@ -4405,39 +4523,28 @@ if i_showPacMan and barstate.islast and not i_cleanMode
     clydeLabel := label.new(bar_index + 20, low60IPDA, "👻 SSL", style=label.style_none, textcolor=#FFB852, size=size.normal)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LIQUIDITY LEVELS - PDH/PDL (Daily) and PWH/PWL (Weekly) - Extended & Grouped
+// LIQUIDITY SEQUENCING - Visual Lines (Simplified)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Daily levels - Orange, dashed lines
-var line pdhLine = na, var line pdlLine = na
-var label pdhLabel = na, var label pdlLabel = na
-// Weekly levels - Purple, solid lines
-var line pwhLine = na, var line pwlLine = na
-var label pwhLabel = na, var label pwlLabel = na
-
-// PDH/PDL/PWH/PWL color scheme
-pdhColor = #FF9800  // Orange for Daily
-pwColor = #E040FB   // Purple for Weekly
+var line pdhLine = na, var line pdlLine = na, var line pwhLine = na, var line pwlLine = na
+var label pdhLabel = na, var label pdlLabel = na, var label pwhLabel = na, var label pwlLabel = na
 
 if barstate.islast
     line.delete(pdhLine), line.delete(pdlLine), line.delete(pwhLine), line.delete(pwlLine)
     label.delete(pdhLabel), label.delete(pdlLabel), label.delete(pwhLabel), label.delete(pwlLabel)
 
-    // ─── DAILY LEVELS (PDH/PDL) - Orange, Dashed ───
     if not na(pdh)
-        pdhLine := line.new(bar_index - 100, pdh, bar_index + 50, pdh, color=color.new(pdhColor, pdhSwept ? 60 : 15), width=2, style=line.style_dashed)
-        pdhLabel := label.new(bar_index + 50, pdh, pdhSwept ? "PDH ✗" : "PDH", style=label.style_none, textcolor=pdhColor, size=size.small)
+        pdhLine := line.new(bar_index - 20, pdh, bar_index + 40, pdh, color=color.new(#FF9800, pdhSwept ? 70 : 20), width=2)
+        pdhLabel := label.new(bar_index + 40, pdh, pdhSwept ? "PDH ✗" : "PDH", style=label.style_none, textcolor=#FF9800, size=size.small)
     if not na(pdl)
-        pdlLine := line.new(bar_index - 100, pdl, bar_index + 50, pdl, color=color.new(pdhColor, pdlSwept ? 60 : 15), width=2, style=line.style_dashed)
-        pdlLabel := label.new(bar_index + 50, pdl, pdlSwept ? "PDL ✗" : "PDL", style=label.style_none, textcolor=pdhColor, size=size.small)
-
-    // ─── WEEKLY LEVELS (PWH/PWL) - Purple, Solid ───
+        pdlLine := line.new(bar_index - 20, pdl, bar_index + 40, pdl, color=color.new(#FF9800, pdlSwept ? 70 : 20), width=2)
+        pdlLabel := label.new(bar_index + 40, pdl, pdlSwept ? "PDL ✗" : "PDL", style=label.style_none, textcolor=#FF9800, size=size.small)
     if not na(pwh)
-        pwhLine := line.new(bar_index - 100, pwh, bar_index + 50, pwh, color=color.new(pwColor, pwhSwept ? 60 : 15), width=2, style=line.style_solid)
-        pwhLabel := label.new(bar_index + 50, pwh, pwhSwept ? "PWH ✗" : "PWH", style=label.style_none, textcolor=pwColor, size=size.small)
+        pwhLine := line.new(bar_index - 20, pwh, bar_index + 40, pwh, color=color.new(#E040FB, pwhSwept ? 70 : 20), width=2)
+        pwhLabel := label.new(bar_index + 40, pwh, pwhSwept ? "PWH ✗" : "PWH", style=label.style_none, textcolor=#E040FB, size=size.small)
     if not na(pwl)
-        pwlLine := line.new(bar_index - 100, pwl, bar_index + 50, pwl, color=color.new(pwColor, pwlSwept ? 60 : 15), width=2, style=line.style_solid)
-        pwlLabel := label.new(bar_index + 50, pwl, pwlSwept ? "PWL ✗" : "PWL", style=label.style_none, textcolor=pwColor, size=size.small)
+        pwlLine := line.new(bar_index - 20, pwl, bar_index + 40, pwl, color=color.new(#E040FB, pwlSwept ? 70 : 20), width=2)
+        pwlLabel := label.new(bar_index + 40, pwl, pwlSwept ? "PWL ✗" : "PWL", style=label.style_none, textcolor=#E040FB, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPOSITE TIER SIGNALS (Only on TRUE high-confluence events)
@@ -4634,39 +4741,39 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 1, tierLabel + " | " + patternName, text_color=tierColor, text_size=size.small, bgcolor=color.new(tierColor, 90), text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 1, 1, 1)
 
-    // Row 2: MTF Bias (Multi-Timeframe alignment check)
+    // Row 2: MTF Bias (compact)
     wA = mtfBiasW == 1 ? "↑" : mtfBiasW == -1 ? "↓" : "—"
     dA = mtfBiasD == 1 ? "↑" : mtfBiasD == -1 ? "↓" : "—"
     hA = mtfBias1H == 1 ? "↑" : mtfBias1H == -1 ? "↓" : "—"
     bullCnt = (mtfBiasW == 1 ? 1 : 0) + (mtfBiasD == 1 ? 1 : 0) + (mtfBias1H == 1 ? 1 : 0)
     bearCnt = (mtfBiasW == -1 ? 1 : 0) + (mtfBiasD == -1 ? 1 : 0) + (mtfBias1H == -1 ? 1 : 0)
     mtfCol = bullCnt >= 2 ? i_bullColor : bearCnt >= 2 ? i_bearColor : textDim
-    table.cell(infoTable, 0, 2, "HTF Bias", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 2, "MTF", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 2, "W" + wA + " D" + dA + " 1H" + hA, text_color=mtfCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 3: Zone (Where price is - Premium=sell zone, Discount=buy zone, OTE=optimal entry)
-    zoneText = inPremium ? "SELL ZONE" : inDiscount ? "BUY ZONE" : inOTE ? "◉ OTE ENTRY" : "EQ (Wait)"
+    // Row 3: Zone
+    zoneText = inPremium ? "PREMIUM" : inDiscount ? "DISCOUNT" : inOTE ? "◉ OTE" : "EQ"
     zoneColor = inOTE ? #00BCD4 : inDiscount ? i_bullColor : inPremium ? i_bearColor : textDim
-    table.cell(infoTable, 0, 3, "Price Zone", text_color=textDim, text_size=size.tiny, bgcolor=inOTE ? color.new(#00BCD4, 90) : tableBg)
+    table.cell(infoTable, 0, 3, "Zone", text_color=textDim, text_size=size.tiny, bgcolor=inOTE ? color.new(#00BCD4, 90) : tableBg)
     table.cell(infoTable, 1, 3, zoneText, text_color=zoneColor, text_size=size.small, bgcolor=inOTE ? color.new(#00BCD4, 90) : tableBg)
 
-    // Row 4: Session (Time window - SB=best, KZ=good, OFF=avoid)
-    sessName = inSilverBullet ? "◉ SILVER BULLET" : londonKZ or nyAMKZ or nyPMKZ ? "◉ KILLZONE" : asianSession ? "ASIA (Wait)" : londonSession ? "LONDON" : nyAMSession ? "NY-AM" : "OFF (Avoid)"
-    table.cell(infoTable, 0, 4, "Time Window", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    // Row 4: Session
+    sessName = inSilverBullet ? "◉ SILVER BULLET" : londonKZ or nyAMKZ or nyPMKZ ? "◉ KILLZONE" : asianSession ? "ASIA" : londonSession ? "LONDON" : nyAMSession ? "NY-AM" : "OFF"
+    table.cell(infoTable, 0, 4, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 4, sessName, text_color=inSilverBullet ? #00E5FF : textBright, text_size=size.small, bgcolor=tableBg)
 
-    // Row 5: Turtle Soup Stage (Liquidity hunt pattern)
-    tsText = tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? "◎ STALKING" : tsStage == "TRAP" ? "◉ TRAPPED!" : tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? "✓ CONFIRMED" : "—"
+    // Row 5: Turtle Soup Stage
+    tsText = tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? "◎ STALK" : tsStage == "TRAP" ? "◉ TRAP" : tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? "✓ CONFIRM" : "—"
     tsColor = tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? #00E676 : tsStage == "TRAP" ? #FFD740 : textDim
-    table.cell(infoTable, 0, 5, "Liq Sweep", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 5, "Turtle Soup", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 5, tsText, text_color=tsColor, text_size=size.small, bgcolor=tableBg)
 
-    // Row 6: AMD Phase (Daily cycle: Accumulate→Manipulate→Distribute)
-    amdText = amdPhase == 1 ? "BUILDING" : amdPhase == 2 ? (asianHighSwept ? "FAKE UP ▲" : asianLowSwept ? "FAKE DOWN ▼" : "HUNTING") : amdPhase == 3 ? "REAL MOVE" : "—"
-    table.cell(infoTable, 0, 6, "Daily Cycle", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    // Row 6: AMD Phase
+    amdText = amdPhase == 1 ? "ACCUM" : amdPhase == 2 ? (asianHighSwept ? "JUDAS ▲" : asianLowSwept ? "JUDAS ▼" : "MANIP") : amdPhase == 3 ? "DIST" : "—"
+    table.cell(infoTable, 0, 6, "AMD", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 6, amdText, text_color=manipulationComplete ? dirColor : textDim, text_size=size.small, bgcolor=tableBg)
 
-    // Row 7: Liquidity Path (Where price is heading)
+    // Row 7: Liquidity Sequence (key targets)
     liqSeq = ""
     if dolDirection == DIR_BULL
         if not pdhSwept and not na(pdh) and pdh > close
@@ -4679,52 +4786,49 @@ if i_showDOLTable and barstate.islast
         if not pwlSwept and not na(pwl) and pwl < close
             liqSeq := liqSeq + "PWL"
     liqSeq := liqSeq == "" ? "—" : liqSeq
-    table.cell(infoTable, 0, 7, "Target Liq", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 7, "Liq Path", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 7, liqSeq, text_color=dirColor, text_size=size.small, bgcolor=tableBg)
 
-    // Row 8: Confluence (How many factors align - need 8+ for high probability)
-    confText = str.tostring(confluenceCount) + "/16" + (confluenceCount >= 10 ? " ✓✓" : confluenceCount >= 8 ? " ✓" : "")
-    table.cell(infoTable, 0, 8, "# Factors", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 8, confText, text_color=confluenceCount >= 8 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
+    // Row 8: Confluence
+    table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 8, str.tostring(confluenceCount) + "/16", text_color=confluenceCount >= 8 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
 
-    // Row 9: Target (Price objective)
-    table.cell(infoTable, 0, 9, "Price Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    // Row 9: Target
+    table.cell(infoTable, 0, 9, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 9, not na(dolTarget) ? str.tostring(dolTarget, format.mintick) : "—", text_color=dirColor, text_size=size.small, bgcolor=tableBg)
 
-    // Row 10: R:R (Risk/Reward - want 2:1 or better)
-    rrText = str.tostring(riskReward, "#.#") + ":1" + (riskReward >= 3 ? " ✓✓" : riskReward >= 2 ? " ✓" : "")
-    table.cell(infoTable, 0, 10, "Risk:Reward", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 10, rrText, text_color=riskReward >= 2 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
+    // Row 10: R:R
+    table.cell(infoTable, 0, 10, "R:R", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 10, str.tostring(riskReward, "#.#") + ":1", text_color=riskReward >= 2 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
 
-    // Row 11: Key Reason (Why this setup)
+    // Row 11: Key Factors
     table.cell(infoTable, 0, 11, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 11, 1, 11)
 
-    // Row 12: Day Type (Expected market behavior today)
-    dayTypeText = isSeekDestroyDay ? "⚔ CHOPPY" : isExpansionDay ? "📈 TRENDING" : isAccumulationDay ? "📦 RANGING" : "—"
+    // Row 12: Day Type
+    dayTypeText = isSeekDestroyDay ? "⚔ SEEK&DESTROY" : isExpansionDay ? "📈 EXPANSION" : isAccumulationDay ? "📦 ACCUMULATION" : "—"
     dayTypeCol = isSeekDestroyDay ? #FF9800 : isExpansionDay ? #4CAF50 : isAccumulationDay ? #2196F3 : textDim
-    table.cell(infoTable, 0, 12, "Day Type", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 12, "Day", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 12, dayTypeText, text_color=dayTypeCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 13: PD Arrays Active (Entry zones available)
+    // Row 13: PD Arrays Active (using ternary to avoid extra scopes)
     pdActive = (hasSuspensionBlock ? "SB " : "") + (hasFVGPresent ? "FVG " : "") + (hasVolumeImbalance ? "VI " : "") + (hasLiquidityVoid ? "LV " : "") + (hasNDOGAlignment ? "NDOG " : "") + (hasFreshOB ? "OB" : "")
-    table.cell(infoTable, 0, 13, "Entry Zones", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 13, pdActive == "" ? "None" : pdActive, text_color=hasSuspensionBlock ? #00E5FF : textBright, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 13, "PD Arrays", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 13, pdActive == "" ? "—" : pdActive, text_color=hasSuspensionBlock ? #00E5FF : textBright, text_size=size.tiny, bgcolor=tableBg)
 
-    // Row 14: Time Risk (Best times to trade)
+    // Row 14: Time Risk
     trCol = timeRiskMultiplier >= 1.2 ? #00E676 : timeRiskMultiplier >= 1.0 ? textBright : timeRiskMultiplier >= 0.7 ? #FFD740 : #FF5252
-    trText = timeRiskReason + (timeRiskMultiplier >= 1.0 ? " GO" : " WAIT")
-    table.cell(infoTable, 0, 14, "Time Score", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 14, trText, text_color=trCol, text_size=size.small, bgcolor=tableBg)
+    table.cell(infoTable, 0, 14, "Time Risk", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 14, timeRiskReason + " ×" + str.tostring(timeRiskMultiplier, "#.#"), text_color=trCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 15: Discount Sensitivity (Probability of entry holding)
-    sensText = discountSensitivity ? "◉ HIGH PROB " + str.tostring(sensitivityCount) + "/6" : "—"
+    // Row 15: Discount Sensitivity
+    sensText = discountSensitivity ? "◉ ACTIVE " + str.tostring(sensitivityCount) + "/6" : "—"
     sensCol = discountSensitivity ? #00E5FF : textDim
-    table.cell(infoTable, 0, 15, "Entry Prob", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 15, "Sensitivity", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 15, sensText, text_color=sensCol, text_size=size.small, bgcolor=discountSensitivity ? color.new(#00E5FF, 90) : tableBg)
 
-    // Row 16: Take Trade Signal (All systems go!)
-    takeIt = (takeTradeSignalBull or takeTradeSignalBear) ? "🚀 EXECUTE NOW!" : "⏳ WAIT..."
+    // Row 16: Take Trade Signal
+    takeIt = (takeTradeSignalBull or takeTradeSignalBear) ? "🚀 TAKE IT!" : "—"
     table.cell(infoTable, 0, 16, takeIt, text_color=(takeTradeSignalBull or takeTradeSignalBear) ? #00FF00 : textDim, text_size=size.small, bgcolor=(takeTradeSignalBull or takeTradeSignalBear) ? color.new(#00FF00, 80) : tableBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 16, 1, 16)
 
