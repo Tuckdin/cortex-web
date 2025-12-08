@@ -4670,18 +4670,19 @@ takeTradeSignalBear := takeTradeCondition and dolDirection == DIR_BEAR
 // DOL PROBABILITY DASHBOARD (GOD MODE INFO TABLE) - SLEEK ARCADE DESIGN
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Simplified Dashboard Colors
+// Dashboard Colors - Bright labels, dim only for inactive
 var color tableBg = color.new(#0D0D0D, 5)
-var color textDim = color.new(#8892B0, 0)
-var color textBright = color.new(#E6F1FF, 0)
+var color textLabel = color.new(#B8C5D9, 0)     // Bright labels (visible)
+var color textBright = color.new(#FFFFFF, 0)    // Full bright for active values
+var color textInactive = color.new(#5A6270, 0)  // Dim grey only for inactive/na values
 
-// Compact table (17 rows - essential ICT info)
-var table infoTable = table.new(position.middle_right, 2, 17, bgcolor=tableBg, border_width=0, frame_width=2, frame_color=color.new(#2121DE, 30))
+// Compact table (16 rows - essential ICT info)
+var table infoTable = table.new(position.middle_right, 2, 16, bgcolor=tableBg, border_width=0, frame_width=2, frame_color=color.new(#2121DE, 30))
 
 if i_showDOLTable and barstate.islast
     // Row 0: Direction
     dirText = dolDirection == DIR_BULL ? "▲ LONG" : dolDirection == DIR_BEAR ? "▼ SHORT" : "◆ NEUTRAL"
-    dirColor = dolDirection == DIR_BULL ? i_bullColor : dolDirection == DIR_BEAR ? i_bearColor : i_neutralColor
+    dirColor = dolDirection == DIR_BULL ? i_bullColor : dolDirection == DIR_BEAR ? i_bearColor : textInactive
     table.cell(infoTable, 0, 0, dirText, text_color=dirColor, text_size=size.normal, bgcolor=color.new(dirColor, 85), text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 0, 1, 0)
 
@@ -4691,39 +4692,41 @@ if i_showDOLTable and barstate.islast
     table.cell(infoTable, 0, 1, tierLabel + " | " + patternName, text_color=tierColor, text_size=size.small, bgcolor=color.new(tierColor, 90), text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 1, 1, 1)
 
-    // Row 2: MTF Bias (compact)
+    // Row 2: MTF Bias (Multi-Timeframe)
     wA = mtfBiasW == 1 ? "↑" : mtfBiasW == -1 ? "↓" : "—"
     dA = mtfBiasD == 1 ? "↑" : mtfBiasD == -1 ? "↓" : "—"
     hA = mtfBias1H == 1 ? "↑" : mtfBias1H == -1 ? "↓" : "—"
     bullCnt = (mtfBiasW == 1 ? 1 : 0) + (mtfBiasD == 1 ? 1 : 0) + (mtfBias1H == 1 ? 1 : 0)
     bearCnt = (mtfBiasW == -1 ? 1 : 0) + (mtfBiasD == -1 ? 1 : 0) + (mtfBias1H == -1 ? 1 : 0)
-    mtfCol = bullCnt >= 2 ? i_bullColor : bearCnt >= 2 ? i_bearColor : textDim
-    table.cell(infoTable, 0, 2, "MTF", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    mtfCol = bullCnt >= 2 ? i_bullColor : bearCnt >= 2 ? i_bearColor : textInactive
+    table.cell(infoTable, 0, 2, "HTF Bias", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 2, "W" + wA + " D" + dA + " 1H" + hA, text_color=mtfCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 3: Zone
-    zoneText = inPremium ? "PREMIUM" : inDiscount ? "DISCOUNT" : inOTE ? "◉ OTE" : "EQ"
-    zoneColor = inOTE ? #00BCD4 : inDiscount ? i_bullColor : inPremium ? i_bearColor : textDim
-    table.cell(infoTable, 0, 3, "Zone", text_color=textDim, text_size=size.tiny, bgcolor=inOTE ? color.new(#00BCD4, 90) : tableBg)
+    // Row 3: Zone (Premium/Discount/OTE)
+    zoneText = inOTE ? "◉ OTE ZONE" : inDiscount ? "DISCOUNT" : inPremium ? "PREMIUM" : "EQUILIBRIUM"
+    zoneColor = inOTE ? #00BCD4 : inDiscount ? i_bullColor : inPremium ? i_bearColor : textInactive
+    table.cell(infoTable, 0, 3, "Price Zone", text_color=textLabel, text_size=size.tiny, bgcolor=inOTE ? color.new(#00BCD4, 90) : tableBg)
     table.cell(infoTable, 1, 3, zoneText, text_color=zoneColor, text_size=size.small, bgcolor=inOTE ? color.new(#00BCD4, 90) : tableBg)
 
-    // Row 4: Session
-    sessName = inSilverBullet ? "◉ SILVER BULLET" : londonKZ or nyAMKZ or nyPMKZ ? "◉ KILLZONE" : asianSession ? "ASIA" : londonSession ? "LONDON" : nyAMSession ? "NY-AM" : "OFF"
-    table.cell(infoTable, 0, 4, "Session", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 4, sessName, text_color=inSilverBullet ? #00E5FF : textBright, text_size=size.small, bgcolor=tableBg)
+    // Row 4: Session/Timing
+    sessName = inSilverBullet ? "◉ SILVER BULLET" : londonKZ or nyAMKZ or nyPMKZ ? "◉ KILLZONE" : asianSession ? "ASIA" : londonSession ? "LONDON" : nyAMSession ? "NY-AM" : "OFF HOURS"
+    sessCol = inSilverBullet ? #00E5FF : londonKZ or nyAMKZ or nyPMKZ ? #FFD740 : textBright
+    table.cell(infoTable, 0, 4, "Timing", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 4, sessName, text_color=sessCol, text_size=size.small, bgcolor=tableBg)
 
     // Row 5: Turtle Soup Stage
-    tsText = tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? "◎ STALK" : tsStage == "TRAP" ? "◉ TRAP" : tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? "✓ CONFIRM" : "—"
-    tsColor = tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? #00E676 : tsStage == "TRAP" ? #FFD740 : textDim
-    table.cell(infoTable, 0, 5, "Turtle Soup", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    tsText = tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? "◎ STALKING" : tsStage == "TRAP" ? "◉ TRAPPED" : tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? "✓ CONFIRMED" : "INACTIVE"
+    tsColor = tsStage == "CONFIRM_BULL" or tsStage == "CONFIRM_BEAR" ? #00E676 : tsStage == "TRAP" ? #FFD740 : tsStage == "STALK_HIGH" or tsStage == "STALK_LOW" ? #00BCD4 : textInactive
+    table.cell(infoTable, 0, 5, "Turtle Soup", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 5, tsText, text_color=tsColor, text_size=size.small, bgcolor=tableBg)
 
-    // Row 6: AMD Phase
-    amdText = amdPhase == 1 ? "ACCUM" : amdPhase == 2 ? (asianHighSwept ? "JUDAS ▲" : asianLowSwept ? "JUDAS ▼" : "MANIP") : amdPhase == 3 ? "DIST" : "—"
-    table.cell(infoTable, 0, 6, "AMD", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 6, amdText, text_color=manipulationComplete ? dirColor : textDim, text_size=size.small, bgcolor=tableBg)
+    // Row 6: AMD Phase (Power of 3)
+    amdText = amdPhase == 1 ? "ACCUMULATION" : amdPhase == 2 ? (asianHighSwept ? "JUDAS ▲" : asianLowSwept ? "JUDAS ▼" : "MANIPULATION") : amdPhase == 3 ? "DISTRIBUTION" : "WAITING"
+    amdCol = amdPhase == 3 ? dirColor : amdPhase == 2 ? #FF9800 : amdPhase == 1 ? #2196F3 : textInactive
+    table.cell(infoTable, 0, 6, "AMD Phase", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 6, amdText, text_color=amdCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 7: Liquidity Sequence (key targets)
+    // Row 7: Liquidity Target Path
     liqSeq = ""
     if dolDirection == DIR_BULL
         if not pdhSwept and not na(pdh) and pdh > close
@@ -4735,45 +4738,47 @@ if i_showDOLTable and barstate.islast
             liqSeq := "PDL→"
         if not pwlSwept and not na(pwl) and pwl < close
             liqSeq := liqSeq + "PWL"
-    liqSeq := liqSeq == "" ? "—" : liqSeq
-    table.cell(infoTable, 0, 7, "Liq Path", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 7, liqSeq, text_color=dirColor, text_size=size.small, bgcolor=tableBg)
+    liqSeq := liqSeq == "" ? "NO TARGET" : liqSeq
+    table.cell(infoTable, 0, 7, "Liq Target", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 7, liqSeq, text_color=liqSeq == "NO TARGET" ? textInactive : dirColor, text_size=size.small, bgcolor=tableBg)
 
-    // Row 8: Confluence
-    table.cell(infoTable, 0, 8, "Confluence", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 8, str.tostring(confluenceCount) + "/16", text_color=confluenceCount >= 8 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
+    // Row 8: Confluence Score
+    confCol = confluenceCount >= 10 ? #00E676 : confluenceCount >= 6 ? #69F0AE : confluenceCount >= 3 ? textBright : textInactive
+    table.cell(infoTable, 0, 8, "Confluence", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 8, str.tostring(confluenceCount) + "/16", text_color=confCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 9: Target
-    table.cell(infoTable, 0, 9, "Target", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 9, not na(dolTarget) ? str.tostring(dolTarget, format.mintick) : "—", text_color=dirColor, text_size=size.small, bgcolor=tableBg)
+    // Row 9: DOL Target Price
+    table.cell(infoTable, 0, 9, "DOL Target", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 9, not na(dolTarget) ? str.tostring(dolTarget, format.mintick) : "NONE", text_color=not na(dolTarget) ? dirColor : textInactive, text_size=size.small, bgcolor=tableBg)
 
-    // Row 10: R:R
-    table.cell(infoTable, 0, 10, "R:R", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 10, str.tostring(riskReward, "#.#") + ":1", text_color=riskReward >= 2 ? #00E676 : textBright, text_size=size.small, bgcolor=tableBg)
+    // Row 10: Risk/Reward Ratio
+    rrCol = riskReward >= 3 ? #00E676 : riskReward >= 2 ? #69F0AE : riskReward >= 1 ? textBright : textInactive
+    table.cell(infoTable, 0, 10, "Risk:Reward", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 10, str.tostring(riskReward, "#.#") + ":1", text_color=rrCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 11: Key Factors
-    table.cell(infoTable, 0, 11, dolReason, text_color=textDim, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_center)
+    // Row 11: Key Setup Factors
+    table.cell(infoTable, 0, 11, dolReason, text_color=textBright, text_size=size.tiny, bgcolor=tableBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 11, 1, 11)
 
     // Row 12: Day Type
-    dayTypeText = isSeekDestroyDay ? "⚔ SEEK&DESTROY" : isExpansionDay ? "📈 EXPANSION" : isAccumulationDay ? "📦 ACCUMULATION" : "—"
-    dayTypeCol = isSeekDestroyDay ? #FF9800 : isExpansionDay ? #4CAF50 : isAccumulationDay ? #2196F3 : textDim
-    table.cell(infoTable, 0, 12, "Day", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    dayTypeText = isSeekDestroyDay ? "⚔ SEEK & DESTROY" : isExpansionDay ? "📈 EXPANSION" : isAccumulationDay ? "📦 ACCUMULATION" : "STANDARD"
+    dayTypeCol = isSeekDestroyDay ? #FF9800 : isExpansionDay ? #4CAF50 : isAccumulationDay ? #2196F3 : textInactive
+    table.cell(infoTable, 0, 12, "Day Profile", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 12, dayTypeText, text_color=dayTypeCol, text_size=size.small, bgcolor=tableBg)
 
-    // Row 13: PD Arrays Active (using ternary to avoid extra scopes)
+    // Row 13: Active PD Arrays
     pdActive = (hasSuspensionBlock ? "SB " : "") + (hasFVGPresent ? "FVG " : "") + (hasVolumeImbalance ? "VI " : "") + (hasLiquidityVoid ? "LV " : "") + (hasNDOGAlignment ? "NDOG " : "") + (hasFreshOB ? "OB" : "")
-    table.cell(infoTable, 0, 13, "PD Arrays", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(infoTable, 1, 13, pdActive == "" ? "—" : pdActive, text_color=hasSuspensionBlock ? #00E5FF : textBright, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 13, "PD Arrays", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 1, 13, pdActive == "" ? "NONE" : pdActive, text_color=pdActive == "" ? textInactive : (hasSuspensionBlock ? #00E5FF : textBright), text_size=size.tiny, bgcolor=tableBg)
 
-    // Row 14: Time Risk
+    // Row 14: Time Risk Multiplier
     trCol = timeRiskMultiplier >= 1.2 ? #00E676 : timeRiskMultiplier >= 1.0 ? textBright : timeRiskMultiplier >= 0.7 ? #FFD740 : #FF5252
-    table.cell(infoTable, 0, 14, "Time Risk", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(infoTable, 0, 14, "Time Risk", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
     table.cell(infoTable, 1, 14, timeRiskReason + " ×" + str.tostring(timeRiskMultiplier, "#.#"), text_color=trCol, text_size=size.small, bgcolor=tableBg)
 
     // Row 15: Take Trade Signal
-    takeIt = (takeTradeSignalBull or takeTradeSignalBear) ? "🚀 TAKE IT!" : "—"
-    table.cell(infoTable, 0, 15, takeIt, text_color=(takeTradeSignalBull or takeTradeSignalBear) ? #00FF00 : textDim, text_size=size.small, bgcolor=(takeTradeSignalBull or takeTradeSignalBear) ? color.new(#00FF00, 80) : tableBg, text_halign=text.align_center)
+    takeIt = (takeTradeSignalBull or takeTradeSignalBear) ? "🚀 TAKE THE TRADE!" : "WAITING..."
+    table.cell(infoTable, 0, 15, takeIt, text_color=(takeTradeSignalBull or takeTradeSignalBear) ? #00FF00 : textInactive, text_size=size.small, bgcolor=(takeTradeSignalBull or takeTradeSignalBear) ? color.new(#00FF00, 80) : tableBg, text_halign=text.align_center)
     table.merge_cells(infoTable, 0, 15, 1, 15)
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -4796,11 +4801,11 @@ var table statsTable = table.new(position.top_left, 2, 4, bgcolor=color.new(#0D0
 if barstate.islast and totalSetupsGenerated > 0
     table.cell(statsTable, 0, 0, "📊 STATS", text_color=#FFD700, text_size=size.tiny, bgcolor=tableBg)
     table.cell(statsTable, 1, 0, str.tostring(winRate, "#") + "% Win", text_color=winRate >= 50 ? #00E676 : #FF5252, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(statsTable, 0, 1, "Setups", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(statsTable, 0, 1, "Setups", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
     table.cell(statsTable, 1, 1, str.tostring(totalSetupsGenerated), text_color=textBright, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(statsTable, 0, 2, "Avg R:R", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(statsTable, 0, 2, "Avg R:R", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
     table.cell(statsTable, 1, 2, str.tostring(avgRR, "#.#"), text_color=avgRR >= 1.5 ? #00E676 : textBright, text_size=size.tiny, bgcolor=tableBg)
-    table.cell(statsTable, 0, 3, "Total R", text_color=textDim, text_size=size.tiny, bgcolor=tableBg)
+    table.cell(statsTable, 0, 3, "Total R", text_color=textLabel, text_size=size.tiny, bgcolor=tableBg)
     table.cell(statsTable, 1, 3, str.tostring(sessionTotalRR, "#.#"), text_color=sessionTotalRR >= 0 ? #00E676 : #FF5252, text_size=size.tiny, bgcolor=tableBg)
 
 // ═══════════════════════════════════════════════════════════════════════════════
