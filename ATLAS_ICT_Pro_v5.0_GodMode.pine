@@ -767,16 +767,15 @@ f_pdaScore(float pdaTop, float pdaBottom, bool isBull, bool inKZ, bool inSB, flo
 // ─────────────────────────────────────────────────────────────────────────────────
 // SCORE DISPLAY FUNCTIONS
 // ─────────────────────────────────────────────────────────────────────────────────
-// Convert 0-100 score to visual rating with +/- modifiers for granularity
-// S tier: 85-100, A tier: 70-84, B tier: 55-69, C tier: 40-54, D tier: 0-39
+// Convert 0-100 score to letter grade: S(85+), A(70-84), B(55-69), C(40-54), D(0-39)
 f_scoreToRating(int score) =>
-    score >= 95 ? "S+" : score >= 90 ? "S" : score >= 85 ? "S-" : score >= 80 ? "A+" : score >= 75 ? "A" : score >= 70 ? "A-" : score >= 65 ? "B+" : score >= 60 ? "B" : score >= 55 ? "B-" : score >= 50 ? "C+" : score >= 45 ? "C" : score >= 40 ? "C-" : score >= 30 ? "D+" : score >= 20 ? "D" : "D-"
+    score >= 85 ? "S" : score >= 70 ? "A" : score >= 55 ? "B" : score >= 40 ? "C" : "D"
 
-// Convert 0-100 score to color grade (more granular transparency)
+// Convert 0-100 score to color transparency
 f_scoreToColor(int score, color baseColor) =>
-    score >= 95 ? color.new(baseColor, 0) : score >= 85 ? color.new(baseColor, 10) : score >= 75 ? color.new(baseColor, 20) : score >= 65 ? color.new(baseColor, 30) : score >= 55 ? color.new(baseColor, 40) : score >= 45 ? color.new(baseColor, 50) : score >= 35 ? color.new(baseColor, 60) : color.new(baseColor, 70)
+    score >= 80 ? color.new(baseColor, 10) : score >= 60 ? color.new(baseColor, 30) : score >= 40 ? color.new(baseColor, 50) : color.new(baseColor, 70)
 
-// Format score display: "OB 78 [A+]"
+// Format score display: "OB 78 [A]"
 f_formatScore(string name, int score) =>
     rating = f_scoreToRating(score)
     name + " " + str.tostring(score) + " [" + rating + "]"
