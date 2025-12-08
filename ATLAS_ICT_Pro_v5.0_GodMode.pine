@@ -934,15 +934,31 @@ f_lvScoreComprehensive(float lvTop, float lvBottom, bool isBull, bool inKZ, bool
 // ─────────────────────────────────────────────────────────────────────────────────
 // SCORE DISPLAY FUNCTIONS
 // ─────────────────────────────────────────────────────────────────────────────────
-// Convert 0-100 score to visual rating
+// Convert 0-100 score to visual rating with +/- modifiers for granularity
 f_scoreToRating(int score) =>
-    score >= 85 ? "S" : score >= 70 ? "A" : score >= 55 ? "B" : score >= 40 ? "C" : "D"
+    // S tier: 85-100 (Superior)
+    score >= 95 ? "S+" : score >= 90 ? "S" : score >= 85 ? "S-" :
+    // A tier: 70-84 (Excellent)
+    score >= 80 ? "A+" : score >= 75 ? "A" : score >= 70 ? "A-" :
+    // B tier: 55-69 (Good)
+    score >= 65 ? "B+" : score >= 60 ? "B" : score >= 55 ? "B-" :
+    // C tier: 40-54 (Fair)
+    score >= 50 ? "C+" : score >= 45 ? "C" : score >= 40 ? "C-" :
+    // D tier: 0-39 (Weak)
+    score >= 30 ? "D+" : score >= 20 ? "D" : "D-"
 
-// Convert 0-100 score to color grade
+// Convert 0-100 score to color grade (more granular transparency)
 f_scoreToColor(int score, color baseColor) =>
-    score >= 85 ? color.new(baseColor, 0) : score >= 70 ? color.new(baseColor, 20) : score >= 55 ? color.new(baseColor, 40) : score >= 40 ? color.new(baseColor, 55) : color.new(baseColor, 70)
+    score >= 95 ? color.new(baseColor, 0) :
+    score >= 85 ? color.new(baseColor, 10) :
+    score >= 75 ? color.new(baseColor, 20) :
+    score >= 65 ? color.new(baseColor, 30) :
+    score >= 55 ? color.new(baseColor, 40) :
+    score >= 45 ? color.new(baseColor, 50) :
+    score >= 35 ? color.new(baseColor, 60) :
+    color.new(baseColor, 70)
 
-// Format score display: "OB 78 [A]"
+// Format score display: "OB 78 [A+]"
 f_formatScore(string name, int score) =>
     rating = f_scoreToRating(score)
     name + " " + str.tostring(score) + " [" + rating + "]"
