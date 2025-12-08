@@ -761,9 +761,9 @@ f_pdaScore(float pdaTop, float pdaBottom, bool isBull, bool inKZ, bool inSB, flo
 f_scoreToRating(int score) =>
     score >= 95 ? "S+" : score >= 90 ? "S" : score >= 85 ? "S-" : score >= 80 ? "A+" : score >= 75 ? "A" : score >= 70 ? "A-" : score >= 65 ? "B+" : score >= 60 ? "B" : score >= 55 ? "B-" : score >= 50 ? "C+" : score >= 45 ? "C" : score >= 40 ? "C-" : score >= 30 ? "D+" : score >= 20 ? "D" : "D-"
 
-// Convert 0-100 score to color grade (more granular transparency)
+// Convert 0-100 score to bright border color (minimal transparency for contrast)
 f_scoreToColor(int score, color baseColor) =>
-    score >= 95 ? color.new(baseColor, 0) : score >= 85 ? color.new(baseColor, 10) : score >= 75 ? color.new(baseColor, 20) : score >= 65 ? color.new(baseColor, 30) : score >= 55 ? color.new(baseColor, 40) : score >= 45 ? color.new(baseColor, 50) : score >= 35 ? color.new(baseColor, 60) : color.new(baseColor, 70)
+    score >= 80 ? color.new(baseColor, 0) : score >= 60 ? color.new(baseColor, 10) : score >= 40 ? color.new(baseColor, 20) : color.new(baseColor, 30)
 
 // Format score display: "OB 78 [A+]"
 f_formatScore(string name, int score) =>
@@ -2616,7 +2616,7 @@ if bullishRejection
     newRB = RejBlock.new(
          math.max(close, open), low, bar_index, DIR_BULL,
          box.new(bar_index, math.max(close, open), bar_index + 15, low,
-                 border_color=rbBoxClr, bgcolor=color.new(rbBullColor, 55),
+                 border_color=rbBoxClr, bgcolor=color.new(rbBullColor, 25),
                  border_width=2, border_style=line.style_solid,
                  text=rbLabel, text_color=rbBoxClr, text_size=size.tiny, text_halign=text.align_right))
     if array.size(rejBlocks) >= 8
@@ -2635,7 +2635,7 @@ if bearishRejection
     newRB = RejBlock.new(
          high, math.min(close, open), bar_index, DIR_BEAR,
          box.new(bar_index, high, bar_index + 15, math.min(close, open),
-                 border_color=rbBoxClr, bgcolor=color.new(rbBearColor, 55),
+                 border_color=rbBoxClr, bgcolor=color.new(rbBearColor, 25),
                  border_width=2, border_style=line.style_solid,
                  text=rbLabel, text_color=rbBoxClr, text_size=size.tiny, text_halign=text.align_right))
     if array.size(rejBlocks) >= 8
@@ -3759,23 +3759,46 @@ if barstate.islast and not na(longestWickCE)
          style=label.style_none, textcolor=color.new(#00BFA5, 20), size=size.tiny, textalign=text.align_left)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PREMIUM/DISCOUNT ZONES - Filled zones (ICT grid style)
+// PREMIUM/DISCOUNT ZONES - Background Grid with Labels
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Premium Zone (above EQ) - Red/Bear zone
-premiumPlot = plot(i_showPDZones ? premiumZone : na, "Premium Zone", color=color.new(i_bearColor, 50), linewidth=2, style=plot.style_linebr)
-// Discount Zone (below EQ) - Green/Bull zone
-discountPlot = plot(i_showPDZones ? discountZone : na, "Discount Zone", color=color.new(i_bullColor, 50), linewidth=2, style=plot.style_linebr)
-// Equilibrium - center line
-eqPlot = plot(i_showEQ ? equilibrium : na, "Equilibrium", color=color.new(#78909C, 30), linewidth=2, style=plot.style_linebr)
-// Range High/Low for fills
-rangeHighPlot = plot(i_showPDZones ? rangeHigh : na, "Range High", color=na, display=display.none)
-rangeLowPlot = plot(i_showPDZones ? rangeLow : na, "Range Low", color=na, display=display.none)
+// Grid line variables
+var line pdGridHigh = na
+var line pdGridPremium = na
+var line pdGridEQ = na
+var line pdGridDiscount = na
+var line pdGridLow = na
+var label pdLabelHigh = na
+var label pdLabelPremium = na
+var label pdLabelEQ = na
+var label pdLabelDiscount = na
+var label pdLabelLow = na
 
-// Fill Premium Zone (from premium line to range high) - subtle red
-fill(premiumPlot, rangeHighPlot, color=color.new(i_bearColor, 90), title="Premium Zone Fill")
-// Fill Discount Zone (from discount line to range low) - subtle green
-fill(discountPlot, rangeLowPlot, color=color.new(i_bullColor, 90), title="Discount Zone Fill")
+// Grid colors (subtle for background)
+gridHighColor = color.new(i_bearColor, 70)
+gridPremColor = color.new(i_bearColor, 60)
+gridEQColor = color.new(#78909C, 50)
+gridDiscColor = color.new(i_bullColor, 60)
+gridLowColor = color.new(i_bullColor, 70)
+
+if barstate.islast and i_showPDZones
+    // Clean up old lines/labels
+    line.delete(pdGridHigh), line.delete(pdGridPremium), line.delete(pdGridEQ), line.delete(pdGridDiscount), line.delete(pdGridLow)
+    label.delete(pdLabelHigh), label.delete(pdLabelPremium), label.delete(pdLabelEQ), label.delete(pdLabelDiscount), label.delete(pdLabelLow)
+
+    // Create horizontal grid lines
+    pdGridHigh := line.new(bar_index - 300, rangeHigh, bar_index + 50, rangeHigh, color=gridHighColor, style=line.style_dashed, width=1)
+    pdGridPremium := line.new(bar_index - 300, premiumZone, bar_index + 50, premiumZone, color=gridPremColor, style=line.style_dotted, width=1)
+    pdGridEQ := line.new(bar_index - 300, equilibrium, bar_index + 50, equilibrium, color=gridEQColor, style=line.style_solid, width=2)
+    pdGridDiscount := line.new(bar_index - 300, discountZone, bar_index + 50, discountZone, color=gridDiscColor, style=line.style_dotted, width=1)
+    pdGridLow := line.new(bar_index - 300, rangeLow, bar_index + 50, rangeLow, color=gridLowColor, style=line.style_dashed, width=1)
+
+    // Create labels on right side
+    pdLabelHigh := label.new(bar_index + 5, rangeHigh, "HIGH", style=label.style_none, textcolor=gridHighColor, size=size.tiny)
+    pdLabelPremium := label.new(bar_index + 5, premiumZone, "PREM", style=label.style_none, textcolor=gridPremColor, size=size.tiny)
+    pdLabelEQ := label.new(bar_index + 5, equilibrium, "EQ", style=label.style_none, textcolor=gridEQColor, size=size.small)
+    pdLabelDiscount := label.new(bar_index + 5, discountZone, "DISC", style=label.style_none, textcolor=gridDiscColor, size=size.tiny)
+    pdLabelLow := label.new(bar_index + 5, rangeLow, "LOW", style=label.style_none, textcolor=gridLowColor, size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CBDR GRID - BRIGHTER lines extended like PDH/LC (unified palette)
