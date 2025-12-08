@@ -3781,12 +3781,12 @@ var label pdLabelEQ = na
 var label pdLabelDiscount = na
 var label pdLabelLow = na
 
-// Grid colors (subtle for background)
-gridHighColor = color.new(i_bearColor, 70)
-gridPremColor = color.new(i_bearColor, 60)
-gridEQColor = color.new(#78909C, 50)
-gridDiscColor = color.new(i_bullColor, 60)
-gridLowColor = color.new(i_bullColor, 70)
+// Grid colors - brighter for visibility
+gridHighColor = color.new(i_bearColor, 20)
+gridPremColor = color.new(i_bearColor, 30)
+gridEQColor = color.new(#78909C, 20)
+gridDiscColor = color.new(i_bullColor, 30)
+gridLowColor = color.new(i_bullColor, 20)
 
 if barstate.islast and i_showPDZones
     // Clean up old lines/labels
@@ -3801,11 +3801,11 @@ if barstate.islast and i_showPDZones
     pdGridLow := line.new(bar_index - 300, rangeLow, bar_index + 50, rangeLow, color=gridLowColor, style=line.style_dashed, width=1)
 
     // Create labels on right side - spelled out for clarity
-    pdLabelHigh := label.new(bar_index + 5, rangeHigh, "RANGE HIGH", style=label.style_none, textcolor=gridHighColor, size=size.tiny)
-    pdLabelPremium := label.new(bar_index + 5, premiumZone, "PREMIUM", style=label.style_none, textcolor=gridPremColor, size=size.tiny)
-    pdLabelEQ := label.new(bar_index + 5, equilibrium, "EQUILIBRIUM", style=label.style_none, textcolor=gridEQColor, size=size.small)
-    pdLabelDiscount := label.new(bar_index + 5, discountZone, "DISCOUNT", style=label.style_none, textcolor=gridDiscColor, size=size.tiny)
-    pdLabelLow := label.new(bar_index + 5, rangeLow, "RANGE LOW", style=label.style_none, textcolor=gridLowColor, size=size.tiny)
+    pdLabelHigh := label.new(bar_index + 5, rangeHigh, "RANGE HIGH", style=label.style_none, textcolor=gridHighColor, size=size.small)
+    pdLabelPremium := label.new(bar_index + 5, premiumZone, "PREMIUM", style=label.style_none, textcolor=gridPremColor, size=size.small)
+    pdLabelEQ := label.new(bar_index + 5, equilibrium, "EQUILIBRIUM", style=label.style_none, textcolor=gridEQColor, size=size.normal)
+    pdLabelDiscount := label.new(bar_index + 5, discountZone, "DISCOUNT", style=label.style_none, textcolor=gridDiscColor, size=size.small)
+    pdLabelLow := label.new(bar_index + 5, rangeLow, "RANGE LOW", style=label.style_none, textcolor=gridLowColor, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CBDR GRID - BRIGHTER lines extended like PDH/LC (unified palette)
