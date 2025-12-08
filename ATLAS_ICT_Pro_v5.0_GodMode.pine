@@ -708,12 +708,12 @@ COLOR_BEAR_PRIMARY = #FF7043    // Deep orange - Order Blocks
 COLOR_BEAR_ACCENT = #EF5350     // Red - Suspension Blocks, Rejection Blocks
 COLOR_BEAR_SOFT = #FF8A65       // Light orange - secondary elements
 
-// Neutral elements
-COLOR_FVG = #78909C             // Blue-gray for FVGs
-COLOR_IFVG_BULL = #FFEB3B       // Yellow for bullish IFVG
-COLOR_IFVG_BEAR = #FFC107       // Amber for bearish IFVG
-COLOR_VI = #7E57C2              // Purple for Volume Imbalance
-COLOR_VOID = #AB47BC            // Magenta for Liquidity Void
+// Neutral elements - ICT soft palette
+COLOR_FVG = #90A4AE             // Soft blue-gray for FVGs
+COLOR_IFVG_BULL = #81C784       // Soft sage green for bullish IFVG
+COLOR_IFVG_BEAR = #E57373       // Soft coral for bearish IFVG
+COLOR_VI = #9575CD              // Soft lavender for Volume Imbalance
+COLOR_VOID = #BA68C8            // Soft orchid for Liquidity Void
 
 // Level lines - harmonized palette
 COLOR_DAILY = #FF9800           // Orange for PDH/PDL
@@ -2591,10 +2591,9 @@ bullishRejection = i_showRejBlock and totalRange > 0 and lowerWick / totalRange 
 // Bearish Rejection Block: Long upper wick at premium
 bearishRejection = i_showRejBlock and totalRange > 0 and upperWick / totalRange >= wickThreshold and bodySize / totalRange <= bodyThreshold and close < open and inPremium
 
-// ICT-style Rejection Block colors (green/red - per ICT discount/premium)
-rbBullColor = #D4EDDA  // Soft pastel mint for bullish rejection (discount)
-rbBearColor = #FFE0E0  // Soft pastel rose for bearish rejection (premium)
-rbDotsColor = #FFEB3B  // Pac-Man yellow for strength dots
+// ICT-style Rejection Block colors - soft palette matching IFVG
+rbBullColor = #81C784  // Soft sage green for bullish rejection (discount)
+rbBearColor = #E57373  // Soft coral for bearish rejection (premium)
 
 // RB Strength scoring function (0-100 scale)
 f_rbStrength(float wickPct, float bodyPct, bool inKZ, bool inSB, bool isBull, int msBias) =>
@@ -2616,7 +2615,7 @@ if bullishRejection
     newRB = RejBlock.new(
          math.max(close, open), low, bar_index, DIR_BULL,
          box.new(bar_index, math.max(close, open), bar_index + 15, low,
-                 border_color=rbBoxClr, bgcolor=color.new(rbBullColor, 25),
+                 border_color=rbBoxClr, bgcolor=color.new(rbBullColor, 85),
                  border_width=2, border_style=line.style_solid,
                  text=rbLabel, text_color=rbBoxClr, text_size=size.tiny, text_halign=text.align_right))
     if array.size(rejBlocks) >= 8
@@ -2635,7 +2634,7 @@ if bearishRejection
     newRB = RejBlock.new(
          high, math.min(close, open), bar_index, DIR_BEAR,
          box.new(bar_index, high, bar_index + 15, math.min(close, open),
-                 border_color=rbBoxClr, bgcolor=color.new(rbBearColor, 25),
+                 border_color=rbBoxClr, bgcolor=color.new(rbBearColor, 85),
                  border_width=2, border_style=line.style_solid,
                  text=rbLabel, text_color=rbBoxClr, text_size=size.tiny, text_halign=text.align_right))
     if array.size(rejBlocks) >= 8
@@ -3793,12 +3792,12 @@ if barstate.islast and i_showPDZones
     pdGridDiscount := line.new(bar_index - 300, discountZone, bar_index + 50, discountZone, color=gridDiscColor, style=line.style_dotted, width=1)
     pdGridLow := line.new(bar_index - 300, rangeLow, bar_index + 50, rangeLow, color=gridLowColor, style=line.style_dashed, width=1)
 
-    // Create labels on right side
-    pdLabelHigh := label.new(bar_index + 5, rangeHigh, "HIGH", style=label.style_none, textcolor=gridHighColor, size=size.tiny)
-    pdLabelPremium := label.new(bar_index + 5, premiumZone, "PREM", style=label.style_none, textcolor=gridPremColor, size=size.tiny)
-    pdLabelEQ := label.new(bar_index + 5, equilibrium, "EQ", style=label.style_none, textcolor=gridEQColor, size=size.small)
-    pdLabelDiscount := label.new(bar_index + 5, discountZone, "DISC", style=label.style_none, textcolor=gridDiscColor, size=size.tiny)
-    pdLabelLow := label.new(bar_index + 5, rangeLow, "LOW", style=label.style_none, textcolor=gridLowColor, size=size.tiny)
+    // Create labels on right side - spelled out for clarity
+    pdLabelHigh := label.new(bar_index + 5, rangeHigh, "RANGE HIGH", style=label.style_none, textcolor=gridHighColor, size=size.tiny)
+    pdLabelPremium := label.new(bar_index + 5, premiumZone, "PREMIUM", style=label.style_none, textcolor=gridPremColor, size=size.tiny)
+    pdLabelEQ := label.new(bar_index + 5, equilibrium, "EQUILIBRIUM", style=label.style_none, textcolor=gridEQColor, size=size.small)
+    pdLabelDiscount := label.new(bar_index + 5, discountZone, "DISCOUNT", style=label.style_none, textcolor=gridDiscColor, size=size.tiny)
+    pdLabelLow := label.new(bar_index + 5, rangeLow, "RANGE LOW", style=label.style_none, textcolor=gridLowColor, size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CBDR GRID - BRIGHTER lines extended like PDH/LC (unified palette)
