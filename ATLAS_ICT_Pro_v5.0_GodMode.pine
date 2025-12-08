@@ -743,9 +743,7 @@ COLOR_LC = #FF6F00              // Amber for London Close
 // ORDER BLOCK SCORE (0-100)
 // Factors: Size, Displacement, Zone, Timing, Market Structure, HTF
 // ─────────────────────────────────────────────────────────────────────────────────
-f_obScoreComprehensive(float obTop, float obBottom, bool isBull, bool inKZ, bool inSB,
-                        float atr, float rangeH, float rangeL, int msBias, int htfBiasDir,
-                        bool hasDisplacement) =>
+f_obScoreComprehensive(float obTop, float obBottom, bool isBull, bool inKZ, bool inSB, float atr, float rangeH, float rangeL, int msBias, int htfBiasDir, bool hasDisplacement) =>
     score = 0.0
     obSize = obTop - obBottom
     obMid = (obTop + obBottom) / 2
@@ -783,9 +781,7 @@ f_obScoreComprehensive(float obTop, float obBottom, bool isBull, bool inKZ, bool
 // FVG SCORE (0-100)
 // Factors: Gap Size, Displacement, Zone, Timing, Market Structure, HTF
 // ─────────────────────────────────────────────────────────────────────────────────
-f_fvgScoreComprehensive(float fvgTop, float fvgBottom, bool isBull, bool inKZ, bool inSB,
-                         float atr, float rangeH, float rangeL, int msBias, int htfBiasDir,
-                         float dispCandle) =>
+f_fvgScoreComprehensive(float fvgTop, float fvgBottom, bool isBull, bool inKZ, bool inSB, float atr, float rangeH, float rangeL, int msBias, int htfBiasDir, float dispCandle) =>
     score = 0.0
     gapSize = fvgTop - fvgBottom
     fvgMid = (fvgTop + fvgBottom) / 2
@@ -824,8 +820,7 @@ f_fvgScoreComprehensive(float fvgTop, float fvgBottom, bool isBull, bool inKZ, b
 // VOLUME IMBALANCE SCORE (0-100)
 // Factors: Gap Size, Zone, Timing, Market Structure, HTF
 // ─────────────────────────────────────────────────────────────────────────────────
-f_viScoreComprehensive(float viTop, float viBottom, bool isBull, bool inKZ, bool inSB,
-                        float atr, float rangeH, float rangeL, int msBias, int htfBiasDir) =>
+f_viScoreComprehensive(float viTop, float viBottom, bool isBull, bool inKZ, bool inSB, float atr, float rangeH, float rangeL, int msBias, int htfBiasDir) =>
     score = 0.0
     gapSize = viTop - viBottom
     viMid = (viTop + viBottom) / 2
@@ -860,8 +855,7 @@ f_viScoreComprehensive(float viTop, float viBottom, bool isBull, bool inKZ, bool
 // SUSPENSION BLOCK SCORE (0-100)
 // Base high score (VI at both ends = rare, powerful), plus standard factors
 // ─────────────────────────────────────────────────────────────────────────────────
-f_sbScoreComprehensive(float sbTop, float sbBottom, bool isBull, bool inKZ, bool inSB,
-                        float atr, float rangeH, float rangeL, int msBias, int htfBiasDir) =>
+f_sbScoreComprehensive(float sbTop, float sbBottom, bool isBull, bool inKZ, bool inSB, float atr, float rangeH, float rangeL, int msBias, int htfBiasDir) =>
     score = 0.0
     sbMid = (sbTop + sbBottom) / 2
     rangeSize = rangeH - rangeL
@@ -894,9 +888,7 @@ f_sbScoreComprehensive(float sbTop, float sbBottom, bool isBull, bool inKZ, bool
 // LIQUIDITY VOID SCORE (0-100)
 // Factors: Void Size, Displacement, Zone, Timing, MS, HTF
 // ─────────────────────────────────────────────────────────────────────────────────
-f_lvScoreComprehensive(float lvTop, float lvBottom, bool isBull, bool inKZ, bool inSB,
-                        float atr, float rangeH, float rangeL, int msBias, int htfBiasDir,
-                        float candleRange) =>
+f_lvScoreComprehensive(float lvTop, float lvBottom, bool isBull, bool inKZ, bool inSB, float atr, float rangeH, float rangeL, int msBias, int htfBiasDir, float candleRange) =>
     score = 0.0
     voidSize = lvTop - lvBottom
     lvMid = (lvTop + lvBottom) / 2
